@@ -1,26 +1,29 @@
 {
   "name": "unify-frontend",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web"
   },
   "dependencies": {
-    "expo": "~55.0.8",
-    "expo-router": "~6.0.23",
-    "expo-status-bar": "~55.0.4",
-    "nativewind": "^4.2.3",
-    "react": "19.2.0",
-    "react-native": "0.83.2",
+    "expo": "^55.0.14",
+    "expo-linking": "^55.0.12",
+    "expo-router": "^55.0.12",
+    "expo-status-bar": "~1.12.1",
+    "nativewind": "^4.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-native": "^0.85.0",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
-    "tailwindcss": "^3.4.19"
+    "react-native-web": "^0.21.0"
   },
   "devDependencies": {
-    "@types/react": "~19.2.2",
+    "@types/react": "~18.2.45",
+    "babel-preset-expo": "^55.0.17",
     "typescript": "~5.9.2"
   },
   "private": true
