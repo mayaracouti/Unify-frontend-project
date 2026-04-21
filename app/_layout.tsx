@@ -1,3 +1,4 @@
+// @ts-ignore
 import "../global.css";
 import { Stack } from "expo-router";
 
