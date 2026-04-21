@@ -7,6 +7,7 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 
 function UnifyMark() {
   return (
@@ -22,6 +23,7 @@ function UnifyMark() {
 }
 
 export default function Login() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -68,7 +70,7 @@ export default function Login() {
               onChangeText={setEmail}
             />
 
-            <View className="mb-3 flex-row items-center rounded-md bg-[#F3F3F3] px-4">
+            <View className="mb-4 flex-row items-center rounded-md bg-[#F3F3F3] px-4">
               <TextInput
                 className="flex-1 py-4 text-[14px] text-zinc-900"
                 placeholder="Senha"
@@ -83,6 +85,20 @@ export default function Login() {
                 </Text>
               </Pressable>
             </View>
+
+            <Pressable
+              className="mb-4 items-center justify-center rounded-md bg-[#2B1257] py-3.5"
+              onPress={() =>
+                router.push({
+                  pathname: "/auth/email-code",
+                  params: { email },
+                })
+              }
+            >
+              <Text className="text-[15px] font-semibold text-white">
+                Login
+              </Text>
+            </Pressable>
 
             <Text className="text-center text-[11px] text-white/55">
               Não possui uma Conta?{" "}
@@ -102,7 +118,10 @@ export default function Login() {
               <View className="h-px flex-1 bg-white/50" />
             </View>
 
-            <Pressable className="flex-row items-center justify-center rounded-md bg-[#F7F1F1] py-3.5">
+            <Pressable
+              className="flex-row items-center justify-center rounded-md bg-[#F7F1F1] py-3.5"
+              onPress={() => router.push("/auth/gmail")}
+            >
               <Text className="mr-3 text-[20px] font-bold text-[#EA4335]">
                 G
               </Text>
