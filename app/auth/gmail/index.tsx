@@ -11,13 +11,13 @@ import { useRouter } from "expo-router";
 
 function UnifyMark() {
   return (
-    <View className="relative mb-4 h-16 w-16 items-center justify-center">
-      <View className="absolute h-7 w-7 -translate-x-2.5 -translate-y-2 rounded-full bg-violet-900/95" />
-      <View className="absolute h-7 w-7 translate-x-2.5 -translate-y-2 rounded-full bg-sky-400/95" />
-      <View className="absolute h-7 w-7 -translate-x-1 translate-y-2.5 rounded-full bg-fuchsia-500/95" />
-      <View className="absolute h-7 w-7 -translate-x-5 rounded-full bg-indigo-700/95" />
-      <View className="absolute h-7 w-7 translate-x-5 rounded-full bg-cyan-400/95" />
-      <View className="h-3.5 w-3.5 rounded-full bg-white/85" />
+    <View className="relative mb-2 h-10 w-10 items-center justify-center">
+      <View className="absolute h-4 w-4 -translate-x-1.5 -translate-y-1.5 rounded-full bg-violet-900/95" />
+      <View className="absolute h-4 w-4 translate-x-1.5 -translate-y-1.5 rounded-full bg-sky-400/95" />
+      <View className="absolute h-4 w-4 -translate-x-0.5 translate-y-2 rounded-full bg-fuchsia-500/95" />
+      <View className="absolute h-4 w-4 -translate-x-3 rounded-full bg-indigo-700/95" />
+      <View className="absolute h-4 w-4 translate-x-3 rounded-full bg-cyan-400/95" />
+      <View className="h-2 w-2 rounded-full bg-white/85" />
     </View>
   );
 }
@@ -25,11 +25,12 @@ function UnifyMark() {
 export default function GmailLogin() {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const canContinue = email.trim().length > 0;
 
   return (
     <LinearGradient
-      colors={["#4D52B5", "#724BCE", "#906DDE"]}
-      locations={[0, 0.55, 0.96]}
+      colors={["#373B92", "#5F42B7", "#7A5CD4"]}
+      locations={[0, 0.58, 1]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={{ flex: 1 }}
@@ -37,69 +38,63 @@ export default function GmailLogin() {
       <View className="absolute inset-0 bg-black/5" />
 
       <SafeAreaView className="flex-1">
-        <View className="flex-1 px-8">
-          <View className="flex-[0.9] items-center justify-center pt-8">
-            <UnifyMark />
-
-            <Text
-              className="text-center text-[46px] font-extrabold tracking-tight text-white"
-              style={{
-                textShadowColor: "rgba(0,0,0,0.22)",
-                textShadowOffset: { width: 0, height: 4 },
-                textShadowRadius: 6,
-              }}
+        <View className="flex-1 px-8 pt-6">
+          <View className="mb-12 flex-row items-center justify-between">
+            <Pressable
+              className="h-12 w-12 justify-center"
+              onPress={() => router.back()}
             >
-              Unify
-            </Text>
-          </View>
-
-          <View className="flex-[1.25] justify-start">
-            <View className="mb-6 items-center">
-              <View className="mb-5 h-16 w-16 items-center justify-center rounded-full bg-[#F7F1F1]">
-                <Text className="text-[34px] font-bold text-[#EA4335]">G</Text>
-              </View>
-
-              <Text className="mb-2 text-center text-[24px] font-bold text-white">
-                Entrar com Gmail
+              <Text className="text-[42px] leading-[44px] text-white/75">
+                ‹
               </Text>
-              <Text className="text-center text-[13px] leading-5 text-white/70">
-                Use sua conta Gmail para continuar acessando o Unify.
-              </Text>
+            </Pressable>
+
+            <View className="items-center">
+              <UnifyMark />
+              <Text className="text-[18px] font-bold text-white">Unify</Text>
             </View>
 
+            <View className="h-12 w-12" />
+          </View>
+
+          <View className="flex-1 justify-center pb-20">
+            <Text className="mb-3 text-[34px] font-bold leading-[42px] text-white">
+              Entrar com Gmail
+            </Text>
+
+            <Text className="mb-10 text-[15px] leading-6 text-white/70">
+              Informe o Gmail vinculado à sua conta para continuar com
+              segurança.
+            </Text>
+
             <TextInput
-              className="mb-4 rounded-md bg-[#F3F3F3] px-4 py-4 text-[14px] text-zinc-900"
-              placeholder="Digite seu Gmail"
-              placeholderTextColor="#A1A1AA"
+              className="mb-4 rounded-md border border-white/20 bg-white/95 px-4 py-4 text-[15px] text-zinc-900"
+              placeholder="email@gmail.com"
+              placeholderTextColor="#8C8F99"
               autoCapitalize="none"
               keyboardType="email-address"
               value={email}
               onChangeText={setEmail}
             />
 
-            <Pressable className="mb-4 flex-row items-center justify-center rounded-md bg-[#F7F1F1] py-3.5">
-              <Text className="mr-3 text-[20px] font-bold text-[#EA4335]">
-                G
-              </Text>
-              <Text className="text-[15px] font-medium text-[#3B82F6]">
-                continuar com Gmail
-              </Text>
-            </Pressable>
-
-            <Text className="text-center text-[11px] leading-4 text-white/55">
-              Ao continuar, você autoriza o Unify a usar seu Gmail para login.
-            </Text>
-          </View>
-
-          <View className="flex-[0.45] justify-end pb-12">
             <Pressable
-              className="items-center justify-center rounded-md border border-white/45 py-3.5"
-              onPress={() => router.back()}
+              className={`mb-5 items-center justify-center rounded-md py-4 ${
+                canContinue ? "bg-white" : "bg-white/35"
+              }`}
             >
-              <Text className="text-[14px] font-semibold text-white">
-                voltar para login
+              <Text
+                className={`text-[15px] font-bold ${
+                  canContinue ? "text-[#2B1257]" : "text-white/55"
+                }`}
+              >
+                Continuar
               </Text>
             </Pressable>
+
+            <Text className="text-[12px] leading-5 text-white/58">
+              Ao continuar, você confirma que este endereço pertence a você e
+              autoriza o Unify a usá-lo para autenticação.
+            </Text>
           </View>
         </View>
       </SafeAreaView>
