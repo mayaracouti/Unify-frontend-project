@@ -6,6 +6,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 
 function UnifyMark() {
   return (
@@ -26,12 +27,20 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <SafeAreaView className="flex-1 bg-[#6B42D9]">
-      <View className="flex-1 bg-[#6B42D9]">
-        <View className="absolute inset-0 bg-[#7B50E8]" />
-        <View className="absolute inset-0 bg-black/5" />
+    <LinearGradient
+      colors={["#4D52B5", "#724BCE", "#906DDE"]}
+      locations={[0, 0.55, 0.96]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ flex: 1 }}
+    >
+      {/* overlay leve */}
+      <View className="absolute inset-0 bg-black/5" />
 
+      <SafeAreaView className="flex-1">
         <View className="flex-1 px-8">
+          
+          {/* TOPO */}
           <View className="flex-[1.05] items-center justify-center pt-8">
             <UnifyMark />
 
@@ -47,6 +56,7 @@ export default function Login() {
             </Text>
           </View>
 
+          {/* FORM */}
           <View className="flex-[1.05] justify-start">
             <TextInput
               className="mb-4 rounded-md bg-[#F3F3F3] px-4 py-4 text-[14px] text-zinc-900"
@@ -82,6 +92,7 @@ export default function Login() {
             </Text>
           </View>
 
+          {/* RODAPÉ */}
           <View className="flex-[0.85] justify-end pb-12">
             <View className="mb-7 flex-row items-center">
               <View className="h-px flex-1 bg-white/50" />
@@ -100,8 +111,9 @@ export default function Login() {
               </Text>
             </Pressable>
           </View>
+
         </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
