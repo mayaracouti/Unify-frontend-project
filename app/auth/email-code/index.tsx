@@ -86,6 +86,8 @@ export default function EmailCode() {
             className={`items-center justify-center rounded-full py-5 ${
               isComplete ? "bg-white" : "bg-[#3B3D45]"
             }`}
+            disabled={!isComplete}
+            onPress={() => router.push("/auth/change-password")}
           >
             <Text
               className={`text-[22px] font-bold ${
