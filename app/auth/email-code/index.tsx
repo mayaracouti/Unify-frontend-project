@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -54,11 +54,6 @@ export default function EmailCode() {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const digits = useMemo(() => {
-    const values = code.split("").slice(0, 6);
-    return Array.from({ length: 6 }, (_, index) => values[index] ?? "");
-  }, [code]);
 
   const isComplete = code.length === 6;
 
@@ -117,34 +112,19 @@ export default function EmailCode() {
             {`Enviamos um código de 6 dígitos para ${email}`}
           </Text>
 
-          <View className="mb-5 flex-row justify-between">
-            {digits.map((digit, index) => (
-              <View key={index} className="w-[15%]">
-                <Text className="text-center text-[42px] font-semibold text-[#F4F4F5]">
-                  {digit || " "}
-                </Text>
-
-                <View
-                  className={`mt-2 h-0.5 ${
-                    digit ? "bg-[#FF4F88]" : "bg-[#8A8E98]"
-                  }`}
-                />
-              </View>
-            ))}
-          </View>
-
           <TextInput
-            className="absolute h-1 w-1 opacity-0"
+            className="mb-5 rounded-md bg-[#F3F3F3] px-4 py-4 text-center text-[22px] font-semibold tracking-[6px] text-zinc-900"
             keyboardType="number-pad"
+            textContentType="oneTimeCode"
             maxLength={6}
             autoFocus
+            placeholder="000000"
+            placeholderTextColor="#A1A1AA"
             value={code}
             onChangeText={(value) =>
               setCode(value.replace(/\D/g, "").slice(0, 6))
             }
           />
-
-         
 
           <Text className="mb-2 text-[18px] leading-7 text-[#A7AAB2]">
             Não recebeu? Não se preocupe, vamos tentar novamente.
