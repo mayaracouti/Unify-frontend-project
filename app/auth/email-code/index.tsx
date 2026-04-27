@@ -40,15 +40,16 @@ async function verifyCodeWithBackend(challengeId: string, code: string) {
     };
   }
 
-  throw new Error("Código inválido");
+  throw new Error("Código incorreto.");
 }
 
 export default function EmailCode() {
   const router = useRouter();
 
-  const { email, challengeId } = useLocalSearchParams<{
+  const { email, challengeId, next } = useLocalSearchParams<{
     email?: string;
     challengeId?: string;
+    next?: string;
   }>();
 
   const [code, setCode] = useState("");
@@ -56,6 +57,15 @@ export default function EmailCode() {
   const [loading, setLoading] = useState(false);
 
   const isComplete = code.length === 6;
+
+  function handleResendCode() {
+    if (next === "/auth/change-password") {
+      router.replace("/auth/forgot-password");
+      return;
+    }
+
+    router.replace("/auth/login");
+  }
 
   async function handleVerifyCode() {
     if (!challengeId) {
@@ -78,7 +88,11 @@ export default function EmailCode() {
       // AGORA SALVA O TOKEN COM SEGURANÇA
       //await SecureStore.setItemAsync("accessToken", data.accessToken);
 
-      // ENTRA NO APP
+      if (next === "/auth/change-password") {
+        router.replace("/auth/change-password");
+        return;
+      }
+
       router.replace("/home");
     } catch (error) {
       if (error instanceof Error) {
@@ -130,7 +144,7 @@ export default function EmailCode() {
             Não recebeu? Não se preocupe, vamos tentar novamente.
           </Text>
 
-          <Pressable className="mb-10 self-start">
+          <Pressable className="mb-10 self-start" onPress={handleResendCode}>
             <Text className="text-[18px] font-bold text-[#2F90D8]">
               Reenviar
             </Text>

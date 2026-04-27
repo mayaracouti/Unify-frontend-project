@@ -127,7 +127,7 @@ export default function Login() {
 
       <SafeAreaView className="flex-1">
         <View className="flex-1 px-8">
-          <View className="flex-[1.05] items-center justify-center pt-8">
+          <View className="items-center pb-8 pt-12">
             <UnifyMark />
 
             <Text
@@ -142,10 +142,21 @@ export default function Login() {
             </Text>
           </View>
 
-          <View className="flex-[1.05] justify-start">
+          <View className="flex-1 justify-start">
+            <Text className="mb-2 text-[26px] font-extrabold text-white">
+              Bem-vindo de volta
+            </Text>
+
+            <Text className="mb-6 text-[14px] font-semibold leading-5 text-white/70">
+              Faça login para acessar sua comunidade inclusiva.
+            </Text>
+
+            <Text className="mb-2 text-[12px] font-extrabold text-white/80">
+              Endereço de E-mail
+            </Text>
             <TextInput
               className="mb-4 rounded-md bg-[#F3F3F3] px-4 py-4 text-[14px] text-zinc-900"
-              placeholder="Digite seu email"
+              placeholder="nome@example.com"
               placeholderTextColor="#A1A1AA"
               autoCapitalize="none"
               keyboardType="email-address"
@@ -153,10 +164,13 @@ export default function Login() {
               onChangeText={setEmail}
             />
 
+            <Text className="mb-2 text-[12px] font-extrabold text-white/80">
+              Senha
+            </Text>
             <View className="mb-4 flex-row items-center rounded-md bg-[#F3F3F3] px-4">
               <TextInput
                 className="flex-1 py-4 text-[14px] text-zinc-900"
-                placeholder="Senha"
+                placeholder="••••••••"
                 placeholderTextColor="#A1A1AA"
                 secureTextEntry={!showPassword}
                 value={password}
@@ -172,6 +186,15 @@ export default function Login() {
               </Pressable>
             </View>
 
+            <Pressable
+              className="mb-6 self-end"
+              onPress={() => router.push("/auth/forgot-password")}
+            >
+              <Text className="text-[12px] font-extrabold text-[#F2F500]">
+                Esqueceu a senha?
+              </Text>
+            </Pressable>
+
             {error ? (
               <Text className="mb-4 text-center text-[12px] text-red-200">
                 {error}
@@ -179,7 +202,7 @@ export default function Login() {
             ) : null}
 
             <Pressable
-              className="mb-4 items-center justify-center rounded-md bg-[#2B1257] py-3.5"
+              className="mt-1 items-center justify-center rounded-md bg-[#2B1257] py-3.5"
               onPress={handleLogin}
               disabled={loading}
             >
@@ -191,21 +214,10 @@ export default function Login() {
                 </Text>
               )}
             </Pressable>
-
-            <View className="flex-row flex-wrap justify-center">
-              <Text className="text-center text-[11px] text-white/55">
-                Não possui uma Conta?{" "}
-              </Text>
-              <Pressable onPress={() => router.push("/auth/cadastro")}>
-                <Text className="text-[11px] font-semibold text-[#2B1257]">
-                  clique aqui e faça seu cadastro.
-                </Text>
-              </Pressable>
-            </View>
           </View>
 
-          <View className="flex-[0.85] justify-end pb-12">
-            <View className="mb-7 flex-row items-center">
+          <View className="pb-12 pt-8">
+            <View className="mb-8 flex-row items-center">
               <View className="h-px flex-1 bg-white/50" />
               <Text className="mx-5 text-[12px] font-semibold uppercase tracking-[1.5px] text-white/90">
                 ou
@@ -213,15 +225,16 @@ export default function Login() {
               <View className="h-px flex-1 bg-white/50" />
             </View>
 
+            <Text className="mb-4 text-center text-[12px] font-semibold text-white/65">
+              Não tem uma conta?
+            </Text>
+
             <Pressable
-              className="flex-row items-center justify-center rounded-md bg-[#F7F1F1] py-3.5"
-              onPress={() => router.push("/auth/gmail")}
+              className="items-center justify-center rounded-md border border-white/70 py-3.5"
+              onPress={() => router.push("/auth/cadastro")}
             >
-              <Text className="mr-3 text-[20px] font-bold text-[#EA4335]">
-                G
-              </Text>
-              <Text className="text-[15px] font-medium text-[#3B82F6]">
-                continue com o Gmail
+              <Text className="text-[15px] font-extrabold text-white">
+                Inscrever-se
               </Text>
             </Pressable>
           </View>

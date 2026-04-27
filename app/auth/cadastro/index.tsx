@@ -230,11 +230,11 @@ export default function Cadastro() {
           </Pressable>
 
           <Pressable
-            className="items-center"
+            className="items-center justify-center rounded-md border border-white/35 py-3"
             onPress={() => router.replace("/auth/login")}
           >
-            <Text className="text-[13px] font-bold text-[#D9D2F4]">
-              ↩ Voltar para o Login
+            <Text className="text-[14px] font-extrabold text-white">
+              Voltar para o Login
             </Text>
           </Pressable>
         </ScrollView>

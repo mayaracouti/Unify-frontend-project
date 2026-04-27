@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   Pressable,
   SafeAreaView,
+  ScrollView,
   Text,
   TextInput,
   View,
@@ -17,15 +18,23 @@ function PasswordRequirement({
   label: string;
 }) {
   return (
-    <View className="mb-2 flex-row items-center">
+    <View className="mb-3 flex-row items-center">
       <View
-        className={`mr-3 h-2.5 w-2.5 rounded-full ${
-          isValid ? "bg-[#5EE6A8]" : "bg-white/30"
+        className={`mr-3 h-5 w-5 items-center justify-center rounded-full ${
+          isValid ? "bg-[#EFFF00]" : "bg-white/12"
         }`}
-      />
+      >
+        <Text
+          className={`text-[11px] font-black ${
+            isValid ? "text-[#171717]" : "text-white/45"
+          }`}
+        >
+          ✓
+        </Text>
+      </View>
       <Text
         className={`text-[13px] ${
-          isValid ? "font-semibold text-white" : "text-white/62"
+          isValid ? "font-bold text-white" : "font-semibold text-white/60"
         }`}
       >
         {label}
@@ -59,8 +68,8 @@ export default function ChangePassword() {
 
   return (
     <LinearGradient
-      colors={["#211235", "#4F2D83", "#7C4CD6"]}
-      locations={[0, 0.56, 1]}
+      colors={["#080A17", "#171323", "#2A1748"]}
+      locations={[0, 0.58, 1]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={{ flex: 1 }}
@@ -68,27 +77,43 @@ export default function ChangePassword() {
       <View className="absolute inset-0 bg-black/10" />
 
       <SafeAreaView className="flex-1">
-        <View className="flex-1 px-8 pt-8">
-          <Pressable
-            className="mb-12 h-12 w-12 justify-center"
-            onPress={() => router.back()}
-          >
-            <Text className="text-[50px] leading-[52px] text-white/70">‹</Text>
-          </Pressable>
+        <ScrollView
+          className="flex-1"
+          contentContainerClassName="px-6 pb-8 pt-6"
+          keyboardShouldPersistTaps="handled"
+        >
+          <View className="mb-10 flex-row items-center">
+            <Pressable
+              className="mr-4 h-11 w-11 items-center justify-center rounded-full bg-white/8"
+              onPress={() => router.back()}
+            >
+              <Text className="text-[34px] leading-[36px] text-white/75">
+                ‹
+              </Text>
+            </Pressable>
 
-          <View className="flex-1 justify-center pb-16">
-            <Text className="mb-4 text-[42px] font-bold leading-[50px] text-white">
+            <Text className="text-[15px] font-extrabold text-white">
+              Unify
+            </Text>
+          </View>
+
+          <View>
+            <Text className="mb-3 text-[34px] font-extrabold leading-[40px] text-white">
               Alterar senha
             </Text>
 
-            <Text className="mb-9 text-[15px] leading-6 text-white/68">
-              Crie uma nova senha forte para manter sua conta protegida.
+            <Text className="mb-8 text-[15px] font-semibold leading-6 text-white/65">
+              Crie uma senha segura para proteger sua conta e continuar usando
+              o Unify.
             </Text>
 
-            <View className="mb-4 flex-row items-center rounded-md border border-white/15 bg-white/95 px-4">
+            <Text className="mb-2 text-[12px] font-extrabold text-white/80">
+              Nova senha
+            </Text>
+            <View className="mb-5 flex-row items-center rounded-md border border-white/12 bg-[#F4F4F5] px-4">
               <TextInput
                 className="flex-1 py-4 text-[15px] text-zinc-900"
-                placeholder="Nova senha"
+                placeholder="Digite sua nova senha"
                 placeholderTextColor="#8C8F99"
                 secureTextEntry={!showPassword}
                 value={password}
@@ -101,10 +126,13 @@ export default function ChangePassword() {
               </Pressable>
             </View>
 
-            <View className="mb-5 flex-row items-center rounded-md border border-white/15 bg-white/95 px-4">
+            <Text className="mb-2 text-[12px] font-extrabold text-white/80">
+              Confirmar senha
+            </Text>
+            <View className="mb-6 flex-row items-center rounded-md border border-white/12 bg-[#F4F4F5] px-4">
               <TextInput
                 className="flex-1 py-4 text-[15px] text-zinc-900"
-                placeholder="Confirmar senha"
+                placeholder="Digite novamente"
                 placeholderTextColor="#8C8F99"
                 secureTextEntry={!showConfirmPassword}
                 value={confirmPassword}
@@ -119,7 +147,11 @@ export default function ChangePassword() {
               </Pressable>
             </View>
 
-            <View className="mb-8">
+            <View className="mb-8 rounded-md border border-white/10 bg-white/8 p-4">
+              <Text className="mb-4 text-[14px] font-extrabold text-white">
+                Sua senha precisa conter:
+              </Text>
+
               <PasswordRequirement
                 isValid={checks.minLength}
                 label="No mínimo 8 caracteres"
@@ -140,21 +172,30 @@ export default function ChangePassword() {
 
             <Pressable
               className={`items-center justify-center rounded-md py-4 ${
-                canSave ? "bg-white" : "bg-white/30"
+                canSave ? "bg-[#EFFF00]" : "bg-white/18"
               }`}
               disabled={!canSave}
               onPress={() => router.replace("/auth/login")}
             >
               <Text
                 className={`text-[16px] font-bold ${
-                  canSave ? "text-[#2B1257]" : "text-white/55"
+                  canSave ? "text-[#171717]" : "text-white/50"
                 }`}
               >
                 Salvar nova senha
               </Text>
             </Pressable>
+
+            <Pressable
+              className="mt-6 items-center justify-center rounded-md border border-white/35 py-3"
+              onPress={() => router.replace("/auth/login")}
+            >
+              <Text className="text-[14px] font-extrabold text-white">
+                Voltar para o login
+              </Text>
+            </Pressable>
           </View>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </LinearGradient>
   );
