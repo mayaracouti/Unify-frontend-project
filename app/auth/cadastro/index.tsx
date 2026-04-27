@@ -7,6 +7,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 
 /**
@@ -116,9 +117,17 @@ export default function Cadastro() {
   }
 
   return (
-    <View className="flex-1 bg-[#202225]">
+    <LinearGradient
+      colors={["#2B0B4F", "#38156A", "#533F78"]}
+      locations={[0, 0.52, 1]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0.95, y: 1 }}
+      style={{ flex: 1 }}
+    >
+      <View className="absolute inset-0 bg-black/10" />
+
       <SafeAreaView className="flex-1">
-        <View className="border-b border-white/30 bg-[#070B1D] px-5 py-5">
+        <View className="border-b border-white/20 bg-black/25 px-5 py-5">
           <View className="flex-row items-center">
             <Pressable
               className="mr-5 h-12 w-12 items-center justify-center rounded-full bg-white/8"
@@ -133,7 +142,7 @@ export default function Cadastro() {
         </View>
 
         <ScrollView
-          className="flex-1 bg-[#111111]"
+          className="flex-1"
           contentContainerClassName="px-6 pb-8 pt-7"
           keyboardShouldPersistTaps="handled"
         >
@@ -152,7 +161,7 @@ export default function Cadastro() {
           </View>
 
           <TextInput
-            className="mb-4 border-b border-[#7B7D86] bg-[#191919] px-4 py-4 text-[14px] text-white"
+            className="mb-4 border-b border-white/35 bg-black/24 px-4 py-4 text-[14px] text-white"
             placeholder="Nome"
             placeholderTextColor="#8F90A0"
             value={name}
@@ -160,7 +169,7 @@ export default function Cadastro() {
           />
 
           <TextInput
-            className="mb-4 border-b border-[#8BFFF3] bg-[#191919] px-4 py-4 text-[14px] text-white"
+            className="mb-4 border-b border-[#8BFFF3] bg-black/24 px-4 py-4 text-[14px] text-white"
             placeholder="E-mail"
             placeholderTextColor="#8F90A0"
             autoCapitalize="none"
@@ -169,7 +178,7 @@ export default function Cadastro() {
             onChangeText={setEmail}
           />
 
-          <View className="mb-4 flex-row items-center border-b border-[#7B7D86] bg-[#191919] px-4">
+          <View className="mb-4 flex-row items-center border-b border-white/35 bg-black/24 px-4">
             <TextInput
               className="flex-1 py-4 text-[14px] text-white"
               placeholder="Senha"
@@ -185,7 +194,7 @@ export default function Cadastro() {
             </Pressable>
           </View>
 
-          <View className="mb-5 flex-row items-center border-b border-[#7B7D86] bg-[#191919] px-4">
+          <View className="mb-5 flex-row items-center border-b border-white/35 bg-black/24 px-4">
             <TextInput
               className="flex-1 py-4 text-[14px] text-white"
               placeholder="Confirmar Senha"
@@ -203,7 +212,7 @@ export default function Cadastro() {
             </Pressable>
           </View>
 
-          <View className="mb-5 flex-row rounded-md bg-[#252528] px-4 py-3">
+          <View className="mb-5 flex-row rounded-md bg-black/28 px-4 py-3">
             <Text className="mr-3 text-[18px] font-black text-[#10E5FF]">
               i
             </Text>
@@ -241,6 +250,6 @@ export default function Cadastro() {
           </Pressable>
         </ScrollView>
       </SafeAreaView>
-    </View>
+    </LinearGradient>
   );
 }
