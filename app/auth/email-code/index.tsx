@@ -34,11 +34,11 @@ export default function EmailCode() {
           </Pressable>
 
           <Text className="mb-6 text-[48px] font-semibold leading-[58px] text-[#F4F4F5]">
-            Insira seu código
+            Insira o código recebido 
           </Text>
 
           <Text className="mb-10 text-[18px] font-semibold tracking-[1px] text-[#A7AAB2]">
-            {email || "seuemail@gmail.com"}
+            {`Enviamos um código de 6 dígitos para ${email}`}
           </Text>
 
           <View className="mb-5 flex-row justify-between">
@@ -67,10 +67,7 @@ export default function EmailCode() {
             }
           />
 
-          <Text className="mb-1 text-[18px] font-bold leading-7 text-[#FF687D]">
-            Estamos enfrentando alguns problemas, tente novamente. Código do
-            erro: (40120)
-          </Text>
+         
 
           <Text className="mb-2 text-[18px] leading-7 text-[#A7AAB2]">
             Não recebeu? Não se preocupe, vamos tentar novamente.

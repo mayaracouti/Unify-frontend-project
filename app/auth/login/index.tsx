@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Pressable,
   SafeAreaView,
   Text,
@@ -22,11 +23,95 @@ function UnifyMark() {
   );
 }
 
+/**
+ * FUNÇÃO OFICIAL - BACKEND REAL
+ * Use essa quando sua API estiver pronta.
+ */
+/*
+async function loginWithBackend(email: string, password: string) {
+  const response = await fetch("https://sua-api.com/auth/login", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      password,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Email ou senha inválidos.");
+  }
+
+  return data;
+}
+*/
+
+/**
+ * FUNÇÃO MOCK - SIMULA LOGIN COM SUCESSO
+ * Dados para testar:
+ * email: teste@email.com
+ * senha: 123456
+ */
+async function loginWithBackend(email: string, password: string) {
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  if (email === "teste@email.com" && password === "123456") {
+    return {
+      challengeId: "123",
+    };
+  }
+
+  throw new Error("Email ou senha inválidos.");
+}
+
 export default function Login() {
   const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleLogin() {
+    if (!email) {
+      setError("Digite seu email.");
+      return;
+    }
+
+    if (!password) {
+      setError("Digite sua senha.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError("");
+
+      const data = await loginWithBackend(email, password);
+
+      router.push({
+        pathname: "/auth/email-code",
+        params: {
+          email,
+          challengeId: data.challengeId,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError("Erro ao fazer login.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <LinearGradient
@@ -36,13 +121,10 @@ export default function Login() {
       end={{ x: 1, y: 1 }}
       style={{ flex: 1 }}
     >
-      {/* overlay leve */}
       <View className="absolute inset-0 bg-black/5" />
 
       <SafeAreaView className="flex-1">
         <View className="flex-1 px-8">
-          
-          {/* TOPO */}
           <View className="flex-[1.05] items-center justify-center pt-8">
             <UnifyMark />
 
@@ -58,7 +140,6 @@ export default function Login() {
             </Text>
           </View>
 
-          {/* FORM */}
           <View className="flex-[1.05] justify-start">
             <TextInput
               className="mb-4 rounded-md bg-[#F3F3F3] px-4 py-4 text-[14px] text-zinc-900"
@@ -86,18 +167,24 @@ export default function Login() {
               </Pressable>
             </View>
 
+            {error ? (
+              <Text className="mb-4 text-center text-[12px] text-red-200">
+                {error}
+              </Text>
+            ) : null}
+
             <Pressable
               className="mb-4 items-center justify-center rounded-md bg-[#2B1257] py-3.5"
-              onPress={() =>
-                router.push({
-                  pathname: "/auth/email-code",
-                  params: { email },
-                })
-              }
+              onPress={handleLogin}
+              disabled={loading}
             >
-              <Text className="text-[15px] font-semibold text-white">
-                Login
-              </Text>
+              {loading ? (
+                <ActivityIndicator />
+              ) : (
+                <Text className="text-[15px] font-semibold text-white">
+                  Login
+                </Text>
+              )}
             </Pressable>
 
             <Text className="text-center text-[11px] text-white/55">
@@ -108,7 +195,6 @@ export default function Login() {
             </Text>
           </View>
 
-          {/* RODAPÉ */}
           <View className="flex-[0.85] justify-end pb-12">
             <View className="mb-7 flex-row items-center">
               <View className="h-px flex-1 bg-white/50" />
@@ -130,7 +216,6 @@ export default function Login() {
               </Text>
             </Pressable>
           </View>
-
         </View>
       </SafeAreaView>
     </LinearGradient>
