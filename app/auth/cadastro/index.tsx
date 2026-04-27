@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -11,9 +12,29 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import Ionicicons from '@expo/vector-icons/Ionicons';
+import DateTimePicker, {
+  type DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 
 import { useAuth } from "../../../src/context/AuthContext";
 import { formatApiErrorMessage } from "../../../src/utils/auth";
+import { isApiError } from "../../../src/types/auth";
+
+const UNDERAGE_SIGNUP_ERROR_CODE = 3008;
+
+const BIRTHDATE_LOCALE = "pt-BR";
+
+function formatBirthdateForDisplay(date: Date): string {
+  return date.toLocaleDateString(BIRTHDATE_LOCALE);
+}
+
+function formatBirthdateForApi(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
 
 function PasswordRequirement({
   isValid,
@@ -47,6 +68,8 @@ export default function Cadastro() {
   const [name, setName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [birthdate, setBirthdate] = useState<Date | null>(null);
+  const [showBirthdatePicker, setShowBirthdatePicker] = useState(false);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -76,9 +99,33 @@ export default function Cadastro() {
     passwordChecks.hasNumber &&
     passwordChecks.hasSpecialCharacter;
 
+  const birthdateForApi = birthdate ? formatBirthdateForApi(birthdate) : "";
+
+  function handleBirthdateChange(
+    event: DateTimePickerEvent,
+    selectedDate?: Date
+  ) {
+    if (Platform.OS === "android") {
+      setShowBirthdatePicker(false);
+    }
+
+    if (event.type === "dismissed" || !selectedDate) {
+      return;
+    }
+
+    setBirthdate(selectedDate);
+    clearError();
+  }
+
   async function handleCreateAccount() {
-    if (!name.trim() || !lastName.trim() || !email.trim() || !password.trim()) {
-      setError("Preencha nome, sobrenome, email e senha para continuar.");
+    if (
+      !name.trim() ||
+      !lastName.trim() ||
+      !email.trim() ||
+      !birthdate ||
+      !password.trim()
+    ) {
+      setError("Preencha nome, sobrenome, email, data de nascimento e senha para continuar.");
       return;
     }
 
@@ -96,6 +143,7 @@ export default function Cadastro() {
         lastName,
         email,
         password,
+        birthdate: birthdateForApi,
       });
 
       router.replace({
@@ -105,6 +153,15 @@ export default function Cadastro() {
         },
       });
     } catch (error) {
+      if (
+        isApiError(error) &&
+        (error.code === UNDERAGE_SIGNUP_ERROR_CODE ||
+          error.error === "VALIDATION_UNDERAGE_USER")
+      ) {
+        router.replace("/auth/underage");
+        return;
+      }
+
       setError(
         formatApiErrorMessage(error, "Não foi possível criar sua conta agora.")
       );
@@ -124,18 +181,6 @@ export default function Cadastro() {
       <View className="absolute inset-0 bg-black/10" />
 
       <SafeAreaView className="flex-1">
-        <View className="border-b border-white/20 bg-black/25 px-5 py-5">
-          <View className="flex-row items-center">
-            <Pressable
-              className="mr-5 h-12 w-12 items-center justify-center rounded-full bg-white/8"
-              onPress={() => router.back()}
-            >
-              <Ionicicons name="arrow-back-outline" size={24} color="#fff" />
-            </Pressable>
-            <Text className="text-[17px] font-bold text-white">Unify</Text>
-          </View>
-        </View>
-
         <ScrollView
           className="flex-1"
           contentContainerClassName="px-6 pb-8 pt-7"
@@ -191,6 +236,35 @@ export default function Cadastro() {
               clearError();
             }}
           />
+
+          <Pressable
+            className="mb-4 flex-row items-center border-b border-white/35 bg-black/24 px-4 py-4"
+            onPress={() => setShowBirthdatePicker((currentValue) => !currentValue)}
+          >
+            <Text
+              className={`flex-1 text-[14px] ${
+                birthdate ? "text-white" : "text-[#8F90A0]"
+              }`}
+            >
+              {birthdate
+                ? formatBirthdateForDisplay(birthdate)
+                : "Data de nascimento"}
+            </Text>
+            <Ionicicons name="calendar-outline" size={20} color="#B7A8D8" />
+          </Pressable>
+
+          {showBirthdatePicker ? (
+            <View className="mb-4 overflow-hidden rounded-md bg-black/24 px-2 py-2">
+              <DateTimePicker
+                value={birthdate ?? new Date()}
+                mode="date"
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                locale={BIRTHDATE_LOCALE}
+                maximumDate={new Date()}
+                onChange={handleBirthdateChange}
+              />
+            </View>
+          ) : null}
 
           <View className="mb-5 flex-row items-center border-b border-white/35 bg-black/24 px-4">
             <TextInput
