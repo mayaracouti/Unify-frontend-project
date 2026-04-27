@@ -34,7 +34,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 async function verifyCodeWithBackend(challengeId: string, code: string) {
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
-  if (challengeId === "123" && code === "A123456") {
+  if (challengeId === "123" && code === "123456") {
     return {
       accessToken: "token-fake",
     };
