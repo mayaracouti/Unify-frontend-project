@@ -1,56 +1,26 @@
 import { useState } from "react";
 import {
   ActivityIndicator,
-  ActivityIndicator,
   Pressable,
   SafeAreaView,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 
-/**
- * FUNÇÃO OFICIAL - BACKEND REAL
- * Use essa quando sua API estiver pronta.
- */
-/*
-async function loginWithBackend(email: string, password: string) {
-  const response = await fetch("https://colocar-api.com/auth/login", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email,
-      password,
-    }),
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || "Email ou senha inválidos.");
-  }
-
-  return data;
-}
-*/
-
-/**
- * FUNÇÃO MOCK - SIMULAÇÃO DE LOGIN
- * Use essa enquanto você ainda não tem backend.
- */
-async function loginWithBackend(email: string, password: string) {
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  if (email === "teste@email.com" && password === "123456") {
-    return {
-      challengeId: "123",
-    };
-  }
-
-  throw new Error("Email ou senha inválidos.");
+function UnifyMark() {
+  return (
+    <View className="relative mb-2 h-10 w-10 items-center justify-center">
+      <View className="absolute h-4 w-4 -translate-x-1.5 -translate-y-1.5 rounded-full bg-violet-900/95" />
+      <View className="absolute h-4 w-4 translate-x-1.5 -translate-y-1.5 rounded-full bg-sky-400/95" />
+      <View className="absolute h-4 w-4 -translate-x-0.5 translate-y-2 rounded-full bg-fuchsia-500/95" />
+      <View className="absolute h-4 w-4 -translate-x-3 rounded-full bg-indigo-700/95" />
+      <View className="absolute h-4 w-4 translate-x-3 rounded-full bg-cyan-400/95" />
+      <View className="h-2 w-2 rounded-full bg-white/85" />
+    </View>
+  );
 }
 
 /**
@@ -82,51 +52,8 @@ async function loginWithBackend(email: string, password: string) {
 
 /**
  * FUNÇÃO MOCK - SIMULA LOGIN COM SUCESSO
- * Dados para testar:
- * email: teste@email.com
- * senha: 123456
- */
-async function loginWithBackend(email: string, password: string) {
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  if (email === "teste@email.com" && password === "123456") {
-    return {
-      challengeId: "123",
-    };
-  }
-
-  throw new Error("Email ou senha inválidos.");
-}
-
-/**
- * FUNÇÃO OFICIAL - BACKEND REAL
- * Use essa quando sua API estiver pronta.
- */
-/*
-async function loginWithBackend(email: string, password: string) {
-  const response = await fetch("https://sua-api.com/auth/login", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email,
-      password,
-    }),
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || "Email ou senha inválidos.");
-  }
-
-  return data;
-}
-*/
-
-/**
- * FUNÇÃO MOCK - SIMULA LOGIN COM SUCESSO
+ * Mantenha essa ativa enquanto o backend real não estiver pronto.
+ *
  * Dados para testar:
  * email: teste@email.com
  * senha: 123456
@@ -146,48 +73,10 @@ async function loginWithBackend(email: string, password: string) {
 export default function Login() {
   const router = useRouter();
 
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  async function handleLogin() {
-    if (!email) {
-      setError("Digite seu email.");
-      return;
-    }
-
-    if (!password) {
-      setError("Digite sua senha.");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError("");
-
-      const data = await loginWithBackend(email, password);
-
-      router.push({
-        pathname: "/auth/email-code",
-        params: {
-          email,
-          challengeId: data.challengeId,
-        },
-      });
-    } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError("Erro ao fazer login.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -273,9 +162,12 @@ export default function Login() {
                 value={password}
                 onChangeText={setPassword}
               />
-              <Pressable onPress={() => setShowPassword((value) => !value)}>
-                <Text className="text-[12px] text-zinc-400">
-                  {showPassword ? "Ocultar" : "◔"}
+              <Pressable
+                className="ml-3 rounded px-2 py-1"
+                onPress={() => setShowPassword((value) => !value)}
+              >
+                <Text className="text-[12px] font-semibold text-[#2B1257]">
+                  {showPassword ? "Ocultar" : "Mostrar"}
                 </Text>
               </Pressable>
             </View>
@@ -331,6 +223,6 @@ export default function Login() {
           </View>
         </View>
       </SafeAreaView>
-    </View>
+    </LinearGradient>
   );
 }
