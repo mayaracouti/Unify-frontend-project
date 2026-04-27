@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Pressable,
   SafeAreaView,
   Text,
@@ -7,11 +8,52 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+//import * as SecureStore from "expo-secure-store";
+
+/**async function verifyCodeWithBackend(challengeId: string, code: string) {
+  const response = await fetch("https://sua-api.com/auth/verify-code", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      challengeId,
+      code,
+    }),
+  });
+
+  const data = await response.json();
+
+  // AQUI VERIFICA SE O CÓDIGO ESTÁ CORRETO
+  if (!response.ok) {
+    throw new Error(data.message || "Código inválido.");
+  }
+
+  return data;
+}*/
+async function verifyCodeWithBackend(challengeId: string, code: string) {
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  if (challengeId === "123" && code === "123456") {
+    return {
+      accessToken: "token-fake",
+    };
+  }
+
+  throw new Error("Código inválido");
+}
 
 export default function EmailCode() {
   const router = useRouter();
-  const { email } = useLocalSearchParams<{ email?: string }>();
+
+  const { email, challengeId } = useLocalSearchParams<{
+    email?: string;
+    challengeId?: string;
+  }>();
+
   const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const digits = useMemo(() => {
     const values = code.split("").slice(0, 6);
@@ -19,6 +61,40 @@ export default function EmailCode() {
   }, [code]);
 
   const isComplete = code.length === 6;
+
+  async function handleVerifyCode() {
+    if (!challengeId) {
+      setError("Código de autenticação não encontrado.");
+      return;
+    }
+
+    if (code.length !== 6) {
+      setError("Digite o código de 6 números.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError("");
+
+      const data = await verifyCodeWithBackend(challengeId, code);
+
+      // SE CHEGOU AQUI, O BACKEND VALIDOU O CÓDIGO
+      // AGORA SALVA O TOKEN COM SEGURANÇA
+      //await SecureStore.setItemAsync("accessToken", data.accessToken);
+
+      // ENTRA NO APP
+      router.replace("/home");
+    } catch (error) {
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError("Erro ao validar código.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <View className="flex-1 bg-[#111214]">
@@ -47,6 +123,7 @@ export default function EmailCode() {
                 <Text className="text-center text-[42px] font-semibold text-[#F4F4F5]">
                   {digit || " "}
                 </Text>
+
                 <View
                   className={`mt-2 h-0.5 ${
                     digit ? "bg-[#FF4F88]" : "bg-[#8A8E98]"
@@ -81,18 +158,22 @@ export default function EmailCode() {
 
           <Pressable
             className={`items-center justify-center rounded-full py-5 ${
-              isComplete ? "bg-white" : "bg-[#3B3D45]"
+              isComplete && !loading ? "bg-white" : "bg-[#3B3D45]"
             }`}
-            disabled={!isComplete}
-            onPress={() => router.push("/auth/change-password")}
+            disabled={!isComplete || loading}
+            onPress={handleVerifyCode}
           >
-            <Text
-              className={`text-[22px] font-bold ${
-                isComplete ? "text-[#18191B]" : "text-[#737782]"
-              }`}
-            >
-              Seguinte
-            </Text>
+            {loading ? (
+              <ActivityIndicator />
+            ) : (
+              <Text
+                className={`text-[22px] font-bold ${
+                  isComplete ? "text-[#18191B]" : "text-[#737782]"
+                }`}
+              >
+                Seguinte
+              </Text>
+            )}
           </Pressable>
         </View>
       </SafeAreaView>
