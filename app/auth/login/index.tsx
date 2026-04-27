@@ -192,12 +192,16 @@ export default function Login() {
               )}
             </Pressable>
 
-            <Text className="text-center text-[11px] text-white/55">
-              Não possui uma Conta?{" "}
-              <Text className="font-semibold text-[#2B1257]">
-                clique aqui e faça seu cadastro.
+            <View className="flex-row flex-wrap justify-center">
+              <Text className="text-center text-[11px] text-white/55">
+                Não possui uma Conta?{" "}
               </Text>
-            </Text>
+              <Pressable onPress={() => router.push("/auth/cadastro")}>
+                <Text className="text-[11px] font-semibold text-[#2B1257]">
+                  clique aqui e faça seu cadastro.
+                </Text>
+              </Pressable>
+            </View>
           </View>
 
           <View className="flex-[0.85] justify-end pb-12">
