@@ -1,130 +1,73 @@
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
-  SafeAreaView,
   Text,
   TextInput,
+  type TextStyle,
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { WormRiseText, WormRiseWrapText } from "../../../src/components/ui/hello-wave";
+import { UnifyMark } from "../../../src/components/ui/unify-mark";
+import { useAuth } from "../../../src/context/AuthContext";
+import { formatApiErrorMessage } from "../../../src/utils/auth";
 
-function UnifyMark() {
-  return (
-    <View className="relative mb-2 h-10 w-10 items-center justify-center">
-      <View className="absolute h-4 w-4 -translate-x-1.5 -translate-y-1.5 rounded-full bg-violet-900/95" />
-      <View className="absolute h-4 w-4 translate-x-1.5 -translate-y-1.5 rounded-full bg-sky-400/95" />
-      <View className="absolute h-4 w-4 -translate-x-0.5 translate-y-2 rounded-full bg-fuchsia-500/95" />
-      <View className="absolute h-4 w-4 -translate-x-3 rounded-full bg-indigo-700/95" />
-      <View className="absolute h-4 w-4 translate-x-3 rounded-full bg-cyan-400/95" />
-      <View className="h-2 w-2 rounded-full bg-white/85" />
-    </View>
-  );
-}
 
-/**
- * FUNÇÃO OFICIAL - BACKEND REAL
- * Use essa quando sua API estiver pronta.
- */
-/*
-async function loginWithBackend(email: string, password: string) {
-  const response = await fetch("https://sua-api.com/auth/login", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email,
-      password,
-    }),
-  });
+const webTitleShadowStyle = {
+  textShadow: "0px 4px 6px rgba(0,0,0,0.22)",
+} as unknown as TextStyle;
 
-  const data = await response.json();
+const nativeTitleShadowStyle: TextStyle = {
+  textShadowColor: "rgba(0,0,0,0.22)",
+  textShadowOffset: { width: 0, height: 4 },
+  textShadowRadius: 6,
+};
 
-  if (!response.ok) {
-    throw new Error(data.message || "Email ou senha inválidos.");
-  }
-
-  return data;
-}
-*/
-
-/**
- * FUNÇÃO MOCK - SIMULA LOGIN COM SUCESSO
- * Mantenha essa ativa enquanto o backend real não estiver pronto.
- *
- * Dados para testar:
- * email: teste@email.com
- * senha: A123456
- */
-async function loginWithBackend(email: string, password: string) {
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  if (email === "teste@email.com" && password === "A1234567") {
-    return {
-      challengeId: "123",
-    };
-  }
-
-  throw new Error("Email ou senha inválidos.");
-}
 
 export default function Login() {
   const router = useRouter();
 
+  const isFocused = useIsFocused();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-
+  const animationReplayKey = isFocused ? "login-focused" : "login-blurred";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function handleLogin() {
-    if (!email) {
-      setError("Digite seu email.");
+
+  const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      setError("Informe seu email e sua senha para continuar.");
       return;
     }
-
-    if (!password) {
-      setError("Digite sua senha.");
-      return;
-    }
-
-    if (
-      password.length < 8 ||
-      !/\d/.test(password) ||
-      !/[A-Z]/.test(password)
-    ) {
-      setError(
-        "A senha precisa ter 8 caracteres, uma letra maiúscula e um número."
-      );
-      return;
-    }
-
+    setLoading(true);
     try {
-      setLoading(true);
-      setError("");
+      const result = await signIn({ email, password });
 
-      const data = await loginWithBackend(email, password);
-
-      router.push({
-        pathname: "/auth/email-code",
-        params: {
-          email,
-          challengeId: data.challengeId,
-        },
-      });
-    } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError("Erro ao fazer login.");
+      if (result.status === "needs-verification") {
+        router.replace({
+          pathname: "/auth/email-code",
+          params: { email: result.email },
+        });
+        return;
       }
+
+      router.replace("/home");
+    } catch (error) {
+      setError(
+        formatApiErrorMessage(error, "Não foi possível concluir seu login agora.")
+      );
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
     <LinearGradient
@@ -140,28 +83,113 @@ export default function Login() {
         <View className="flex-1 px-8">
           <View className="items-center pb-8 pt-12">
             <UnifyMark />
-
-            <Text
-              className="text-center text-[46px] font-extrabold tracking-tight text-white"
-              style={{
-                textShadowColor: "rgba(0,0,0,0.22)",
-                textShadowOffset: { width: 0, height: 4 },
-                textShadowRadius: 6,
-              }}
-            >
-              Unify
-            </Text>
+          
+            { Platform.OS !== "web" ? (
+              
+              <WormRiseWrapText
+                text="Unify"
+                textClassName="text-[46px] font-extrabold tracking-tight text-white tracking-tight"
+                segmentStyle={nativeTitleShadowStyle}
+                autoPlay={isFocused}
+                delay={340}
+                stagger={20}
+                duration={460}
+                fromX={-14}
+                fromY={24}
+                lift={36}
+                peakScale={1.08}
+                startOpacity={0}
+                replayKey={animationReplayKey}
+              />
+            
+            ) : (
+            <WormRiseText
+                text="Unify"
+                className="text-[46px] font-extrabold tracking-tight text-white"
+                delay={340}
+                stagger={20}
+                duration={460}
+                fromX={-14}
+                fromY={24}
+                lift={36}
+                peakScale={1.08}
+                startOpacity={0}
+                replayKey={animationReplayKey}
+              />
+            )}
+            
           </View>
+          
+          { Platform.OS !== "web" ? (
+            <View>
+              <WormRiseWrapText
+                  text="Bem vindo de volta!"
+                  className="mb-2"
+                  textClassName="text-[26px] font-extrabold tracking-tight text-white"
+                  segmentStyle={nativeTitleShadowStyle}
+                  autoPlay={isFocused}
+                  delay={340}
+                  stagger={60}
+                  duration={1000}
+                  fromX={-14}
+                  fromY={24}
+                  lift={36}
+                  peakScale={1.08}
+                  startOpacity={0}
+                  replayKey={animationReplayKey}
+                />
 
-          <View className="flex-1 justify-start">
-            <Text className="mb-2 text-[26px] font-extrabold text-white">
-              Bem-vindo de volta
-            </Text>
+              <WormRiseWrapText
+                text="Faça login para acessar sua comunidade inclusiva."
+                className="mb-6"
+                textClassName="text-[14px] font-semibold leading-5 text-white/70 text-nowrap"
+                segmentStyle={nativeTitleShadowStyle}
+                autoPlay={isFocused}
+                delay={340}
+                stagger={60}
+                duration={1200}
+                fromX={-14}
+                fromY={24}
+                lift={36}
+                peakScale={1.08}
+                startOpacity={0}
+                replayKey={animationReplayKey}
+              />
+            </View>
+          ) : (
+          <View className="mb-6">
+            <WormRiseText
+              text="Bem vindo de volta!"
+              className="mb-2 text-[26px] font-extrabold text-white"
+              delay={340}
+              stagger={20}
+              duration={460}
+              fromX={-14}
+              fromY={24}
+              lift={36}
+              peakScale={1.08}
+              startOpacity={0}
+              replayKey={animationReplayKey}
+            />
 
-            <Text className="mb-6 text-[14px] font-semibold leading-5 text-white/70">
-              Faça login para acessar sua comunidade inclusiva.
-            </Text>
+            <WormRiseText
+              text="Faça login para acessar sua comunidade inclusiva."
+              className="mb-6 text-[14px] font-semibold leading-5 text-white/70"
+              delay={340}
+              stagger={20}
+              duration={460}
+              fromX={-14}
+              fromY={24}
+              lift={36}
+              peakScale={1.08}
+              startOpacity={0}
+              replayKey={animationReplayKey}
+            />
+          </View>
+           )
+          }
 
+          <View className="flex-1 justify-start mt-10">
             <Text className="mb-2 text-[12px] font-extrabold text-white/80">
               Endereço de E-mail
             </Text>
@@ -205,12 +233,6 @@ export default function Login() {
                 Esqueceu a senha?
               </Text>
             </Pressable>
-
-            {error ? (
-              <Text className="mb-4 text-center text-[12px] text-red-200">
-                {error}
-              </Text>
-            ) : null}
 
             <Pressable
               className="mt-1 items-center justify-center rounded-md bg-[#2B1257] py-3.5"

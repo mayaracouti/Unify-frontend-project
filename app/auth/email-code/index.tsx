@@ -1,108 +1,95 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  SafeAreaView,
   Text,
   TextInput,
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-//import * as SecureStore from "expo-secure-store";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-/**async function verifyCodeWithBackend(challengeId: string, code: string) {
-  const response = await fetch("https://sua-api.com/auth/verify-code", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      challengeId,
-      code,
-    }),
-  });
-
-  const data = await response.json();
-
-  // AQUI VERIFICA SE O CÓDIGO ESTÁ CORRETO
-  if (!response.ok) {
-    throw new Error(data.message || "Código inválido.");
-  }
-
-  return data;
-}*/
-async function verifyCodeWithBackend(challengeId: string, code: string) {
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  if (challengeId === "123" && code === "123456") {
-    return {
-      accessToken: "token-fake",
-    };
-  }
-
-  throw new Error("Código incorreto.");
-}
+import { useAuth } from "../../../src/context/AuthContext";
+import { formatApiErrorMessage, normalizeVerificationCode } from "../../../src/utils/auth";
+import { clearPendingVerificationEmail } from "../../../src/storage/tokenStorage";
+import { showGlobalToast } from "../../../src/utils/globalToast";
+import Ionicicons from '@expo/vector-icons/Ionicons';
 
 export default function EmailCode() {
   const router = useRouter();
-
-  const { email, challengeId, next } = useLocalSearchParams<{
-    email?: string;
-    challengeId?: string;
-    next?: string;
-  }>();
-
+  const inputRef = useRef<TextInput>(null);
+  const { email } = useLocalSearchParams<{ email?: string }>();
+  const { pendingVerificationEmail, resendVerificationCode, verifyEmail } = useAuth();
   const [code, setCode] = useState("");
-  const [error, setError] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [isResending, setIsResending] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const isComplete = code.length === 6;
 
-  function handleResendCode() {
-    if (next === "/auth/change-password") {
-      router.replace("/auth/forgot-password");
+  const resolvedEmail =
+    (typeof email === "string" && email.length > 0 ? email : null) ??
+    pendingVerificationEmail ??
+    "";
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleVerifyEmail = async () => {
+    if (!resolvedEmail) {
+      setErrorMessage("Nenhum email pendente foi encontrado para validação.");
       return;
     }
 
-    router.replace("/auth/login");
-  }
+    setLoading(true);
+    setErrorMessage(null);
+    setInfoMessage(null);
 
-  async function handleVerifyCode() {
-    if (!challengeId) {
-      setError("Código de autenticação não encontrado.");
-      return;
-    }
 
-    if (code.length !== 6) {
-      setError("Digite o código de 6 números.");
-      return;
-    }
 
     try {
-      setLoading(true);
-      setError("");
-
-      const data = await verifyCodeWithBackend(challengeId, code);
-
-      // SE CHEGOU AQUI, O BACKEND VALIDOU O CÓDIGO
-      // AGORA SALVA O TOKEN COM SEGURANÇA
-      //await SecureStore.setItemAsync("accessToken", data.accessToken);
-
-      if (next === "/auth/change-password") {
-        router.replace("/auth/change-password");
-        return;
-      }
-
-      router.replace("/home");
+      await verifyEmail({ email: resolvedEmail, code });
+      router.replace("/auth/login");
+      showGlobalToast({
+            title: "Sucesso",
+            message: "Email verificado com sucesso! Faça login para continuar.",
+            variant: "success",
+          });
     } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError("Erro ao validar código.");
-      }
+      setErrorMessage(
+        formatApiErrorMessage(error, "Não foi possível validar o código informado.")
+      );
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleResendCode = async () => {
+    if (!resolvedEmail) {
+      setErrorMessage("Nenhum email pendente foi encontrado para reenvio.");
+      return;
+    }
+
+    setIsResending(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await resendVerificationCode(resolvedEmail);
+      setInfoMessage(response.message);
+    } catch (error) {
+      setErrorMessage(
+        formatApiErrorMessage(error, "Não foi possível reenviar o código agora.")
+      );
+    } finally {
+      setIsResending(false);
+    }
+  };
+
+  const goBackLoginScreen = async () => {
+    await clearPendingVerificationEmail();
+    router.push("/auth/login");
   }
 
   return (
@@ -111,11 +98,9 @@ export default function EmailCode() {
         <View className="flex-1 px-8 pt-8">
           <Pressable
             className="mb-14 h-14 w-14 items-center justify-center rounded-full bg-white/8"
-            onPress={() => router.back()}
+            onPress={goBackLoginScreen}
           >
-            <Text className="text-[52px] leading-[54px] text-[#A5A8B0]">
-              ‹
-            </Text>
+            <Ionicicons name="arrow-back-outline" size={24} color="#fff" />
           </Pressable>
 
           <Text className="mb-6 text-[48px] font-semibold leading-[58px] text-[#F4F4F5]">
@@ -135,18 +120,27 @@ export default function EmailCode() {
             placeholder="000000"
             placeholderTextColor="#A1A1AA"
             value={code}
-            onChangeText={(value) =>
-              setCode(value.replace(/\D/g, "").slice(0, 6))
-            }
+            onChangeText={(value) => {
+              setCode(normalizeVerificationCode(value));
+
+              if (errorMessage) {
+                setErrorMessage(null);
+              }
+
+              if (infoMessage) {
+                setInfoMessage(null);
+              }
+            }}
           />
 
           <Text className="mb-2 text-[18px] leading-7 text-[#A7AAB2]">
-            Não recebeu? Não se preocupe, vamos tentar novamente.
+            Digite o código de 6 caracteres enviado para seu email. Enquanto a
+            conta não for confirmada, o app mantém você nesta etapa.
           </Text>
 
-          <Pressable className="mb-10 self-start" onPress={handleResendCode}>
+          <Pressable className="mb-10 self-start" onPress={handleResendCode} disabled={isResending}>
             <Text className="text-[18px] font-bold text-[#2F90D8]">
-              Reenviar
+              {isResending ? "Reenviando..." : "Reenviar código"}
             </Text>
           </Pressable>
 
@@ -155,7 +149,7 @@ export default function EmailCode() {
               isComplete && !loading ? "bg-white" : "bg-[#3B3D45]"
             }`}
             disabled={!isComplete || loading}
-            onPress={handleVerifyCode}
+            onPress={handleVerifyEmail}
           >
             {loading ? (
               <ActivityIndicator />

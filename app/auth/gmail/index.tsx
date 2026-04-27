@@ -1,13 +1,13 @@
 import { useState } from "react";
 import {
   Pressable,
-  SafeAreaView,
   Text,
   TextInput,
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 function UnifyMark() {
   return (

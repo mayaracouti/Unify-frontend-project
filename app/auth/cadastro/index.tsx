@@ -1,116 +1,113 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Pressable,
-  SafeAreaView,
   ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import Ionicicons from '@expo/vector-icons/Ionicons';
 
-/**
- * FUNÇÃO OFICIAL - BACKEND REAL
- * Use essa quando sua API estiver pronta.
- */
-/*
-async function createAccountWithBackend(data: {
-  name: string;
-  email: string;
-  password: string;
+import { useAuth } from "../../../src/context/AuthContext";
+import { formatApiErrorMessage } from "../../../src/utils/auth";
+
+function PasswordRequirement({
+  isValid,
+  label,
+}: {
+  isValid: boolean;
+  label: string;
 }) {
-  const response = await fetch("https://sua-api.com/auth/register", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  const responseData = await response.json();
-
-  if (!response.ok) {
-    throw new Error(responseData.message || "Erro ao criar conta.");
-  }
-
-  return responseData;
-}
-*/
-
-/**
- * FUNÇÃO MOCK - SIMULA CADASTRO COM SUCESSO
- * Mantenha essa ativa enquanto o backend real não estiver pronto.
- */
-async function createAccountWithBackend(_data: {
-  name: string;
-  email: string;
-  password: string;
-}) {
-  await new Promise((resolve) => setTimeout(resolve, 700));
-
-  return {
-    userId: "user-fake-123",
-  };
+  return (
+    <View className="mb-2 flex-row items-center">
+      <View
+        className={`mr-3 h-2.5 w-2.5 rounded-full ${
+          isValid ? "bg-[#8BFFF3]" : "bg-white/20"
+        }`}
+      />
+      <Text
+        className={`text-[12px] font-semibold leading-4 ${
+          isValid ? "text-[#8BFFF3]" : "text-[#D7D7DE]"
+        }`}
+      >
+        {label}
+      </Text>
+    </View>
+  );
 }
 
 export default function Cadastro() {
   const router = useRouter();
+  const { signUp } = useAuth();
 
   const [name, setName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const clearError = () => {
+    if (error) {
+      setError(null);
+    }
+  };
+
+  const passwordChecks = useMemo(
+    () => ({
+      minLength: password.length >= 8,
+      hasUppercase: /[A-Z]/.test(password),
+      hasLowercase: /[a-z]/.test(password),
+      hasNumber: /\d/.test(password),
+      hasSpecialCharacter: /[^A-Za-z0-9]/.test(password),
+    }),
+    [password]
+  );
+
+  const isPasswordValid =
+    passwordChecks.minLength &&
+    passwordChecks.hasUppercase &&
+    passwordChecks.hasLowercase &&
+    passwordChecks.hasNumber &&
+    passwordChecks.hasSpecialCharacter;
 
   async function handleCreateAccount() {
-    if (!name.trim()) {
-      setError("Digite seu nome.");
+    if (!name.trim() || !lastName.trim() || !email.trim() || !password.trim()) {
+      setError("Preencha nome, sobrenome, email e senha para continuar.");
       return;
     }
 
-    if (!email.trim()) {
-      setError("Digite seu e-mail.");
-      return;
-    }
-
-    if (password.length < 8) {
-      setError("A senha deve ter pelo menos 8 caracteres.");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError("As senhas não conferem.");
+    if (!isPasswordValid) {
+      setError("A senha precisa atender a todos os requisitos exibidos abaixo.");
       return;
     }
 
     try {
       setLoading(true);
-      setError("");
+      setError(null);
 
-      const data = await createAccountWithBackend({
+      const response = await signUp({
         name,
+        lastName,
         email,
         password,
       });
 
-      router.push({
-        pathname: "/auth/cadastro/accessibility",
+      router.replace({
+        pathname: "/auth/email-code",
         params: {
-          userId: data.userId,
-          name,
-          email,
+          email: response.email,
         },
       });
     } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError("Erro ao criar conta.");
-      }
+      setError(
+        formatApiErrorMessage(error, "Não foi possível criar sua conta agora.")
+      );
     } finally {
       setLoading(false);
     }
@@ -133,9 +130,7 @@ export default function Cadastro() {
               className="mr-5 h-12 w-12 items-center justify-center rounded-full bg-white/8"
               onPress={() => router.back()}
             >
-              <Text className="text-[40px] font-bold leading-[42px] text-white">
-                ‹
-              </Text>
+              <Ionicicons name="arrow-back-outline" size={24} color="#fff" />
             </Pressable>
             <Text className="text-[17px] font-bold text-white">Unify</Text>
           </View>
@@ -148,7 +143,7 @@ export default function Cadastro() {
         >
           <View className="mb-5 items-center">
             <View className="mb-5 h-16 w-16 items-center justify-center rounded-md bg-[#814DFF]">
-              <Text className="text-[26px] font-black text-white">♣</Text>
+              <Ionicicons name="person-add-outline" size={28} color="#fff" />
             </View>
 
             <Text className="mb-3 text-center text-[25px] font-extrabold text-white">
@@ -160,13 +155,29 @@ export default function Cadastro() {
             </Text>
           </View>
 
-          <TextInput
-            className="mb-4 border-b border-white/35 bg-black/24 px-4 py-4 text-[14px] text-white"
-            placeholder="Nome"
-            placeholderTextColor="#8F90A0"
-            value={name}
-            onChangeText={setName}
-          />
+          <View className="mb-4 flex-row">
+            <TextInput
+              className="mr-3 flex-1 border-b border-white/35 bg-black/24 px-4 py-4 text-[14px] text-white"
+              placeholder="Nome"
+              placeholderTextColor="#8F90A0"
+              value={name}
+              onChangeText={(value) => {
+                setName(value);
+                clearError();
+              }}
+            />
+
+            <TextInput
+              className="flex-1 border-b border-white/35 bg-black/24 px-4 py-4 text-[14px] text-white"
+              placeholder="Sobrenome"
+              placeholderTextColor="#8F90A0"
+              value={lastName}
+              onChangeText={(value) => {
+                setLastName(value);
+                clearError();
+              }}
+            />
+          </View>
 
           <TextInput
             className="mb-4 border-b border-[#8BFFF3] bg-black/24 px-4 py-4 text-[14px] text-white"
@@ -175,17 +186,23 @@ export default function Cadastro() {
             autoCapitalize="none"
             keyboardType="email-address"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(value) => {
+              setEmail(value);
+              clearError();
+            }}
           />
 
-          <View className="mb-4 flex-row items-center border-b border-white/35 bg-black/24 px-4">
+          <View className="mb-5 flex-row items-center border-b border-white/35 bg-black/24 px-4">
             <TextInput
               className="flex-1 py-4 text-[14px] text-white"
               placeholder="Senha"
               placeholderTextColor="#8F90A0"
               secureTextEntry={!showPassword}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(value) => {
+                setPassword(value);
+                clearError();
+              }}
             />
             <Pressable onPress={() => setShowPassword((value) => !value)}>
               <Text className="text-[12px] font-bold text-[#B7A8D8]">
@@ -194,32 +211,31 @@ export default function Cadastro() {
             </Pressable>
           </View>
 
-          <View className="mb-5 flex-row items-center border-b border-white/35 bg-black/24 px-4">
-            <TextInput
-              className="flex-1 py-4 text-[14px] text-white"
-              placeholder="Confirmar Senha"
-              placeholderTextColor="#8F90A0"
-              secureTextEntry={!showConfirmPassword}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-            />
-            <Pressable
-              onPress={() => setShowConfirmPassword((value) => !value)}
-            >
-              <Text className="text-[12px] font-bold text-[#B7A8D8]">
-                {showConfirmPassword ? "Ocultar" : "Ver"}
-              </Text>
-            </Pressable>
-          </View>
+          <View className="mb-5 rounded-md bg-black/28 px-4 py-3">
+            <Text className="mb-3 text-[12px] font-bold leading-4 text-[#D7D7DE]">
+              A senha precisa atender os seguintes requisitos:
+            </Text>
 
-          <View className="mb-5 flex-row rounded-md bg-black/28 px-4 py-3">
-            <Text className="mr-3 text-[18px] font-black text-[#10E5FF]">
-              i
-            </Text>
-            <Text className="flex-1 text-[12px] font-bold leading-4 text-[#D7D7DE]">
-              As senhas devem ter pelo menos 8 caracteres para garantir alta
-              segurança para o seu perfil.
-            </Text>
+            <PasswordRequirement
+              isValid={passwordChecks.minLength}
+              label="Conter no mínimo 8 caracteres"
+            />
+            <PasswordRequirement
+              isValid={passwordChecks.hasUppercase}
+              label="Conter pelo menos uma letra maiúscula"
+            />
+            <PasswordRequirement
+              isValid={passwordChecks.hasLowercase}
+              label="Conter pelo menos uma letra minúscula"
+            />
+            <PasswordRequirement
+              isValid={passwordChecks.hasNumber}
+              label="Conter pelo menos um número"
+            />
+            <PasswordRequirement
+              isValid={passwordChecks.hasSpecialCharacter}
+              label="Conter pelo menos um caractere especial"
+            />
           </View>
 
           {error ? (
@@ -235,9 +251,13 @@ export default function Cadastro() {
             disabled={loading}
             onPress={handleCreateAccount}
           >
-            <Text className="text-[15px] font-extrabold text-[#191919]">
-              {loading ? "Cadastrando..." : "Cadastrar  →"}
-            </Text>
+            {loading ? (
+              <ActivityIndicator color="#191919" />
+            ) : (
+              <Text className="text-[15px] font-extrabold text-[#191919]">
+                Cadastrar  →
+              </Text>
+            )}
           </Pressable>
 
           <Pressable

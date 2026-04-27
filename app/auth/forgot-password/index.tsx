@@ -2,53 +2,15 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  SafeAreaView,
   Text,
   TextInput,
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-
-/**
- * FUNÇÃO OFICIAL - BACKEND REAL
- * Use essa quando sua API estiver pronta.
- */
-/*
-async function requestPasswordResetWithBackend(email: string) {
-  const response = await fetch("https://sua-api.com/auth/forgot-password", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ email }),
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || "Erro ao enviar código.");
-  }
-
-  return data;
-}
-*/
-
-/**
- * FUNÇÃO MOCK - SIMULA ENVIO DO CÓDIGO POR E-MAIL
- * Código para testar na próxima tela: 123456
- */
-async function requestPasswordResetWithBackend(email: string) {
-  await new Promise((resolve) => setTimeout(resolve, 800));
-
-  if (!email.includes("@")) {
-    throw new Error("Digite um e-mail válido.");
-  }
-
-  return {
-    challengeId: "123",
-  };
-}
+import { SafeAreaView } from "react-native-safe-area-context";
+import { authService } from "../../../src/services/authService";
+import { formatApiErrorMessage } from "../../../src/utils/auth";
 
 export default function ForgotPassword() {
   const router = useRouter();
@@ -56,33 +18,30 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
-  async function handleSendCode() {
+  async function handleSendResetLink() {
     if (!email.trim()) {
       setError("Digite seu e-mail.");
+      setSuccessMessage("");
       return;
     }
 
     try {
       setLoading(true);
       setError("");
+      setSuccessMessage("");
 
-      const data = await requestPasswordResetWithBackend(email);
+      const response = await authService.forgotPassword({ email });
 
-      router.push({
-        pathname: "/auth/email-code",
-        params: {
-          email,
-          challengeId: data.challengeId,
-          next: "/auth/change-password",
-        },
-      });
+      setSuccessMessage(response.message);
     } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError("Erro ao enviar código.");
-      }
+      setError(
+        formatApiErrorMessage(
+          error,
+          "Não foi possível enviar o link de redefinição agora."
+        )
+      );
     } finally {
       setLoading(false);
     }
@@ -99,28 +58,13 @@ export default function ForgotPassword() {
       <View className="absolute inset-0 bg-black/10" />
 
       <SafeAreaView className="flex-1">
-        <View className="flex-1 px-6 pt-6">
-          <View className="mb-10 flex-row items-center">
-            <Pressable
-              className="mr-4 h-14 w-14 items-center justify-center rounded-full bg-white/10"
-              onPress={() => router.back()}
-            >
-              <Text className="text-[46px] leading-[48px] text-white/85">
-                ‹
-              </Text>
-            </Pressable>
-
-            <Text className="text-[17px] font-extrabold text-white">
-              Unify
-            </Text>
-          </View>
-
+        <View className="flex-1 px-6 pt-6 mt-10">
           <Text className="mb-3 text-[34px] font-extrabold leading-[40px] text-white">
             Recuperar senha
           </Text>
 
           <Text className="mb-8 text-[15px] font-semibold leading-6 text-white/65">
-            Digite o e-mail cadastrado para receber o código de validação.
+            Digite o e-mail cadastrado para receber um link de redefinição.
           </Text>
 
           <Text className="mb-2 text-[12px] font-extrabold text-white/80">
@@ -134,8 +78,29 @@ export default function ForgotPassword() {
             autoCapitalize="none"
             keyboardType="email-address"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(value) => {
+              setEmail(value);
+
+              if (error) {
+                setError("");
+              }
+
+              if (successMessage) {
+                setSuccessMessage("");
+              }
+            }}
           />
+
+          {successMessage ? (
+            <View className="mb-4 rounded-md border border-emerald-300/35 bg-emerald-400/10 px-4 py-3">
+              <Text className="text-center text-[12px] font-semibold text-emerald-100">
+                {successMessage}
+              </Text>
+              <Text className="mt-2 text-center text-[12px] font-medium text-white/80">
+                Abra o e-mail e toque no link para redefinir sua senha no app.
+              </Text>
+            </View>
+          ) : null}
 
           {error ? (
             <Text className="mb-4 text-center text-[12px] font-semibold text-red-300">
@@ -148,13 +113,13 @@ export default function ForgotPassword() {
               loading ? "bg-[#BFC200]" : "bg-[#EFFF00]"
             }`}
             disabled={loading}
-            onPress={handleSendCode}
+            onPress={handleSendResetLink}
           >
             {loading ? (
               <ActivityIndicator />
             ) : (
               <Text className="text-[16px] font-bold text-[#171717]">
-                Enviar código
+                {successMessage ? "Enviar novamente" : "Enviar link"}
               </Text>
             )}
           </Pressable>
