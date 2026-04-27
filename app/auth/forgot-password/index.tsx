@@ -102,15 +102,15 @@ export default function ForgotPassword() {
         <View className="flex-1 px-6 pt-6">
           <View className="mb-10 flex-row items-center">
             <Pressable
-              className="mr-4 h-11 w-11 items-center justify-center rounded-full bg-white/8"
+              className="mr-4 h-14 w-14 items-center justify-center rounded-full bg-white/10"
               onPress={() => router.back()}
             >
-              <Text className="text-[34px] leading-[36px] text-white/75">
+              <Text className="text-[46px] leading-[48px] text-white/85">
                 ‹
               </Text>
             </Pressable>
 
-            <Text className="text-[15px] font-extrabold text-white">
+            <Text className="text-[17px] font-extrabold text-white">
               Unify
             </Text>
           </View>

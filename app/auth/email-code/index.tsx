@@ -34,7 +34,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 async function verifyCodeWithBackend(challengeId: string, code: string) {
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
-  if (challengeId === "123" && code === "123456") {
+  if (challengeId === "123" && code === "A123456") {
     return {
       accessToken: "token-fake",
     };
@@ -110,10 +110,10 @@ export default function EmailCode() {
       <SafeAreaView className="flex-1">
         <View className="flex-1 px-8 pt-8">
           <Pressable
-            className="mb-14 h-12 w-12 justify-center"
+            className="mb-14 h-14 w-14 items-center justify-center rounded-full bg-white/8"
             onPress={() => router.back()}
           >
-            <Text className="text-[50px] leading-[52px] text-[#777B86]">
+            <Text className="text-[52px] leading-[54px] text-[#A5A8B0]">
               ‹
             </Text>
           </Pressable>

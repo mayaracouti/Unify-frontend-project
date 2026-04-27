@@ -41,10 +41,10 @@ export default function GmailLogin() {
         <View className="flex-1 px-8 pt-6">
           <View className="mb-12 flex-row items-center justify-between">
             <Pressable
-              className="h-12 w-12 justify-center"
+              className="h-14 w-14 items-center justify-center rounded-full bg-white/10"
               onPress={() => router.back()}
             >
-              <Text className="text-[42px] leading-[44px] text-white/75">
+              <Text className="text-[48px] leading-[50px] text-white/85">
                 ‹
               </Text>
             </Pressable>
@@ -54,7 +54,7 @@ export default function GmailLogin() {
               <Text className="text-[18px] font-bold text-white">Unify</Text>
             </View>
 
-            <View className="h-12 w-12" />
+            <View className="h-14 w-14" />
           </View>
 
           <View className="flex-1 justify-center pb-20">

@@ -118,15 +118,17 @@ export default function Cadastro() {
   return (
     <View className="flex-1 bg-[#202225]">
       <SafeAreaView className="flex-1">
-        <View className="border-b border-white/30 bg-[#070B1D] px-5 py-4">
+        <View className="border-b border-white/30 bg-[#070B1D] px-5 py-5">
           <View className="flex-row items-center">
             <Pressable
-              className="mr-5 h-8 w-8 items-center justify-center"
+              className="mr-5 h-12 w-12 items-center justify-center rounded-full bg-white/8"
               onPress={() => router.back()}
             >
-              <Text className="text-[24px] font-bold text-white">‹</Text>
+              <Text className="text-[40px] font-bold leading-[42px] text-white">
+                ‹
+              </Text>
             </Pressable>
-            <Text className="text-[15px] font-bold text-white">Unify</Text>
+            <Text className="text-[17px] font-bold text-white">Unify</Text>
           </View>
         </View>
 

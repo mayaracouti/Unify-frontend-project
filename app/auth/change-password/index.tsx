@@ -49,6 +49,7 @@ export default function ChangePassword() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [error, setError] = useState("");
 
   const checks = useMemo(
     () => ({
@@ -65,6 +66,28 @@ export default function ChangePassword() {
     checks.hasNumber &&
     checks.hasUppercase &&
     checks.matches;
+
+  function handleSavePassword() {
+    if (!password || !confirmPassword) {
+      setError("Digite e confirme sua nova senha.");
+      return;
+    }
+
+    if (!checks.minLength || !checks.hasUppercase || !checks.hasNumber) {
+      setError(
+        "A senha precisa ter 8 caracteres, uma letra maiúscula e um número."
+      );
+      return;
+    }
+
+    if (!checks.matches) {
+      setError("As senhas precisam ser iguais.");
+      return;
+    }
+
+    setError("");
+    router.replace("/auth/login");
+  }
 
   return (
     <LinearGradient
@@ -84,15 +107,15 @@ export default function ChangePassword() {
         >
           <View className="mb-10 flex-row items-center">
             <Pressable
-              className="mr-4 h-11 w-11 items-center justify-center rounded-full bg-white/8"
+              className="mr-4 h-14 w-14 items-center justify-center rounded-full bg-white/10"
               onPress={() => router.back()}
             >
-              <Text className="text-[34px] leading-[36px] text-white/75">
+              <Text className="text-[46px] leading-[48px] text-white/85">
                 ‹
               </Text>
             </Pressable>
 
-            <Text className="text-[15px] font-extrabold text-white">
+            <Text className="text-[17px] font-extrabold text-white">
               Unify
             </Text>
           </View>
@@ -117,7 +140,10 @@ export default function ChangePassword() {
                 placeholderTextColor="#8C8F99"
                 secureTextEntry={!showPassword}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(value) => {
+                  setPassword(value);
+                  setError("");
+                }}
               />
               <Pressable onPress={() => setShowPassword((value) => !value)}>
                 <Text className="text-[12px] font-semibold text-[#4F2D83]">
@@ -136,7 +162,10 @@ export default function ChangePassword() {
                 placeholderTextColor="#8C8F99"
                 secureTextEntry={!showConfirmPassword}
                 value={confirmPassword}
-                onChangeText={setConfirmPassword}
+                onChangeText={(value) => {
+                  setConfirmPassword(value);
+                  setError("");
+                }}
               />
               <Pressable
                 onPress={() => setShowConfirmPassword((value) => !value)}
@@ -170,12 +199,17 @@ export default function ChangePassword() {
               />
             </View>
 
+            {error ? (
+              <Text className="mb-4 text-center text-[12px] font-semibold text-red-300">
+                {error}
+              </Text>
+            ) : null}
+
             <Pressable
               className={`items-center justify-center rounded-md py-4 ${
                 canSave ? "bg-[#EFFF00]" : "bg-white/18"
               }`}
-              disabled={!canSave}
-              onPress={() => router.replace("/auth/login")}
+              onPress={handleSavePassword}
             >
               <Text
                 className={`text-[16px] font-bold ${

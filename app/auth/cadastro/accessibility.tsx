@@ -40,7 +40,7 @@ const fontSizes: Array<{
 /*
 async function saveAccessibilityPreferencesWithBackend(data: {
   userId?: string;
-  supportFocus: SupportFocus;
+  supportFocuses: SupportFocus[];
   fontSize: FontSize;
   highContrast: boolean;
   screenReader: boolean;
@@ -69,7 +69,7 @@ async function saveAccessibilityPreferencesWithBackend(data: {
  */
 async function saveAccessibilityPreferencesWithBackend(_data: {
   userId?: string;
-  supportFocus: SupportFocus;
+  supportFocuses: SupportFocus[];
   fontSize: FontSize;
   highContrast: boolean;
   screenReader: boolean;
@@ -85,12 +85,26 @@ export default function CadastroAccessibility() {
   const router = useRouter();
   const { userId } = useLocalSearchParams<{ userId?: string }>();
 
-  const [supportFocus, setSupportFocus] = useState<SupportFocus>("Visual");
+  const [supportFocuses, setSupportFocuses] = useState<SupportFocus[]>([
+    "Visual",
+  ]);
   const [fontSize, setFontSize] = useState<FontSize>("Média");
   const [highContrast, setHighContrast] = useState(true);
   const [screenReader, setScreenReader] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  function handleToggleSupportFocus(option: SupportFocus) {
+    setSupportFocuses((currentOptions) => {
+      if (currentOptions.includes(option)) {
+        return currentOptions.filter(
+          (currentOption) => currentOption !== option
+        );
+      }
+
+      return [...currentOptions, option];
+    });
+  }
 
   async function handleSavePreferences() {
     try {
@@ -99,7 +113,7 @@ export default function CadastroAccessibility() {
 
       await saveAccessibilityPreferencesWithBackend({
         userId,
-        supportFocus,
+        supportFocuses,
         fontSize,
         highContrast,
         screenReader,
@@ -120,15 +134,17 @@ export default function CadastroAccessibility() {
   return (
     <View className="flex-1 bg-[#202225]">
       <SafeAreaView className="flex-1">
-        <View className="border-b border-white/30 bg-[#070B1D] px-5 py-4">
+        <View className="border-b border-white/30 bg-[#070B1D] px-5 py-5">
           <View className="flex-row items-center">
             <Pressable
-              className="mr-5 h-8 w-8 items-center justify-center"
+              className="mr-5 h-12 w-12 items-center justify-center rounded-full bg-white/8"
               onPress={() => router.back()}
             >
-              <Text className="text-[24px] font-bold text-white">‹</Text>
+              <Text className="text-[40px] font-bold leading-[42px] text-white">
+                ‹
+              </Text>
             </Pressable>
-            <Text className="text-[15px] font-bold text-white">Unify</Text>
+            <Text className="text-[17px] font-bold text-white">Unify</Text>
           </View>
         </View>
 
@@ -152,7 +168,7 @@ export default function CadastroAccessibility() {
 
           <View className="mb-6 flex-row flex-wrap justify-between">
             {supportOptions.map((option) => {
-              const selected = supportFocus === option.label;
+              const selected = supportFocuses.includes(option.label);
 
               return (
                 <Pressable
@@ -162,7 +178,7 @@ export default function CadastroAccessibility() {
                       ? "border-[#8C55FF] bg-[#303033]"
                       : "border-transparent bg-[#28282B]"
                   }`}
-                  onPress={() => setSupportFocus(option.label)}
+                  onPress={() => handleToggleSupportFocus(option.label)}
                 >
                   <View className="mb-3 h-11 w-11 items-center justify-center rounded-md bg-[#814DFF]">
                     <Text className="text-[22px] font-black text-white">

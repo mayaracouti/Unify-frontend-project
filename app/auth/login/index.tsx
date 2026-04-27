@@ -56,12 +56,12 @@ async function loginWithBackend(email: string, password: string) {
  *
  * Dados para testar:
  * email: teste@email.com
- * senha: 123456
+ * senha: A123456
  */
 async function loginWithBackend(email: string, password: string) {
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
-  if (email === "teste@email.com" && password === "123456") {
+  if (email === "teste@email.com" && password === "A1234567") {
     return {
       challengeId: "123",
     };
@@ -88,6 +88,17 @@ export default function Login() {
 
     if (!password) {
       setError("Digite sua senha.");
+      return;
+    }
+
+    if (
+      password.length < 8 ||
+      !/\d/.test(password) ||
+      !/[A-Z]/.test(password)
+    ) {
+      setError(
+        "A senha precisa ter 8 caracteres, uma letra maiúscula e um número."
+      );
       return;
     }
 
