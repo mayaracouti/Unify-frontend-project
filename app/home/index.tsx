@@ -1,7 +1,9 @@
-import type { ComponentProps } from "react";
+import { useEffect, useState, type ComponentProps } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../src/context/AuthContext";
+import { profileService } from "../../src/services/profileService";
 import Ionicicons from "@expo/vector-icons/Ionicons";
 
 type Tab = {
@@ -26,7 +28,53 @@ const changeActiveTab = (index: number) => {
 };
 
 export default function Home() {
+  const router = useRouter();
   const { signOut } = useAuth();
+  const [checkingProfile, setCheckingProfile] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    async function routeByProfileCompletion() {
+      try {
+        const completion = await profileService.getCompletion();
+
+        if (!active) {
+          return;
+        }
+
+        if (!completion.profileCompleted) {
+          router.replace("/onboarding/profile");
+          return;
+        }
+
+        if (!completion.matchPreferencesCompleted) {
+          router.replace("/onboarding/match-preferences");
+          return;
+        }
+      } finally {
+        if (active) {
+          setCheckingProfile(false);
+        }
+      }
+    }
+
+    void routeByProfileCompletion();
+
+    return () => {
+      active = false;
+    };
+  }, [router]);
+
+  if (checkingProfile) {
+    return (
+      <View className="flex-1 items-center justify-center bg-[#1F2023]">
+        <Text className="text-[14px] font-bold text-white/75">
+          Preparando sua experiência...
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-[#1F2023]">
