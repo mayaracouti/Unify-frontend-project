@@ -6,6 +6,10 @@ import { clearAuthSession, getAuthSnapshot, saveAuthSession } from "../storage/t
 let initialized = false;
 let refreshPromise: Promise<AuthSession | null> | null = null;
 
+function isFormData(value: unknown): value is FormData {
+  return typeof FormData !== "undefined" && value instanceof FormData;
+}
+
 function hasHeader(headers: Record<string, string>, headerName: string): boolean {
   const normalizedHeaderName = headerName.toLowerCase();
   return Object.keys(headers).some((key) => key.toLowerCase() === normalizedHeaderName);
@@ -57,7 +61,11 @@ export function initializeApiInterceptors() {
       headers.Accept = "application/json";
     }
 
-    if (config.data !== undefined && !hasHeader(headers, "Content-Type")) {
+    if (
+      config.data !== undefined &&
+      !isFormData(config.data) &&
+      !hasHeader(headers, "Content-Type")
+    ) {
       headers["Content-Type"] = "application/json";
     }
 

@@ -13,14 +13,20 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import {
+  ChoiceCard,
+  SectionTitle,
+  SimilaritySelector,
+} from "../../src/components/profile/form-controls";
+import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { profileService } from "../../src/services/profileService";
 import type {
   LookupOptionResponse,
   ProfileOptionsResponse,
   SimilarityPreference,
-  SimilarityOptionResponse,
 } from "../../src/types/profile";
 import { formatApiErrorMessage } from "../../src/utils/auth";
+import { showGlobalToast } from "../../src/utils/globalToast";
 import {
   getForegroundLocationPermissionState,
   requestForegroundLocationPermissionState,
@@ -32,80 +38,10 @@ function toggleId(currentIds: number[], id: number): number[] {
     : [...currentIds, id];
 }
 
-function ChoiceCard({
-  label,
-  selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      className={`min-h-[56px] flex-1 basis-[46%] flex-row items-center justify-between rounded-lg border-2 px-5 py-3 ${
-        selected
-          ? "border-[#EAEA00] bg-[#EAEA00]/10"
-          : "border-[#262626] bg-[#201F1F]"
-      }`}
-      onPress={onPress}
-    >
-      <Text className="flex-1 text-[16px] font-bold text-white">{label}</Text>
-      {selected ? <Ionicons name="checkmark-circle" size={22} color="#EAEA00" /> : null}
-    </Pressable>
-  );
-}
-
-function SectionTitle({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; title: string }) {
-  return (
-    <View className="mb-3 flex-row items-center">
-      <Ionicons name={icon} size={22} color="#00DAF3" />
-      <Text className="ml-2 text-[22px] font-bold text-white">{title}</Text>
-    </View>
-  );
-}
-
-function SimilaritySelector({
-  title,
-  value,
-  options,
-  onChange,
-}: {
-  title: string;
-  value: SimilarityPreference;
-  options: SimilarityOptionResponse[];
-  onChange: (value: SimilarityPreference) => void;
-}) {
-  return (
-    <View className="mb-6">
-      <Text className="mb-3 text-[15px] font-bold text-[#CAC3D8]">{title}</Text>
-      <View className="flex-row flex-wrap gap-3">
-        {options.map((option) => {
-          const selected = option.value === value;
-
-          return (
-            <Pressable
-              key={option.value}
-              className={`min-h-[48px] rounded-full border-2 px-4 py-3 ${
-                selected
-                  ? "border-[#7C4DFF] bg-[#7C4DFF]"
-                  : "border-[#494455] bg-transparent"
-              }`}
-              onPress={() => onChange(option.value)}
-            >
-              <Text className="text-[14px] font-bold text-white">
-                {option.description}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
-export default function MatchPreferencesOnboarding() {
+export default function EditMatchPreferences() {
   const router = useRouter();
+  useRequireCompletedOnboarding();
+
   const [options, setOptions] = useState<ProfileOptionsResponse | null>(null);
   const [connectionTypeId, setConnectionTypeId] = useState<number | undefined>();
   const [desiredGenderIds, setDesiredGenderIds] = useState<number[]>([]);
@@ -117,7 +53,7 @@ export default function MatchPreferencesOnboarding() {
     useState<SimilarityPreference>("SIMILAR");
   const [energyLevelSimilarity, setEnergyLevelSimilarity] =
     useState<SimilarityPreference>("ANY");
-  const [minAge, setMinAge] = useState("18");
+  const [minAge, setMinAge] = useState("");
   const [maxAge, setMaxAge] = useState("");
   const [maxMatchDistanceKm, setMaxMatchDistanceKm] = useState("30");
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
@@ -137,26 +73,23 @@ export default function MatchPreferencesOnboarding() {
         { value: "DIFFERENT" as const, description: "Diferente de mim" },
       ];
 
-  const canSave = useMemo(
-    () => {
-      const parsedDistance = Number(maxMatchDistanceKm);
-      const parsedMinAge = Number(minAge);
-      const parsedMaxAge = Number(maxAge);
+  const canSave = useMemo(() => {
+    const parsedDistance = Number(maxMatchDistanceKm);
+    const parsedMinAge = Number(minAge);
+    const parsedMaxAge = Number(maxAge);
 
-      return (
-        Boolean(connectionTypeId) &&
-        desiredGenderIds.length > 0 &&
-        Number.isFinite(parsedDistance) &&
-        parsedDistance > 0 &&
-        Number.isFinite(parsedMinAge) &&
-        Number.isFinite(parsedMaxAge) &&
-        parsedMinAge >= 18 &&
-        parsedMaxAge >= 18 &&
-        parsedMinAge <= parsedMaxAge
-      );
-    },
-    [connectionTypeId, desiredGenderIds.length, maxMatchDistanceKm, maxAge, minAge]
-  );
+    return (
+      Boolean(connectionTypeId) &&
+      desiredGenderIds.length > 0 &&
+      Number.isFinite(parsedDistance) &&
+      parsedDistance > 0 &&
+      Number.isFinite(parsedMinAge) &&
+      Number.isFinite(parsedMaxAge) &&
+      parsedMinAge >= 18 &&
+      parsedMaxAge >= 18 &&
+      parsedMinAge <= parsedMaxAge
+    );
+  }, [connectionTypeId, desiredGenderIds.length, maxMatchDistanceKm, maxAge, minAge]);
   const showLocationSettingsButton =
     Platform.OS !== "web" && !hasLocationPermission && !canAskLocationPermissionAgain;
 
@@ -184,9 +117,11 @@ export default function MatchPreferencesOnboarding() {
         setMinAge(preferences.minAge == null ? "" : String(preferences.minAge));
         setMaxAge(preferences.maxAge == null ? "" : String(preferences.maxAge));
         setMaxMatchDistanceKm(String(preferences.maxMatchDistanceKm ?? 30));
-      } catch (error) {
+      } catch (nextError) {
         if (active) {
-          setError(formatApiErrorMessage(error, "Não foi possível carregar suas preferências."));
+          setError(
+            formatApiErrorMessage(nextError, "Não foi possível carregar suas preferências.")
+          );
         }
       } finally {
         if (active) {
@@ -270,16 +205,21 @@ export default function MatchPreferencesOnboarding() {
     const parsedMaxAge = Number(maxAge);
 
     if (!canSave || Number.isNaN(distance)) {
-      setError("Preencha objetivo, gêneros desejados, faixa etária válida e uma distância maior que zero.");
-      return;
+        showGlobalToast({ title: "Atenção", variant: "error", message: "Preencha objetivo, gêneros desejados, faixa etária válida e uma distância maior que zero." });
+        setError(
+            "Preencha objetivo, gêneros desejados, faixa etária válida e uma distância maior que zero."
+        );
+        return;
     }
 
     if (parsedMinAge < 18 || parsedMaxAge < 18) {
+        showGlobalToast({ title: "Atenção", variant: "error", message: "A faixa etária mínima e máxima deve ser de pelo menos 18 anos." });
       setError("A faixa etária mínima e máxima deve ser de pelo menos 18 anos.");
       return;
     }
 
     if (parsedMinAge > parsedMaxAge) {
+        showGlobalToast({ title: "Atenção", variant: "error", message: "A idade mínima não pode ser maior que a idade máxima." });
       setError("A idade mínima não pode ser maior que a idade máxima.");
       return;
     }
@@ -300,9 +240,12 @@ export default function MatchPreferencesOnboarding() {
         desiredGenderIds,
       });
 
-      router.replace("/home");
-    } catch (error) {
-      setError(formatApiErrorMessage(error, "Não foi possível salvar suas preferências."));
+      router.replace("/profile");
+    } catch (nextError) {
+      showGlobalToast({ title: "Erro", variant: "error", message: "Não foi possível salvar suas preferências." });
+      setError(
+        formatApiErrorMessage(nextError, "Não foi possível salvar suas preferências.")
+      );
     } finally {
       setSaving(false);
     }
@@ -313,12 +256,15 @@ export default function MatchPreferencesOnboarding() {
       <SafeAreaView className="flex-1">
         <View className="h-16 flex-row items-center justify-between border-b-2 border-[#262626] bg-[#0E0E0E] px-6">
           <View className="flex-row items-center">
-            <Pressable className="mr-3 h-10 w-10 items-center justify-center rounded-full" onPress={() => router.replace("/onboarding/profile")}>
+            <Pressable
+              className="mr-3 h-10 w-10 items-center justify-center rounded-full"
+              onPress={() => router.replace("/profile")}
+            >
               <Ionicons name="arrow-back" size={24} color="#E5E2E1" />
             </Pressable>
             <Text className="text-2xl font-black text-[#7C4DFF]">Unify</Text>
           </View>
-          <Text className="text-[14px] font-bold text-[#CAC3D8]">Passo 2 de 2</Text>
+          <Text className="text-[14px] font-bold text-[#CAC3D8]">Preferências</Text>
         </View>
 
         {loading ? (
@@ -331,17 +277,17 @@ export default function MatchPreferencesOnboarding() {
             contentContainerClassName="mx-auto w-full max-w-[720px] px-6 pb-10 pt-8"
             keyboardShouldPersistTaps="handled"
           >
-            <View className="mb-8">
-              <Text className="mb-2 text-[32px] font-extrabold leading-10 text-white">
-                Preferências de match
+            <View className="mb-8 rounded-[28px] bg-[#111214] p-6">
+              <Text className="text-[30px] font-extrabold leading-10 text-white">
+                Ajuste suas preferências de match
               </Text>
-              <Text className="text-[16px] font-medium leading-6 text-[#CAC3D8]">
-                Conte o que você busca para encontrarmos conexões com mais afinidade.
+              <Text className="mt-2 text-[15px] font-semibold leading-6 text-[#CAC3D8]">
+                Atualize apenas os critérios usados para sugerir novas conexões.
               </Text>
             </View>
 
             {options ? (
-              <>
+              <View className="rounded-[28px] bg-[#111214] p-6">
                 <View className="mb-8">
                   <SectionTitle icon="flag-outline" title="Qual seu objetivo?" />
                   <View className="flex-row flex-wrap gap-3">
@@ -381,131 +327,128 @@ export default function MatchPreferencesOnboarding() {
                     ))}
                   </View>
                 </View>
-              </>
-            ) : null}
 
-            <View className="mb-8">
-              <SectionTitle icon="calendar-outline" title="Faixa etária desejada" />
-              <View className="flex-row gap-3">
-                <TextInput
-                  className="min-h-[56px] flex-1 rounded-t-lg border-b-2 border-[#948EA1] bg-[#1C1B1B] px-4 text-[16px] text-white"
-                  keyboardType="numeric"
-                  placeholder="Idade mínima (18)"
-                  placeholderTextColor="#948EA1"
-                  value={minAge}
-                  onChangeText={setMinAge}
-                />
-                <TextInput
-                  className="min-h-[56px] flex-1 rounded-t-lg border-b-2 border-[#948EA1] bg-[#1C1B1B] px-4 text-[16px] text-white"
-                  keyboardType="numeric"
-                  placeholder="Idade máxima (18+)"
-                  placeholderTextColor="#948EA1"
-                  value={maxAge}
-                  onChangeText={setMaxAge}
-                />
-              </View>
-              <Text className="mt-2 text-[13px] font-semibold text-[#CAC3D8]">
-                Defina a faixa etária que você deseja encontrar.
-              </Text>
-            </View>
+                <View className="mb-8">
+                  <SectionTitle icon="calendar-outline" title="Faixa etária desejada" />
+                  <View className="flex-row gap-3">
+                    <TextInput
+                      className="min-h-[56px] flex-1 rounded-t-lg border-b-2 border-[#948EA1] bg-[#1C1B1B] px-4 text-[16px] text-white"
+                      keyboardType="numeric"
+                      placeholder="Idade mínima (18)"
+                      placeholderTextColor="#948EA1"
+                      value={minAge}
+                      onChangeText={setMinAge}
+                    />
+                    <TextInput
+                      className="min-h-[56px] flex-1 rounded-t-lg border-b-2 border-[#948EA1] bg-[#1C1B1B] px-4 text-[16px] text-white"
+                      keyboardType="numeric"
+                      placeholder="Idade máxima (18+)"
+                      placeholderTextColor="#948EA1"
+                      value={maxAge}
+                      onChangeText={setMaxAge}
+                    />
+                  </View>
+                </View>
 
-            <View className="mb-8">
-              <SectionTitle icon="navigate-outline" title="Distância máxima" />
-              <View className="rounded-lg border border-[#353534] bg-[#201F1F] px-4 py-4">
-                <TextInput
-                  className="h-14 rounded-t-lg border-b-2 border-[#948EA1] bg-[#1C1B1B] px-4 text-[18px] font-bold text-white"
-                  keyboardType="numeric"
-                  placeholder="30"
-                  placeholderTextColor="#948EA1"
-                  value={maxMatchDistanceKm}
-                  onChangeText={setMaxMatchDistanceKm}
-                />
-                <Text className="mt-2 text-[13px] font-semibold text-[#CAC3D8]">
-                  Quilômetros até a conexão sugerida.
-                </Text>
-                {hasLocationPermission ? (
-                  <Text className="mt-3 text-[13px] font-bold text-[#5DDB85]">
-                    Acesso à localização já está liberado.
-                  </Text>
-                ) : (
-                  <Text className="mt-3 text-[13px] font-semibold text-[#CAC3D8]">
-                    {showLocationSettingsButton
-                      ? "O acesso foi bloqueado no celular. Abra os ajustes do aparelho para liberar a localização."
-                      : "Conceda o acesso à localização para usar a distância dos matches com base no GPS."}
-                  </Text>
-                )}
-
-                {!hasLocationPermission && !showLocationSettingsButton ? (
-                  <Pressable
-                    className={`mt-4 h-12 items-center justify-center rounded-xl ${locationStatus === "requesting" ? "bg-[#CFCF62]" : "bg-[#EAEA00]"}`}
-                    disabled={locationStatus === "requesting"}
-                    onPress={() => void handleGrantLocationAccess()}
-                  >
-                    {locationStatus === "requesting" ? (
-                      <ActivityIndicator color="#323200" size="small" />
+                <View className="mb-8">
+                  <SectionTitle icon="navigate-outline" title="Distância máxima (KM)" />
+                  <View className="rounded-lg border border-[#353534] bg-[#201F1F] px-4 py-4">
+                    <TextInput
+                      className="h-14 rounded-t-lg border-b-2 border-[#948EA1] bg-[#1C1B1B] px-4 text-[18px] font-bold text-white"
+                      keyboardType="numeric"
+                      placeholder="30"
+                      placeholderTextColor="#948EA1"
+                      value={maxMatchDistanceKm}
+                      onChangeText={setMaxMatchDistanceKm}
+                    />
+                    <Text className="mt-2 text-[13px] font-semibold text-[#CAC3D8]">
+                      Quilômetros até a conexão sugerida.
+                    </Text>
+                    {hasLocationPermission ? (
+                      <Text className="mt-3 text-[13px] font-bold text-[#5DDB85]">
+                        Acesso à localização já está liberado.
+                      </Text>
                     ) : (
-                      <Text className="text-[15px] font-black text-[#323200]">
-                        Conceder acesso a localização
+                      <Text className="mt-3 text-[13px] font-semibold text-[#CAC3D8]">
+                        {showLocationSettingsButton
+                          ? "O acesso foi bloqueado no celular. Abra os ajustes do aparelho para liberar a localização."
+                          : "Conceda o acesso à localização para usar a distância dos matches com base no GPS."}
                       </Text>
                     )}
-                  </Pressable>
-                ) : null}
 
-                {showLocationSettingsButton ? (
-                  <Pressable
-                    className="mt-4 h-12 items-center justify-center rounded-xl border border-[#5DDB85] bg-[#132519]"
-                    onPress={() => void handleOpenLocationSettings()}
-                  >
-                    <Text className="text-[15px] font-black text-[#5DDB85]">
-                      Ir para os ajustes do celular
-                    </Text>
-                  </Pressable>
-                ) : null}
+                    {!hasLocationPermission && !showLocationSettingsButton ? (
+                      <Pressable
+                        className={`mt-4 h-12 items-center justify-center rounded-xl ${locationStatus === "requesting" ? "bg-[#CFCF62]" : "bg-[#EAEA00]"}`}
+                        disabled={locationStatus === "requesting"}
+                        onPress={() => void handleGrantLocationAccess()}
+                      >
+                        {locationStatus === "requesting" ? (
+                          <ActivityIndicator color="#323200" size="small" />
+                        ) : (
+                          <Text className="text-[15px] font-black text-[#323200]">
+                            Conceder acesso a localização
+                          </Text>
+                        )}
+                      </Pressable>
+                    ) : null}
 
-                {locationStatus === "failed" && !hasLocationPermission ? (
-                  <Text className="mt-3 text-[13px] font-semibold text-red-300">
-                    Não foi possível obter a permissão de localização agora. Tente novamente.
-                  </Text>
-                ) : null}
+                    {showLocationSettingsButton ? (
+                      <Pressable
+                        className="mt-4 h-12 items-center justify-center rounded-xl border border-[#5DDB85] bg-[#132519]"
+                        onPress={() => void handleOpenLocationSettings()}
+                      >
+                        <Text className="text-[15px] font-black text-[#5DDB85]">
+                          Ir para os ajustes do celular
+                        </Text>
+                      </Pressable>
+                    ) : null}
+
+                    {locationStatus === "failed" && !hasLocationPermission ? (
+                      <Text className="mt-3 text-[13px] font-semibold text-red-300">
+                        Não foi possível obter a permissão de localização agora. Tente novamente.
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+
+                <View>
+                  <SectionTitle icon="options-outline" title="Afinidades" />
+                  <SimilaritySelector
+                    title="Necessidades de acessibilidade"
+                    value={accessibilityNeedSimilarity}
+                    options={similarityOptions}
+                    onChange={setAccessibilityNeedSimilarity}
+                  />
+                  <SimilaritySelector
+                    title="Autonomia"
+                    value={autonomyCompatibility}
+                    options={similarityOptions}
+                    onChange={setAutonomyCompatibility}
+                  />
+                  <SimilaritySelector
+                    title="Estilo de vida"
+                    value={lifestyleSimilarity}
+                    options={similarityOptions}
+                    onChange={setLifestyleSimilarity}
+                  />
+                  <SimilaritySelector
+                    title="Energia social"
+                    value={energyLevelSimilarity}
+                    options={similarityOptions}
+                    onChange={setEnergyLevelSimilarity}
+                  />
+                </View>
               </View>
-            </View>
-
-            <View className="mb-8">
-              <SectionTitle icon="options-outline" title="Afinidades" />
-              <SimilaritySelector
-                title="Necessidades de acessibilidade"
-                value={accessibilityNeedSimilarity}
-                options={similarityOptions}
-                onChange={setAccessibilityNeedSimilarity}
-              />
-              <SimilaritySelector
-                title="Autonomia"
-                value={autonomyCompatibility}
-                options={similarityOptions}
-                onChange={setAutonomyCompatibility}
-              />
-              <SimilaritySelector
-                title="Estilo de vida"
-                value={lifestyleSimilarity}
-                options={similarityOptions}
-                onChange={setLifestyleSimilarity}
-              />
-              <SimilaritySelector
-                title="Energia social"
-                value={energyLevelSimilarity}
-                options={similarityOptions}
-                onChange={setEnergyLevelSimilarity}
-              />
-            </View>
+            ) : null}
 
             {error ? (
-              <Text className="mb-4 text-center text-[13px] font-semibold text-red-300">
+              <Text className="mb-4 mt-6 text-center text-[13px] font-semibold text-red-300">
                 {error}
               </Text>
             ) : null}
 
             <Pressable
-              className={`h-14 items-center justify-center rounded-lg ${saving ? "bg-[#CDCD00]" : "bg-[#EAEA00]"}`}
+              className={`mt-6 h-14 items-center justify-center rounded-2xl ${saving ? "bg-[#CDCD00]" : "bg-[#EAEA00]"}`}
               disabled={saving}
               onPress={handleSave}
             >
@@ -513,7 +456,7 @@ export default function MatchPreferencesOnboarding() {
                 <ActivityIndicator color="#323200" />
               ) : (
                 <Text className="text-[17px] font-black text-[#323200]">
-                  Finalizar cadastro
+                  Salvar preferências
                 </Text>
               )}
             </Pressable>

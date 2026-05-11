@@ -8,7 +8,6 @@ import {
 } from "react";
 
 import { authService } from "../services/authService";
-import { userService } from "../services/userService";
 import {
   clearAuthSession,
   clearPendingVerificationEmail,
@@ -18,7 +17,6 @@ import {
   subscribeToAuthStorage,
 } from "../storage/tokenStorage";
 import type {
-  CurrentUserResponse,
   EmailVerificationRequest,
   ResendEmailVerificationRequest,
   SignInRequest,
@@ -31,11 +29,9 @@ import { createAuthSession, isApiError } from "../types/auth";
 import { normalizeEmail } from "../utils/auth";
 
 type AuthContextValue = {
-  currentUser: CurrentUserResponse | null;
   isAuthenticated: boolean;
   isReady: boolean;
   pendingVerificationEmail: string | null;
-  refreshCurrentUser: () => Promise<CurrentUserResponse | null>;
   resendVerificationCode: (
     email?: string
   ) => Promise<VerificationCodeDispatchResponse>;
@@ -55,7 +51,6 @@ const INITIAL_SNAPSHOT: StoredAuthSnapshot = {
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [snapshot, setSnapshot] = useState<StoredAuthSnapshot>(INITIAL_SNAPSHOT);
-  const [currentUser, setCurrentUser] = useState<CurrentUserResponse | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -78,31 +73,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       setSnapshot(nextSnapshot);
 
-      if (!nextSnapshot.session) {
+      if (isMounted) {
         setIsReady(true);
-        return;
-      }
-
-      try {
-        const user = await userService.getCurrentUser();
-
-        if (!isMounted) {
-          return;
-        }
-
-        setCurrentUser(user);
-      } catch {
-        await clearAuthSession();
-
-        if (!isMounted) {
-          return;
-        }
-
-        setCurrentUser(null);
-      } finally {
-        if (isMounted) {
-          setIsReady(true);
-        }
       }
     };
 
@@ -114,33 +86,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
-  useEffect(() => {
-    if (!snapshot.session) {
-      setCurrentUser(null);
-    }
-  }, [snapshot.session]);
-
-  const refreshCurrentUser = async () => {
-    if (!snapshot.session) {
-      setCurrentUser(null);
-      return null;
-    }
-
-    try {
-      const user = await userService.getCurrentUser();
-      setCurrentUser(user);
-      return user;
-    } catch (error) {
-      await clearAuthSession();
-      setCurrentUser(null);
-      throw error;
-    }
-  };
-
   const signUp = async (payload: SignUpRequest) => {
     const response = await authService.signUp(payload);
     await clearAuthSession();
-    setCurrentUser(null);
     await setPendingVerificationEmail(response.email);
     return response;
   };
@@ -159,13 +107,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
       await saveAuthSession(session);
       await clearPendingVerificationEmail();
 
-      const user = await userService.getCurrentUser();
-
-      setCurrentUser(user);
-
       return {
         status: "authenticated",
-        user,
       };
     } catch (error) {
       if (
@@ -174,7 +117,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
         error.error === "USER_EMAIL_NOT_VERIFIED"
       ) {
         await clearAuthSession();
-        setCurrentUser(null);
         await setPendingVerificationEmail(normalizedEmail);
 
         return {
@@ -221,17 +163,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
     } finally {
       await clearAuthSession();
       await clearPendingVerificationEmail();
-      setCurrentUser(null);
     }
   };
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      currentUser,
       isAuthenticated: Boolean(snapshot.session),
       isReady,
       pendingVerificationEmail: snapshot.pendingVerificationEmail,
-      refreshCurrentUser,
       resendVerificationCode,
       session: snapshot.session,
       signIn,
@@ -239,7 +178,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       signUp,
       verifyEmail,
     }),
-    [currentUser, isReady, snapshot.pendingVerificationEmail, snapshot.session]
+    [isReady, snapshot.pendingVerificationEmail, snapshot.session]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

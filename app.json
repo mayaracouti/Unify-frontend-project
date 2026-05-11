@@ -30,7 +30,20 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permita que a Unify acesse suas fotos para atualizar sua imagem de perfil e sua galeria.",
+          "cameraPermission": "Permita que a Unify use a câmera para atualizar sua imagem de perfil e sua galeria."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Permita que a Unify use sua localização para melhorar a distância dos seus matches."
+        }
+      ]
     ]
   }
 }

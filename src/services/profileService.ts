@@ -1,12 +1,18 @@
 import { customApiCall } from "../api/customApi";
+import { runtimeConfig } from "../config/runtime";
 import type {
   ProfileCompletionResponse,
   ProfileOptionsResponse,
+  UserProfileDirectoryItemResponse,
+  UserProfileImageResponse,
   UserMatchPreferencesResponse,
   UserMatchPreferencesUpsertRequest,
   UserProfileResponse,
   UserProfileUpsertRequest,
 } from "../types/profile";
+
+const ALL_USER_PROFILES_ENDPOINT = "/users/profiles";
+const PROFILE_IMAGES_ENDPOINT = "/users/me/profile/images";
 
 export const profileService = {
   getCompletion() {
@@ -31,12 +37,68 @@ export const profileService = {
     });
   },
 
+  getAllProfiles() {
+    return customApiCall.get<UserProfileDirectoryItemResponse[]>(
+      ALL_USER_PROFILES_ENDPOINT,
+      undefined,
+      { requiresAuth: true }
+    );
+  },
+
   saveProfile(payload: UserProfileUpsertRequest) {
     return customApiCall.put<UserProfileResponse, UserProfileUpsertRequest>(
       "/users/me/profile",
       payload,
       { requiresAuth: true }
     );
+  },
+
+  getActiveProfileImages() {
+    return customApiCall.get<UserProfileImageResponse[]>(PROFILE_IMAGES_ENDPOINT, undefined, {
+      requiresAuth: true,
+    });
+  },
+
+  uploadProfilePicture(formData: FormData) {
+    return customApiCall.post<UserProfileImageResponse, FormData>(
+      `${PROFILE_IMAGES_ENDPOINT}/profile-picture`,
+      formData,
+      { requiresAuth: true }
+    );
+  },
+
+  uploadGalleryImage(formData: FormData) {
+    return customApiCall.post<UserProfileImageResponse, FormData>(
+      `${PROFILE_IMAGES_ENDPOINT}/gallery`,
+      formData,
+      { requiresAuth: true }
+    );
+  },
+
+  deleteProfileImage(imageId: string) {
+    return customApiCall.delete<void>(`${PROFILE_IMAGES_ENDPOINT}/${imageId}`, {
+      requiresAuth: true,
+    });
+  },
+
+  resolveProfileImageUrl(relativeUrl?: string | null) {
+    if (!relativeUrl) {
+      return null;
+    }
+
+    if (/^https?:\/\//i.test(relativeUrl)) {
+      return relativeUrl;
+    }
+
+    const normalizedBaseUrl = runtimeConfig.apiBaseUrl.endsWith("/")
+      ? runtimeConfig.apiBaseUrl.slice(0, -1)
+      : runtimeConfig.apiBaseUrl;
+
+    const normalizedPath = relativeUrl.startsWith("/")
+      ? relativeUrl
+      : `/${relativeUrl}`;
+
+    return `${normalizedBaseUrl}${normalizedPath}`;
   },
 
   getMatchPreferences() {

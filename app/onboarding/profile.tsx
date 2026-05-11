@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
+  Platform,
   Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
+import * as Location from "expo-location";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -25,13 +28,21 @@ function toggleId(currentIds: number[], id: number): number[] {
     : [...currentIds, id];
 }
 
+function isIoniconName(
+  value?: string | null
+): value is keyof typeof Ionicons.glyphMap {
+  return typeof value === "string" && value in Ionicons.glyphMap;
+}
+
 function OptionChip({
   label,
   selected,
+  iconName,
   onPress,
 }: {
   label: string;
   selected: boolean;
+  iconName?: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
 }) {
   return (
@@ -43,11 +54,17 @@ function OptionChip({
       }`}
       onPress={onPress}
     >
-      {selected ? (
+      {iconName ? (
+        <Ionicons
+          name={iconName}
+          size={18}
+          color={selected ? "#323200" : "#E5E2E1"}
+        />
+      ) : selected ? (
         <Ionicons name="checkmark-circle" size={18} color="#323200" />
       ) : null}
       <Text
-        className={`text-[15px] font-bold ${selected ? "ml-2 text-[#323200]" : "text-[#E5E2E1]"}`}
+        className={`text-[15px] font-bold ${(selected || iconName) ? "ml-2" : ""} ${selected ? "text-[#323200]" : "text-[#E5E2E1]"}`}
       >
         {label}
       </Text>
@@ -88,11 +105,13 @@ function MultiChoice({
   options,
   values,
   onChange,
+  showOptionIcons = false,
 }: {
   title: string;
   options: LookupOptionResponse[];
   values: number[];
   onChange: (ids: number[]) => void;
+  showOptionIcons?: boolean;
 }) {
   return (
     <View className="mb-8">
@@ -103,12 +122,95 @@ function MultiChoice({
             key={option.id}
             label={option.description}
             selected={values.includes(option.id)}
+            iconName={
+              showOptionIcons && isIoniconName(option.ionicIcon)
+                ? option.ionicIcon
+                : undefined
+            }
             onPress={() => onChange(toggleId(values, option.id))}
           />
         ))}
       </View>
     </View>
   );
+}
+
+type AutoLocation = {
+  latitude: number;
+  longitude: number;
+};
+
+type LocationPermissionState = {
+  granted: boolean;
+  canAskAgain: boolean;
+  status: Location.PermissionStatus;
+};
+
+const LOCATION_REQUEST_TIMEOUT_MS = 10000;
+
+function mapPermissionState(
+  permission: Location.LocationPermissionResponse
+): LocationPermissionState {
+  return {
+    granted: permission.status === Location.PermissionStatus.GRANTED,
+    canAskAgain: permission.canAskAgain,
+    status: permission.status,
+  };
+}
+
+async function waitForCurrentPosition(): Promise<Location.LocationObject | null> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    const currentPosition = await Promise.race<Location.LocationObject | null>([
+      Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      }),
+      new Promise<null>((resolve) => {
+        timeoutHandle = setTimeout(() => {
+          resolve(null);
+        }, LOCATION_REQUEST_TIMEOUT_MS);
+      }),
+    ]);
+
+    return currentPosition;
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  }
+}
+
+async function getForegroundLocationPermissionState(): Promise<LocationPermissionState> {
+  const permission = await Location.getForegroundPermissionsAsync();
+
+  return mapPermissionState(permission);
+}
+
+async function getCurrentDeviceLocation(): Promise<AutoLocation> {
+  const currentPosition = (await waitForCurrentPosition()) ??
+    (await Location.getLastKnownPositionAsync());
+
+  if (!currentPosition) {
+    throw new Error("Unable to determine device location.");
+  }
+
+  return {
+    latitude: currentPosition.coords.latitude,
+    longitude: currentPosition.coords.longitude,
+  };
+}
+
+async function requestForegroundLocationPermissionState(): Promise<LocationPermissionState> {
+  const currentPermission = await Location.getForegroundPermissionsAsync();
+
+  if (currentPermission.status === Location.PermissionStatus.GRANTED) {
+    return mapPermissionState(currentPermission);
+  }
+
+  const permission = await Location.requestForegroundPermissionsAsync();
+
+  return mapPermissionState(permission);
 }
 
 export default function ProfileOnboarding() {
@@ -123,8 +225,13 @@ export default function ProfileOnboarding() {
   const [lifestyleTypeIds, setLifestyleTypeIds] = useState<number[]>([]);
   const [energyLevelId, setEnergyLevelId] = useState<number | undefined>();
   const [interestTypeIds, setInterestTypeIds] = useState<number[]>([]);
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
+  const [autoLocation, setAutoLocation] = useState<AutoLocation | null>(null);
+  const [hasLocationPermission, setHasLocationPermission] = useState(false);
+  const [canAskLocationPermissionAgain, setCanAskLocationPermissionAgain] = useState(true);
+  const [locationStatus, setLocationStatus] = useState<
+    "idle" | "checking" | "requesting" | "failed"
+  >("checking");
+  const [isRefreshingLocation, setIsRefreshingLocation] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -138,9 +245,54 @@ export default function ProfileOnboarding() {
       interestTypeIds.length > 0,
     [communicationFormIds.length, genderId, interestTypeIds.length, lifestyleTypeIds.length]
   );
+  const showLocationSettingsButton =
+    Platform.OS !== "web" && !hasLocationPermission && !canAskLocationPermissionAgain;
 
   useEffect(() => {
     let active = true;
+
+    async function syncAutomaticLocation(existingLocation: AutoLocation | null) {
+      setAutoLocation(existingLocation);
+      setLocationStatus("checking");
+
+      if (!active) {
+        return;
+      }
+
+      try {
+        const permission = await getForegroundLocationPermissionState();
+
+        if (!active) {
+          return;
+        }
+
+        setHasLocationPermission(permission.granted);
+        setCanAskLocationPermissionAgain(permission.canAskAgain);
+
+        if (!permission.granted) {
+          setLocationStatus("idle");
+          return;
+        }
+
+        if (existingLocation) {
+          setLocationStatus("idle");
+          return;
+        }
+
+        const currentLocation = await getCurrentDeviceLocation();
+
+        if (!active) {
+          return;
+        }
+
+        setAutoLocation(currentLocation);
+        setLocationStatus("idle");
+      } catch {
+        if (active) {
+          setLocationStatus("failed");
+        }
+      }
+    }
 
     async function loadProfile() {
       try {
@@ -163,15 +315,15 @@ export default function ProfileOnboarding() {
         setLifestyleTypeIds(idsFromOptions(profile.lifestyleTypes));
         setEnergyLevelId(profile.energyLevel?.id);
         setInterestTypeIds(idsFromOptions(profile.interestTypes));
-        setLatitude(
-          profile.activeLocation?.latitude == null
-            ? ""
-            : String(profile.activeLocation.latitude)
-        );
-        setLongitude(
-          profile.activeLocation?.longitude == null
-            ? ""
-            : String(profile.activeLocation.longitude)
+
+        void syncAutomaticLocation(
+          profile.activeLocation?.latitude != null &&
+            profile.activeLocation?.longitude != null
+            ? {
+                latitude: profile.activeLocation.latitude,
+                longitude: profile.activeLocation.longitude,
+              }
+            : null
         );
       } catch (error) {
         if (active) {
@@ -191,27 +343,68 @@ export default function ProfileOnboarding() {
     };
   }, []);
 
+  async function handleGrantLocationAccess() {
+    try {
+      setError("");
+      setLocationStatus("requesting");
+
+      const permission = await requestForegroundLocationPermissionState();
+
+      setHasLocationPermission(permission.granted);
+      setCanAskLocationPermissionAgain(permission.canAskAgain);
+
+      if (!permission.granted) {
+        setLocationStatus("idle");
+        return;
+      }
+
+      setLocationStatus("idle");
+    } catch (nextError) {
+      const permission = await getForegroundLocationPermissionState().catch(() => null);
+
+      if (permission) {
+        setHasLocationPermission(permission.granted);
+        setCanAskLocationPermissionAgain(permission.canAskAgain);
+      }
+
+      setError(
+        formatApiErrorMessage(nextError, "Não foi possível salvar sua localização agora.")
+      );
+      setLocationStatus("failed");
+    }
+  }
+
+  async function handleOpenLocationSettings() {
+    if (Platform.OS === "web") {
+      return;
+    }
+
+    await Linking.openSettings();
+  }
+
   async function handleSave() {
     if (!canSave) {
       setError("Preencha gênero, comunicação, estilo de vida e interesses para continuar.");
       return;
     }
 
-    const parsedLatitude = latitude.trim() ? Number(latitude.replace(",", ".")) : null;
-    const parsedLongitude = longitude.trim() ? Number(longitude.replace(",", ".")) : null;
-
-    if (
-      (parsedLatitude === null) !== (parsedLongitude === null) ||
-      (parsedLatitude !== null && (Number.isNaN(parsedLatitude) || parsedLatitude < -90 || parsedLatitude > 90)) ||
-      (parsedLongitude !== null && (Number.isNaN(parsedLongitude) || parsedLongitude < -180 || parsedLongitude > 180))
-    ) {
-      setError("Informe latitude e longitude válidas, ou deixe os dois campos vazios.");
-      return;
-    }
-
     try {
       setSaving(true);
       setError("");
+
+      let nextLocation = autoLocation ?? undefined;
+
+      if (hasLocationPermission) {
+        try {
+          setIsRefreshingLocation(true);
+          nextLocation = await getCurrentDeviceLocation();
+          setAutoLocation(nextLocation);
+        } catch {
+          nextLocation = autoLocation ?? undefined;
+        } finally {
+          setIsRefreshingLocation(false);
+        }
+      }
 
       await profileService.saveProfile({
         bio: bio.trim(),
@@ -223,10 +416,7 @@ export default function ProfileOnboarding() {
         lifestyleTypeIds,
         energyLevelId,
         interestTypeIds,
-        location:
-          parsedLatitude !== null && parsedLongitude !== null
-            ? { latitude: parsedLatitude, longitude: parsedLongitude }
-            : undefined,
+        location: nextLocation,
       });
 
       router.replace("/onboarding/match-preferences");
@@ -289,7 +479,7 @@ export default function ProfileOnboarding() {
             {options ? (
               <>
                 <SingleChoice title="Gênero" options={options.genders} value={genderId} onChange={setGenderId} />
-                <MultiChoice title="Tipo de deficiência" options={options.disabilities} values={disabilityIds} onChange={setDisabilityIds} />
+                <MultiChoice title="Tipo de deficiência" options={options.disabilities} values={disabilityIds} onChange={setDisabilityIds} showOptionIcons />
                 <MultiChoice title="Necessidades de acessibilidade" options={options.accessibilityNeeds} values={accessibilityNeedIds} onChange={setAccessibilityNeedIds} />
                 <SingleChoice title="Nível de autonomia" options={options.autonomyLevels} value={autonomyLevelId} onChange={setAutonomyLevelId} />
                 <MultiChoice title="Formas de comunicação" options={options.communicationForms} values={communicationFormIds} onChange={setCommunicationFormIds} />
@@ -300,24 +490,75 @@ export default function ProfileOnboarding() {
             ) : null}
 
             <View className="mb-8">
-              <Text className="mb-3 text-[22px] font-bold text-white">Onde você está?</Text>
-              <View className="flex-row gap-3">
-                <TextInput
-                  className="min-h-[56px] flex-1 rounded-t-lg border-b-2 border-[#948EA1] bg-[#1C1B1B] px-4 text-[16px] text-white"
-                  keyboardType="numeric"
-                  placeholder="Latitude"
-                  placeholderTextColor="#948EA1"
-                  value={latitude}
-                  onChangeText={setLatitude}
-                />
-                <TextInput
-                  className="min-h-[56px] flex-1 rounded-t-lg border-b-2 border-[#948EA1] bg-[#1C1B1B] px-4 text-[16px] text-white"
-                  keyboardType="numeric"
-                  placeholder="Longitude"
-                  placeholderTextColor="#948EA1"
-                  value={longitude}
-                  onChangeText={setLongitude}
-                />
+              <Text className="mb-3 text-[22px] font-bold text-white">Localização</Text>
+              <View className="rounded-lg border border-[#353534] bg-[#201F1F] px-4 py-4">
+                <View className="flex-row items-start">
+                  <Ionicons
+                    name={
+                      hasLocationPermission
+                        ? "checkmark-circle"
+                        : locationStatus === "requesting"
+                          ? "radio-outline"
+                          : locationStatus === "failed"
+                            ? "alert-circle-outline"
+                            : "location-outline"
+                    }
+                    size={20}
+                    color={hasLocationPermission ? "#5DDB85" : "#00DAF3"}
+                  />
+                  <View className="ml-3 flex-1">
+                    <Text className="text-[16px] font-bold text-white">
+                      {hasLocationPermission
+                        ? "Localização liberada"
+                        : locationStatus === "requesting"
+                          ? "Solicitando acesso à localização"
+                          : "Localização automática"}
+                    </Text>
+                    {hasLocationPermission ? (
+                      <Text className="mt-2 text-[13px] font-bold text-[#5DDB85]">
+                        Acesso à localização já está liberado.
+                      </Text>
+                    ) : null}
+                    <Text className="mt-1 text-[13px] font-semibold leading-5 text-[#CAC3D8]">
+                      {locationStatus === "failed"
+                          ? "Não conseguimos atualizar sua localização agora. Você ainda pode continuar e tentar novamente depois."
+                          : hasLocationPermission
+                            ? autoLocation
+                              ? "Sua localização atual será usada para alimentar as preferências de distância."
+                              : "O acesso já foi concedido. Assim que a posição estiver disponível, ela será usada nos matches por distância."
+                            : showLocationSettingsButton
+                              ? "O acesso foi bloqueado no celular. Abra os ajustes do aparelho para liberar a localização."
+                              : "Conceda o acesso à sua localização para melhorar os matches por distância. Você ainda pode continuar sem isso."}
+                    </Text>
+
+                    {!hasLocationPermission ? (
+                      <Pressable
+                        className={`mt-4 h-12 items-center justify-center rounded-xl ${locationStatus === "requesting" ? "bg-[#CFCF62]" : "bg-[#EAEA00]"}`}
+                        disabled={locationStatus === "requesting"}
+                        onPress={() => void handleGrantLocationAccess()}
+                      >
+                        {locationStatus === "requesting" ? (
+                          <ActivityIndicator color="#323200" size="small" />
+                        ) : (
+                          <Text className="text-[15px] font-black text-[#323200]">
+                            Habilitar GPS
+                          </Text>
+                        )}
+                      </Pressable>
+                    ) : null}
+
+                    {showLocationSettingsButton ? (
+                      <Pressable
+                        className="mt-4 h-12 items-center justify-center rounded-xl border border-[#5DDB85] bg-[#132519]"
+                        onPress={() => void handleOpenLocationSettings()}
+                      >
+                        <Text className="text-[15px] font-black text-[#5DDB85]">
+                          Ir para os ajustes do celular
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
               </View>
             </View>
 
@@ -325,6 +566,15 @@ export default function ProfileOnboarding() {
               <Text className="mb-4 text-center text-[13px] font-semibold text-red-300">
                 {error}
               </Text>
+            ) : null}
+
+            {isRefreshingLocation ? (
+              <View className="mb-4 flex-row items-center justify-center rounded-lg border border-[#2E4952] bg-[#112028] px-4 py-3">
+                <ActivityIndicator color="#00DAF3" size="small" />
+                <Text className="ml-3 text-center text-[13px] font-semibold text-[#BFEFFF]">
+                  Atualizando sua localização antes de salvar o perfil...
+                </Text>
+              </View>
             ) : null}
 
             <Pressable

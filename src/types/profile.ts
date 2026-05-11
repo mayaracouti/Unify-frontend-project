@@ -3,6 +3,7 @@ export type SimilarityPreference = "ANY" | "SIMILAR" | "DIFFERENT";
 export interface LookupOptionResponse {
   id: number;
   description: string;
+  ionicIcon?: string | null;
 }
 
 export interface DisabilityOptionResponse extends LookupOptionResponse {
@@ -17,6 +18,13 @@ export interface SimilarityOptionResponse {
 export interface LocationResponse {
   latitude: number | null;
   longitude: number | null;
+}
+
+export interface UserProfileImageResponse {
+  id: string;
+  profilePicture: boolean;
+  active: boolean;
+  url: string;
 }
 
 export interface ProfileOptionsResponse {
@@ -43,6 +51,17 @@ export interface ProfileCompletionResponse {
 export interface UserProfileResponse {
   id: string | null;
   bio: string | null;
+  name?: string | null;
+  lastName?: string | null;
+  age?: number | null;
+  user?: {
+    id?: string | null;
+    name?: string | null;
+    lastName?: string | null;
+    email?: string | null;
+    cellphone?: string | null;
+    age?: number | null;
+  } | null;
   gender: LookupOptionResponse | null;
   disabilities: DisabilityOptionResponse[];
   accessibilityNeeds: LookupOptionResponse[];
@@ -52,6 +71,15 @@ export interface UserProfileResponse {
   energyLevel: LookupOptionResponse | null;
   interestTypes: LookupOptionResponse[];
   activeLocation: LocationResponse | null;
+  profilePicture?: UserProfileImageResponse | null;
+  galleryImages?: UserProfileImageResponse[];
+}
+
+export interface UserProfileDirectoryItemResponse extends UserProfileResponse {
+  userId?: string | null;
+  email?: string | null;
+  cellphone?: string | null;
+  matchPreferences?: UserMatchPreferencesResponse | null;
 }
 
 export interface UserProfileUpsertRequest {
@@ -89,8 +117,8 @@ export interface UserMatchPreferencesUpsertRequest {
   autonomyCompatibility: SimilarityPreference;
   lifestyleSimilarity: SimilarityPreference;
   energyLevelSimilarity: SimilarityPreference;
-  minAge?: number;
-  maxAge?: number;
+  minAge: number;
+  maxAge: number;
   maxMatchDistanceKm: number;
   desiredGenderIds: number[];
 }

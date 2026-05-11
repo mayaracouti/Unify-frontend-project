@@ -87,7 +87,6 @@ export interface NormalizedApiError extends Error {
 export type SignInResult =
   | {
       status: "authenticated";
-      user: CurrentUserResponse;
     }
   | {
       status: "needs-verification";

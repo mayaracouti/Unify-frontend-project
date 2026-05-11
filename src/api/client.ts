@@ -60,6 +60,10 @@ export interface ApiClient {
 
 const DEFAULT_TIMEOUT_MS = 20000;
 
+function isFormData(value: unknown): value is FormData {
+  return typeof FormData !== "undefined" && value instanceof FormData;
+}
+
 function buildUrl(baseURL: string, path: string, params?: ApiQueryParams): string {
   const normalizedBaseUrl = baseURL.endsWith("/") ? baseURL.slice(0, -1) : baseURL;
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
@@ -249,7 +253,12 @@ async function performRequest<T>(
     const response = await fetch(requestUrl, {
       method: config.method,
       headers: config.headers,
-      body: config.data === undefined ? undefined : JSON.stringify(config.data),
+      body:
+        config.data === undefined
+          ? undefined
+          : isFormData(config.data)
+            ? config.data
+            : JSON.stringify(config.data),
       signal: controller.signal,
       credentials: "include",
     });

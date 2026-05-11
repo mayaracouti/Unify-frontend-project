@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { WormRiseText, WormRiseWrapText } from "../../../src/components/ui/hello-wave";
 import { UnifyMark } from "../../../src/components/ui/unify-mark";
 import { useAuth } from "../../../src/context/AuthContext";
+import { profileService } from "../../../src/services/profileService";
 import { formatApiErrorMessage } from "../../../src/utils/auth";
 
 
@@ -57,6 +58,22 @@ export default function Login() {
           params: { email: result.email },
         });
         return;
+      }
+
+      try {
+        const completion = await profileService.getCompletion();
+
+        if (!completion.profileCompleted) {
+          router.replace("/onboarding/profile");
+          return;
+        }
+
+        if (!completion.matchPreferencesCompleted) {
+          router.replace("/onboarding/match-preferences");
+          return;
+        }
+      } catch {
+        // Fall back to home when completion cannot be resolved immediately.
       }
 
       router.replace("/home");
