@@ -13,12 +13,16 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import {
+  ChoiceCard,
+  SectionTitle,
+  SimilaritySelector,
+} from "../../src/components/profile/form-controls";
 import { profileService } from "../../src/services/profileService";
 import type {
   LookupOptionResponse,
   ProfileOptionsResponse,
   SimilarityPreference,
-  SimilarityOptionResponse,
 } from "../../src/types/profile";
 import { formatApiErrorMessage } from "../../src/utils/auth";
 import {
@@ -30,78 +34,6 @@ function toggleId(currentIds: number[], id: number): number[] {
   return currentIds.includes(id)
     ? currentIds.filter((currentId) => currentId !== id)
     : [...currentIds, id];
-}
-
-function ChoiceCard({
-  label,
-  selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      className={`min-h-[56px] flex-1 basis-[46%] flex-row items-center justify-between rounded-lg border-2 px-5 py-3 ${
-        selected
-          ? "border-[#EAEA00] bg-[#EAEA00]/10"
-          : "border-[#262626] bg-[#201F1F]"
-      }`}
-      onPress={onPress}
-    >
-      <Text className="flex-1 text-[16px] font-bold text-white">{label}</Text>
-      {selected ? <Ionicons name="checkmark-circle" size={22} color="#EAEA00" /> : null}
-    </Pressable>
-  );
-}
-
-function SectionTitle({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; title: string }) {
-  return (
-    <View className="mb-3 flex-row items-center">
-      <Ionicons name={icon} size={22} color="#00DAF3" />
-      <Text className="ml-2 text-[22px] font-bold text-white">{title}</Text>
-    </View>
-  );
-}
-
-function SimilaritySelector({
-  title,
-  value,
-  options,
-  onChange,
-}: {
-  title: string;
-  value: SimilarityPreference;
-  options: SimilarityOptionResponse[];
-  onChange: (value: SimilarityPreference) => void;
-}) {
-  return (
-    <View className="mb-6">
-      <Text className="mb-3 text-[15px] font-bold text-[#CAC3D8]">{title}</Text>
-      <View className="flex-row flex-wrap gap-3">
-        {options.map((option) => {
-          const selected = option.value === value;
-
-          return (
-            <Pressable
-              key={option.value}
-              className={`min-h-[48px] rounded-full border-2 px-4 py-3 ${
-                selected
-                  ? "border-[#7C4DFF] bg-[#7C4DFF]"
-                  : "border-[#494455] bg-transparent"
-              }`}
-              onPress={() => onChange(option.value)}
-            >
-              <Text className="text-[14px] font-bold text-white">
-                {option.description}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
-  );
 }
 
 export default function MatchPreferencesOnboarding() {
@@ -117,6 +49,8 @@ export default function MatchPreferencesOnboarding() {
     useState<SimilarityPreference>("SIMILAR");
   const [energyLevelSimilarity, setEnergyLevelSimilarity] =
     useState<SimilarityPreference>("ANY");
+  const [loveLanguageSimilarity, setLoveLanguageSimilarity] =
+    useState<SimilarityPreference | null>(null);
   const [minAge, setMinAge] = useState("18");
   const [maxAge, setMaxAge] = useState("");
   const [maxMatchDistanceKm, setMaxMatchDistanceKm] = useState("30");
@@ -146,6 +80,7 @@ export default function MatchPreferencesOnboarding() {
       return (
         Boolean(connectionTypeId) &&
         desiredGenderIds.length > 0 &&
+        loveLanguageSimilarity !== null &&
         Number.isFinite(parsedDistance) &&
         parsedDistance > 0 &&
         Number.isFinite(parsedMinAge) &&
@@ -155,7 +90,14 @@ export default function MatchPreferencesOnboarding() {
         parsedMinAge <= parsedMaxAge
       );
     },
-    [connectionTypeId, desiredGenderIds.length, maxMatchDistanceKm, maxAge, minAge]
+    [
+      connectionTypeId,
+      desiredGenderIds.length,
+      loveLanguageSimilarity,
+      maxMatchDistanceKm,
+      maxAge,
+      minAge,
+    ]
   );
   const showLocationSettingsButton =
     Platform.OS !== "web" && !hasLocationPermission && !canAskLocationPermissionAgain;
@@ -181,6 +123,7 @@ export default function MatchPreferencesOnboarding() {
         setAutonomyCompatibility(preferences.autonomyCompatibility ?? "SIMILAR");
         setLifestyleSimilarity(preferences.lifestyleSimilarity ?? "SIMILAR");
         setEnergyLevelSimilarity(preferences.energyLevelSimilarity ?? "ANY");
+        setLoveLanguageSimilarity(preferences.loveLanguageSimilarity ?? null);
         setMinAge(preferences.minAge == null ? "" : String(preferences.minAge));
         setMaxAge(preferences.maxAge == null ? "" : String(preferences.maxAge));
         setMaxMatchDistanceKm(String(preferences.maxMatchDistanceKm ?? 30));
@@ -270,7 +213,9 @@ export default function MatchPreferencesOnboarding() {
     const parsedMaxAge = Number(maxAge);
 
     if (!canSave || Number.isNaN(distance)) {
-      setError("Preencha objetivo, gêneros desejados, faixa etária válida e uma distância maior que zero.");
+      setError(
+        "Preencha objetivo, gêneros desejados, afinidade de linguagem do amor, faixa etária válida e uma distância maior que zero."
+      );
       return;
     }
 
@@ -294,6 +239,7 @@ export default function MatchPreferencesOnboarding() {
         autonomyCompatibility,
         lifestyleSimilarity,
         energyLevelSimilarity,
+        loveLanguageSimilarity,
         minAge: parsedMinAge,
         maxAge: parsedMaxAge,
         maxMatchDistanceKm: distance,
@@ -495,6 +441,13 @@ export default function MatchPreferencesOnboarding() {
                 value={energyLevelSimilarity}
                 options={similarityOptions}
                 onChange={setEnergyLevelSimilarity}
+              />
+              <SimilaritySelector
+                title="Linguagens do amor"
+                value={loveLanguageSimilarity}
+                options={similarityOptions}
+                onChange={setLoveLanguageSimilarity}
+                onClear={() => setLoveLanguageSimilarity(null)}
               />
             </View>
 
