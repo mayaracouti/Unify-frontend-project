@@ -45,6 +45,7 @@ export default function EditProfile() {
   const [options, setOptions] = useState<ProfileOptionsResponse | null>(null);
   const [bio, setBio] = useState("");
   const [genderId, setGenderId] = useState<number | undefined>();
+  const [pronounsId, setPronounsId] = useState<number | undefined>();
   const [disabilityIds, setDisabilityIds] = useState<number[]>([]);
   const [accessibilityNeedIds, setAccessibilityNeedIds] = useState<number[]>([]);
   const [autonomyLevelId, setAutonomyLevelId] = useState<number | undefined>();
@@ -52,6 +53,7 @@ export default function EditProfile() {
   const [lifestyleTypeIds, setLifestyleTypeIds] = useState<number[]>([]);
   const [energyLevelId, setEnergyLevelId] = useState<number | undefined>();
   const [interestTypeIds, setInterestTypeIds] = useState<number[]>([]);
+  const [loveLanguageIds, setLoveLanguageIds] = useState<number[]>([]);
   const [autoLocation, setAutoLocation] = useState<AutoLocation | null>(null);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const [canAskLocationPermissionAgain, setCanAskLocationPermissionAgain] = useState(true);
@@ -67,10 +69,19 @@ export default function EditProfile() {
   const canSave = useMemo(
     () =>
       Boolean(genderId) &&
+      Boolean(pronounsId) &&
       communicationFormIds.length > 0 &&
       lifestyleTypeIds.length > 0 &&
-      interestTypeIds.length > 0,
-    [communicationFormIds.length, genderId, interestTypeIds.length, lifestyleTypeIds.length]
+      interestTypeIds.length > 0 &&
+      loveLanguageIds.length > 0,
+    [
+      communicationFormIds.length,
+      genderId,
+      interestTypeIds.length,
+      lifestyleTypeIds.length,
+      loveLanguageIds.length,
+      pronounsId,
+    ]
   );
   const showLocationSettingsButton =
     Platform.OS !== "web" && !hasLocationPermission && !canAskLocationPermissionAgain;
@@ -135,6 +146,7 @@ export default function EditProfile() {
         setOptions(nextOptions);
         setBio(profile.bio ?? "");
         setGenderId(profile.gender?.id);
+        setPronounsId(profile.pronouns?.id);
         setDisabilityIds(idsFromOptions(profile.disabilities));
         setAccessibilityNeedIds(idsFromOptions(profile.accessibilityNeeds));
         setAutonomyLevelId(profile.autonomyLevel?.id);
@@ -142,6 +154,7 @@ export default function EditProfile() {
         setLifestyleTypeIds(idsFromOptions(profile.lifestyleTypes));
         setEnergyLevelId(profile.energyLevel?.id);
         setInterestTypeIds(idsFromOptions(profile.interestTypes));
+        setLoveLanguageIds(idsFromOptions(profile.loveLanguages));
 
         void syncAutomaticLocation(
           profile.activeLocation?.latitude != null &&
@@ -211,7 +224,9 @@ export default function EditProfile() {
 
   async function handleSave() {
     if (!canSave) {
-      setError("Preencha gênero, comunicação, estilo de vida e interesses para salvar.");
+      setError(
+        "Preencha gênero, pronomes, comunicação, estilo de vida, interesses e linguagens do amor para salvar."
+      );
       return;
     }
 
@@ -236,6 +251,7 @@ export default function EditProfile() {
       await profileService.saveProfile({
         bio: bio.trim(),
         genderId,
+        pronounsId: pronounsId ?? null,
         disabilityIds,
         accessibilityNeedIds,
         autonomyLevelId,
@@ -243,6 +259,7 @@ export default function EditProfile() {
         lifestyleTypeIds,
         energyLevelId,
         interestTypeIds,
+        loveLanguageIds: loveLanguageIds.length > 0 ? loveLanguageIds : null,
         location: nextLocation,
       });
 
@@ -309,6 +326,13 @@ export default function EditProfile() {
             {options ? (
               <View className="rounded-[28px] bg-[#111214] p-6">
                 <SingleChoice title="Gênero" options={options.genders} value={genderId} onChange={setGenderId} />
+                <SingleChoice
+                  title="Pronomes"
+                  options={options.pronouns}
+                  value={pronounsId}
+                  onChange={setPronounsId}
+                  onClear={() => setPronounsId(undefined)}
+                />
                 <MultiChoice title="Tipo de deficiência" options={options.disabilities} values={disabilityIds} onChange={setDisabilityIds} toggleId={toggleId} showOptionIcons />
                 <MultiChoice title="Necessidades de acessibilidade" options={options.accessibilityNeeds} values={accessibilityNeedIds} onChange={setAccessibilityNeedIds} toggleId={toggleId} />
                 <SingleChoice title="Nível de autonomia" options={options.autonomyLevels} value={autonomyLevelId} onChange={setAutonomyLevelId} />
@@ -316,6 +340,7 @@ export default function EditProfile() {
                 <MultiChoice title="Estilo de vida" options={options.lifestyleTypes} values={lifestyleTypeIds} onChange={setLifestyleTypeIds} toggleId={toggleId} />
                 <SingleChoice title="Nível de energia" options={options.energyLevels} value={energyLevelId} onChange={setEnergyLevelId} />
                 <MultiChoice title="Interesses & Hobbies" options={options.interestTypes} values={interestTypeIds} onChange={setInterestTypeIds} toggleId={toggleId} />
+                <MultiChoice title="Linguagens do amor" options={options.loveLanguages} values={loveLanguageIds} onChange={setLoveLanguageIds} toggleId={toggleId} />
 
                 <View className="mb-2 rounded-2xl border border-[#353534] bg-[#201F1F] px-4 py-4">
                   <View className="flex-row items-start">

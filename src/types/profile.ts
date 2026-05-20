@@ -29,6 +29,7 @@ export interface UserProfileImageResponse {
 
 export interface ProfileOptionsResponse {
   genders: LookupOptionResponse[];
+  pronouns: LookupOptionResponse[];
   disabilities: DisabilityOptionResponse[];
   accessibilityNeeds: LookupOptionResponse[];
   autonomyLevels: LookupOptionResponse[];
@@ -36,6 +37,7 @@ export interface ProfileOptionsResponse {
   lifestyleTypes: LookupOptionResponse[];
   energyLevels: LookupOptionResponse[];
   interestTypes: LookupOptionResponse[];
+  loveLanguages: LookupOptionResponse[];
   connectionTypes: LookupOptionResponse[];
   similarityPreferences: SimilarityOptionResponse[];
 }
@@ -63,6 +65,7 @@ export interface UserProfileResponse {
     age?: number | null;
   } | null;
   gender: LookupOptionResponse | null;
+  pronouns: LookupOptionResponse | null;
   disabilities: DisabilityOptionResponse[];
   accessibilityNeeds: LookupOptionResponse[];
   autonomyLevel: LookupOptionResponse | null;
@@ -70,6 +73,7 @@ export interface UserProfileResponse {
   lifestyleTypes: LookupOptionResponse[];
   energyLevel: LookupOptionResponse | null;
   interestTypes: LookupOptionResponse[];
+  loveLanguages: LookupOptionResponse[];
   activeLocation: LocationResponse | null;
   profilePicture?: UserProfileImageResponse | null;
   galleryImages?: UserProfileImageResponse[];
@@ -85,6 +89,7 @@ export interface UserProfileDirectoryItemResponse extends UserProfileResponse {
 export interface UserProfileUpsertRequest {
   bio?: string;
   genderId?: number;
+  pronounsId?: number | null;
   disabilityIds: number[];
   accessibilityNeedIds: number[];
   autonomyLevelId?: number;
@@ -92,6 +97,7 @@ export interface UserProfileUpsertRequest {
   lifestyleTypeIds: number[];
   energyLevelId?: number;
   interestTypeIds: number[];
+  loveLanguageIds?: number[] | null;
   location?: {
     latitude: number;
     longitude: number;
@@ -105,6 +111,7 @@ export interface UserMatchPreferencesResponse {
   autonomyCompatibility: SimilarityPreference | null;
   lifestyleSimilarity: SimilarityPreference | null;
   energyLevelSimilarity: SimilarityPreference | null;
+  loveLanguageSimilarity: SimilarityPreference | null;
   minAge: number | null;
   maxAge: number | null;
   maxMatchDistanceKm: number | null;
@@ -117,6 +124,7 @@ export interface UserMatchPreferencesUpsertRequest {
   autonomyCompatibility: SimilarityPreference;
   lifestyleSimilarity: SimilarityPreference;
   energyLevelSimilarity: SimilarityPreference;
+  loveLanguageSimilarity: SimilarityPreference | null;
   minAge: number;
   maxAge: number;
   maxMatchDistanceKm: number;

@@ -14,6 +14,10 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import {
+  MultiChoice,
+  SingleChoice,
+} from "../../src/components/profile/form-controls";
 import { profileService } from "../../src/services/profileService";
 import type { LookupOptionResponse, ProfileOptionsResponse } from "../../src/types/profile";
 import { formatApiErrorMessage } from "../../src/utils/auth";
@@ -26,113 +30,6 @@ function toggleId(currentIds: number[], id: number): number[] {
   return currentIds.includes(id)
     ? currentIds.filter((currentId) => currentId !== id)
     : [...currentIds, id];
-}
-
-function isIoniconName(
-  value?: string | null
-): value is keyof typeof Ionicons.glyphMap {
-  return typeof value === "string" && value in Ionicons.glyphMap;
-}
-
-function OptionChip({
-  label,
-  selected,
-  iconName,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  iconName?: keyof typeof Ionicons.glyphMap;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      className={`min-h-[52px] flex-row items-center rounded-full border-2 px-5 py-3 ${
-        selected
-          ? "border-[#EAEA00] bg-[#EAEA00]"
-          : "border-[#494455] bg-transparent"
-      }`}
-      onPress={onPress}
-    >
-      {iconName ? (
-        <Ionicons
-          name={iconName}
-          size={18}
-          color={selected ? "#323200" : "#E5E2E1"}
-        />
-      ) : selected ? (
-        <Ionicons name="checkmark-circle" size={18} color="#323200" />
-      ) : null}
-      <Text
-        className={`text-[15px] font-bold ${(selected || iconName) ? "ml-2" : ""} ${selected ? "text-[#323200]" : "text-[#E5E2E1]"}`}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-function SingleChoice({
-  title,
-  options,
-  value,
-  onChange,
-}: {
-  title: string;
-  options: LookupOptionResponse[];
-  value?: number;
-  onChange: (id: number) => void;
-}) {
-  return (
-    <View className="mb-8">
-      <Text className="mb-3 text-[22px] font-bold text-white">{title}</Text>
-      <View className="flex-row flex-wrap gap-3">
-        {options.map((option) => (
-          <OptionChip
-            key={option.id}
-            label={option.description}
-            selected={value === option.id}
-            onPress={() => onChange(option.id)}
-          />
-        ))}
-      </View>
-    </View>
-  );
-}
-
-function MultiChoice({
-  title,
-  options,
-  values,
-  onChange,
-  showOptionIcons = false,
-}: {
-  title: string;
-  options: LookupOptionResponse[];
-  values: number[];
-  onChange: (ids: number[]) => void;
-  showOptionIcons?: boolean;
-}) {
-  return (
-    <View className="mb-8">
-      <Text className="mb-3 text-[22px] font-bold text-white">{title}</Text>
-      <View className="flex-row flex-wrap gap-3">
-        {options.map((option) => (
-          <OptionChip
-            key={option.id}
-            label={option.description}
-            selected={values.includes(option.id)}
-            iconName={
-              showOptionIcons && isIoniconName(option.ionicIcon)
-                ? option.ionicIcon
-                : undefined
-            }
-            onPress={() => onChange(toggleId(values, option.id))}
-          />
-        ))}
-      </View>
-    </View>
-  );
 }
 
 type AutoLocation = {
@@ -218,6 +115,7 @@ export default function ProfileOnboarding() {
   const [options, setOptions] = useState<ProfileOptionsResponse | null>(null);
   const [bio, setBio] = useState("");
   const [genderId, setGenderId] = useState<number | undefined>();
+  const [pronounsId, setPronounsId] = useState<number | undefined>();
   const [disabilityIds, setDisabilityIds] = useState<number[]>([]);
   const [accessibilityNeedIds, setAccessibilityNeedIds] = useState<number[]>([]);
   const [autonomyLevelId, setAutonomyLevelId] = useState<number | undefined>();
@@ -225,6 +123,7 @@ export default function ProfileOnboarding() {
   const [lifestyleTypeIds, setLifestyleTypeIds] = useState<number[]>([]);
   const [energyLevelId, setEnergyLevelId] = useState<number | undefined>();
   const [interestTypeIds, setInterestTypeIds] = useState<number[]>([]);
+  const [loveLanguageIds, setLoveLanguageIds] = useState<number[]>([]);
   const [autoLocation, setAutoLocation] = useState<AutoLocation | null>(null);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const [canAskLocationPermissionAgain, setCanAskLocationPermissionAgain] = useState(true);
@@ -240,10 +139,19 @@ export default function ProfileOnboarding() {
   const canSave = useMemo(
     () =>
       Boolean(genderId) &&
+      Boolean(pronounsId) &&
       communicationFormIds.length > 0 &&
       lifestyleTypeIds.length > 0 &&
-      interestTypeIds.length > 0,
-    [communicationFormIds.length, genderId, interestTypeIds.length, lifestyleTypeIds.length]
+      interestTypeIds.length > 0 &&
+      loveLanguageIds.length > 0,
+    [
+      communicationFormIds.length,
+      genderId,
+      interestTypeIds.length,
+      lifestyleTypeIds.length,
+      loveLanguageIds.length,
+      pronounsId,
+    ]
   );
   const showLocationSettingsButton =
     Platform.OS !== "web" && !hasLocationPermission && !canAskLocationPermissionAgain;
@@ -308,6 +216,7 @@ export default function ProfileOnboarding() {
         setOptions(nextOptions);
         setBio(profile.bio ?? "");
         setGenderId(profile.gender?.id);
+        setPronounsId(profile.pronouns?.id);
         setDisabilityIds(idsFromOptions(profile.disabilities));
         setAccessibilityNeedIds(idsFromOptions(profile.accessibilityNeeds));
         setAutonomyLevelId(profile.autonomyLevel?.id);
@@ -315,6 +224,7 @@ export default function ProfileOnboarding() {
         setLifestyleTypeIds(idsFromOptions(profile.lifestyleTypes));
         setEnergyLevelId(profile.energyLevel?.id);
         setInterestTypeIds(idsFromOptions(profile.interestTypes));
+        setLoveLanguageIds(idsFromOptions(profile.loveLanguages));
 
         void syncAutomaticLocation(
           profile.activeLocation?.latitude != null &&
@@ -384,7 +294,9 @@ export default function ProfileOnboarding() {
 
   async function handleSave() {
     if (!canSave) {
-      setError("Preencha gênero, comunicação, estilo de vida e interesses para continuar.");
+      setError(
+        "Preencha gênero, pronomes, comunicação, estilo de vida, interesses e linguagens do amor para continuar."
+      );
       return;
     }
 
@@ -409,6 +321,7 @@ export default function ProfileOnboarding() {
       await profileService.saveProfile({
         bio: bio.trim(),
         genderId,
+        pronounsId: pronounsId ?? null,
         disabilityIds,
         accessibilityNeedIds,
         autonomyLevelId,
@@ -416,6 +329,7 @@ export default function ProfileOnboarding() {
         lifestyleTypeIds,
         energyLevelId,
         interestTypeIds,
+        loveLanguageIds: loveLanguageIds.length > 0 ? loveLanguageIds : null,
         location: nextLocation,
       });
 
@@ -479,13 +393,21 @@ export default function ProfileOnboarding() {
             {options ? (
               <>
                 <SingleChoice title="Gênero" options={options.genders} value={genderId} onChange={setGenderId} />
-                <MultiChoice title="Tipo de deficiência" options={options.disabilities} values={disabilityIds} onChange={setDisabilityIds} showOptionIcons />
-                <MultiChoice title="Necessidades de acessibilidade" options={options.accessibilityNeeds} values={accessibilityNeedIds} onChange={setAccessibilityNeedIds} />
+                <SingleChoice
+                  title="Pronomes"
+                  options={options.pronouns}
+                  value={pronounsId}
+                  onChange={setPronounsId}
+                  onClear={() => setPronounsId(undefined)}
+                />
+                <MultiChoice title="Tipo de deficiência" options={options.disabilities} values={disabilityIds} onChange={setDisabilityIds} toggleId={toggleId} showOptionIcons />
+                <MultiChoice title="Necessidades de acessibilidade" options={options.accessibilityNeeds} values={accessibilityNeedIds} onChange={setAccessibilityNeedIds} toggleId={toggleId} />
                 <SingleChoice title="Nível de autonomia" options={options.autonomyLevels} value={autonomyLevelId} onChange={setAutonomyLevelId} />
-                <MultiChoice title="Formas de comunicação" options={options.communicationForms} values={communicationFormIds} onChange={setCommunicationFormIds} />
-                <MultiChoice title="Estilo de vida" options={options.lifestyleTypes} values={lifestyleTypeIds} onChange={setLifestyleTypeIds} />
+                <MultiChoice title="Formas de comunicação" options={options.communicationForms} values={communicationFormIds} onChange={setCommunicationFormIds} toggleId={toggleId} />
+                <MultiChoice title="Estilo de vida" options={options.lifestyleTypes} values={lifestyleTypeIds} onChange={setLifestyleTypeIds} toggleId={toggleId} />
                 <SingleChoice title="Nível de energia" options={options.energyLevels} value={energyLevelId} onChange={setEnergyLevelId} />
-                <MultiChoice title="Interesses & Hobbies" options={options.interestTypes} values={interestTypeIds} onChange={setInterestTypeIds} />
+                <MultiChoice title="Interesses & Hobbies" options={options.interestTypes} values={interestTypeIds} onChange={setInterestTypeIds} toggleId={toggleId} />
+                <MultiChoice title="Linguagens do amor" options={options.loveLanguages} values={loveLanguageIds} onChange={setLoveLanguageIds} toggleId={toggleId} />
               </>
             ) : null}
 

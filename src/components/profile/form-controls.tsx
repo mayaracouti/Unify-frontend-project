@@ -56,11 +56,13 @@ export function SingleChoice({
   options,
   value,
   onChange,
+  onClear,
 }: {
   title: string;
   options: LookupOptionResponse[];
   value?: number;
   onChange: (id: number) => void;
+  onClear?: () => void;
 }) {
   return (
     <View className="mb-8">
@@ -71,7 +73,14 @@ export function SingleChoice({
             key={option.id}
             label={option.description}
             selected={value === option.id}
-            onPress={() => onChange(option.id)}
+            onPress={() => {
+              if (value === option.id && onClear) {
+                onClear();
+                return;
+              }
+
+              onChange(option.id);
+            }}
           />
         ))}
       </View>
@@ -162,11 +171,13 @@ export function SimilaritySelector({
   value,
   options,
   onChange,
+  onClear,
 }: {
   title: string;
-  value: SimilarityPreference;
+  value: SimilarityPreference | null;
   options: SimilarityOptionResponse[];
   onChange: (value: SimilarityPreference) => void;
+  onClear?: () => void;
 }) {
   return (
     <View className="mb-6">
@@ -183,7 +194,14 @@ export function SimilaritySelector({
                   ? "border-[#7C4DFF] bg-[#7C4DFF]"
                   : "border-[#494455] bg-transparent"
               }`}
-              onPress={() => onChange(option.value)}
+              onPress={() => {
+                if (selected && onClear) {
+                  onClear();
+                  return;
+                }
+
+                onChange(option.value);
+              }}
             >
               <Text className="text-[14px] font-bold text-white">
                 {option.description}

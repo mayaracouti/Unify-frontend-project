@@ -53,6 +53,8 @@ export default function EditMatchPreferences() {
     useState<SimilarityPreference>("SIMILAR");
   const [energyLevelSimilarity, setEnergyLevelSimilarity] =
     useState<SimilarityPreference>("ANY");
+  const [loveLanguageSimilarity, setLoveLanguageSimilarity] =
+    useState<SimilarityPreference | null>(null);
   const [minAge, setMinAge] = useState("");
   const [maxAge, setMaxAge] = useState("");
   const [maxMatchDistanceKm, setMaxMatchDistanceKm] = useState("30");
@@ -81,6 +83,7 @@ export default function EditMatchPreferences() {
     return (
       Boolean(connectionTypeId) &&
       desiredGenderIds.length > 0 &&
+      loveLanguageSimilarity !== null &&
       Number.isFinite(parsedDistance) &&
       parsedDistance > 0 &&
       Number.isFinite(parsedMinAge) &&
@@ -89,7 +92,14 @@ export default function EditMatchPreferences() {
       parsedMaxAge >= 18 &&
       parsedMinAge <= parsedMaxAge
     );
-  }, [connectionTypeId, desiredGenderIds.length, maxMatchDistanceKm, maxAge, minAge]);
+  }, [
+    connectionTypeId,
+    desiredGenderIds.length,
+    loveLanguageSimilarity,
+    maxMatchDistanceKm,
+    maxAge,
+    minAge,
+  ]);
   const showLocationSettingsButton =
     Platform.OS !== "web" && !hasLocationPermission && !canAskLocationPermissionAgain;
 
@@ -114,6 +124,7 @@ export default function EditMatchPreferences() {
         setAutonomyCompatibility(preferences.autonomyCompatibility ?? "SIMILAR");
         setLifestyleSimilarity(preferences.lifestyleSimilarity ?? "SIMILAR");
         setEnergyLevelSimilarity(preferences.energyLevelSimilarity ?? "ANY");
+        setLoveLanguageSimilarity(preferences.loveLanguageSimilarity ?? null);
         setMinAge(preferences.minAge == null ? "" : String(preferences.minAge));
         setMaxAge(preferences.maxAge == null ? "" : String(preferences.maxAge));
         setMaxMatchDistanceKm(String(preferences.maxMatchDistanceKm ?? 30));
@@ -205,21 +216,34 @@ export default function EditMatchPreferences() {
     const parsedMaxAge = Number(maxAge);
 
     if (!canSave || Number.isNaN(distance)) {
-        showGlobalToast({ title: "Atenção", variant: "error", message: "Preencha objetivo, gêneros desejados, faixa etária válida e uma distância maior que zero." });
-        setError(
-            "Preencha objetivo, gêneros desejados, faixa etária válida e uma distância maior que zero."
-        );
-        return;
+      showGlobalToast({
+        title: "Atenção",
+        variant: "error",
+        message:
+          "Preencha objetivo, gêneros desejados, afinidade de linguagem do amor, faixa etária válida e uma distância maior que zero.",
+      });
+      setError(
+        "Preencha objetivo, gêneros desejados, afinidade de linguagem do amor, faixa etária válida e uma distância maior que zero."
+      );
+      return;
     }
 
     if (parsedMinAge < 18 || parsedMaxAge < 18) {
-        showGlobalToast({ title: "Atenção", variant: "error", message: "A faixa etária mínima e máxima deve ser de pelo menos 18 anos." });
+      showGlobalToast({
+        title: "Atenção",
+        variant: "error",
+        message: "A faixa etária mínima e máxima deve ser de pelo menos 18 anos.",
+      });
       setError("A faixa etária mínima e máxima deve ser de pelo menos 18 anos.");
       return;
     }
 
     if (parsedMinAge > parsedMaxAge) {
-        showGlobalToast({ title: "Atenção", variant: "error", message: "A idade mínima não pode ser maior que a idade máxima." });
+      showGlobalToast({
+        title: "Atenção",
+        variant: "error",
+        message: "A idade mínima não pode ser maior que a idade máxima.",
+      });
       setError("A idade mínima não pode ser maior que a idade máxima.");
       return;
     }
@@ -234,6 +258,7 @@ export default function EditMatchPreferences() {
         autonomyCompatibility,
         lifestyleSimilarity,
         energyLevelSimilarity,
+        loveLanguageSimilarity,
         minAge: parsedMinAge,
         maxAge: parsedMaxAge,
         maxMatchDistanceKm: distance,
@@ -436,6 +461,13 @@ export default function EditMatchPreferences() {
                     value={energyLevelSimilarity}
                     options={similarityOptions}
                     onChange={setEnergyLevelSimilarity}
+                  />
+                  <SimilaritySelector
+                    title="Linguagens do amor"
+                    value={loveLanguageSimilarity}
+                    options={similarityOptions}
+                    onChange={setLoveLanguageSimilarity}
+                    onClear={() => setLoveLanguageSimilarity(null)}
                   />
                 </View>
               </View>
