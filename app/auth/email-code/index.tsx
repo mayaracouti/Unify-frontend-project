@@ -113,7 +113,7 @@ export default function EmailCode() {
 
           <TextInput
             className="mb-5 rounded-md bg-[#F3F3F3] px-4 py-4 text-center text-[22px] font-semibold tracking-[6px] text-zinc-900"
-            keyboardType="number-pad"
+            keyboardType="default"
             textContentType="oneTimeCode"
             maxLength={6}
             autoFocus
