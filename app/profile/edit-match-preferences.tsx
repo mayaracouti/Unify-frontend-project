@@ -331,6 +331,7 @@ export default function EditMatchPreferences() {
                   <SectionTitle icon="heart-outline" title="Interesse em" />
                   <View className="flex-row flex-wrap gap-2">
                     {options.genders.map((option) => (
+                      option.id !== 4 ? (
                       <Pressable
                         key={option.id}
                         className={`min-h-[22px] rounded-full border-2 px-5 py-3 ${
@@ -349,6 +350,7 @@ export default function EditMatchPreferences() {
                           </Text>
                         </View>
                       </Pressable>
+                      ) : null
                     ))}
                   </View>
                 </View>
