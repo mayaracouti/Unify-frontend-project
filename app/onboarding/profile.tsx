@@ -135,18 +135,22 @@ export default function ProfileOnboarding() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const hasPronounOptions = (options?.pronouns.length ?? 0) > 0;
+  const hasLoveLanguageOptions = (options?.loveLanguages.length ?? 0) > 0;
   const bioLength = bio.trim().length;
   const canSave = useMemo(
     () =>
       Boolean(genderId) &&
-      Boolean(pronounsId) &&
+      (!hasPronounOptions || Boolean(pronounsId)) &&
       communicationFormIds.length > 0 &&
       lifestyleTypeIds.length > 0 &&
       interestTypeIds.length > 0 &&
-      loveLanguageIds.length > 0,
+      (!hasLoveLanguageOptions || loveLanguageIds.length > 0),
     [
       communicationFormIds.length,
       genderId,
+      hasLoveLanguageOptions,
+      hasPronounOptions,
       interestTypeIds.length,
       lifestyleTypeIds.length,
       loveLanguageIds.length,
@@ -295,7 +299,7 @@ export default function ProfileOnboarding() {
   async function handleSave() {
     if (!canSave) {
       setError(
-        "Preencha gênero, pronomes, comunicação, estilo de vida, interesses e linguagens do amor para continuar."
+        "Preencha os campos obrigatórios disponíveis para continuar."
       );
       return;
     }
@@ -393,13 +397,15 @@ export default function ProfileOnboarding() {
             {options ? (
               <>
                 <SingleChoice title="Gênero" options={options.genders} value={genderId} onChange={setGenderId} />
-                <SingleChoice
-                  title="Pronomes"
-                  options={options.pronouns}
-                  value={pronounsId}
-                  onChange={setPronounsId}
-                  onClear={() => setPronounsId(undefined)}
-                />
+                {hasPronounOptions ? (
+                  <SingleChoice
+                    title="Pronomes"
+                    options={options.pronouns}
+                    value={pronounsId}
+                    onChange={setPronounsId}
+                    onClear={() => setPronounsId(undefined)}
+                  />
+                ) : null}
                 <MultiChoice title="Tipo de deficiência" options={options.disabilities} values={disabilityIds} onChange={setDisabilityIds} toggleId={toggleId} showOptionIcons />
                 <MultiChoice title="Necessidades de acessibilidade" options={options.accessibilityNeeds} values={accessibilityNeedIds} onChange={setAccessibilityNeedIds} toggleId={toggleId} />
                 <SingleChoice title="Nível de autonomia" options={options.autonomyLevels} value={autonomyLevelId} onChange={setAutonomyLevelId} />
@@ -407,7 +413,9 @@ export default function ProfileOnboarding() {
                 <MultiChoice title="Estilo de vida" options={options.lifestyleTypes} values={lifestyleTypeIds} onChange={setLifestyleTypeIds} toggleId={toggleId} />
                 <SingleChoice title="Nível de energia" options={options.energyLevels} value={energyLevelId} onChange={setEnergyLevelId} />
                 <MultiChoice title="Interesses & Hobbies" options={options.interestTypes} values={interestTypeIds} onChange={setInterestTypeIds} toggleId={toggleId} />
-                <MultiChoice title="Linguagens do amor" options={options.loveLanguages} values={loveLanguageIds} onChange={setLoveLanguageIds} toggleId={toggleId} />
+                {hasLoveLanguageOptions ? (
+                  <MultiChoice title="Linguagens do amor" options={options.loveLanguages} values={loveLanguageIds} onChange={setLoveLanguageIds} toggleId={toggleId} />
+                ) : null}
               </>
             ) : null}
 

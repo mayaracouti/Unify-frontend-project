@@ -14,6 +14,25 @@ import type {
 const ALL_USER_PROFILES_ENDPOINT = "/users/profiles";
 const PROFILE_IMAGES_ENDPOINT = "/users/me/profile/images";
 
+function normalizeProfileOptions(
+  options: Partial<ProfileOptionsResponse>
+): ProfileOptionsResponse {
+  return {
+    genders: options.genders ?? [],
+    pronouns: options.pronouns ?? [],
+    disabilities: options.disabilities ?? [],
+    accessibilityNeeds: options.accessibilityNeeds ?? [],
+    autonomyLevels: options.autonomyLevels ?? [],
+    communicationForms: options.communicationForms ?? [],
+    lifestyleTypes: options.lifestyleTypes ?? [],
+    energyLevels: options.energyLevels ?? [],
+    interestTypes: options.interestTypes ?? [],
+    loveLanguages: options.loveLanguages ?? [],
+    connectionTypes: options.connectionTypes ?? [],
+    similarityPreferences: options.similarityPreferences ?? [],
+  };
+}
+
 export const profileService = {
   getCompletion() {
     return customApiCall.get<ProfileCompletionResponse>(
@@ -23,12 +42,14 @@ export const profileService = {
     );
   },
 
-  getOptions() {
-    return customApiCall.get<ProfileOptionsResponse>(
+  async getOptions() {
+    const options = await customApiCall.get<Partial<ProfileOptionsResponse>>(
       "/users/me/profile/options",
       undefined,
       { requiresAuth: true }
     );
+
+    return normalizeProfileOptions(options);
   },
 
   getProfile() {
