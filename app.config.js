@@ -22,6 +22,7 @@ module.exports = () => {
   const expoConfig = appJson.expo;
   const appProfile = readTrimmedEnv("EXPO_PUBLIC_APP_PROFILE") ?? "dev";
   const apiBaseUrl = readTrimmedEnv("EXPO_PUBLIC_API_BASE_URL");
+  const useMocks = readTrimmedEnv("EXPO_PUBLIC_USE_MOCKS");
   const usesCleartextTraffic = shouldAllowAndroidCleartextTraffic(
     appProfile,
     apiBaseUrl
@@ -37,6 +38,7 @@ module.exports = () => {
       ...(expoConfig.extra ?? {}),
       appProfile,
       ...(apiBaseUrl ? { apiBaseUrl } : {}),
+      ...(useMocks ? { useMocks } : {}),
     },
   };
 };

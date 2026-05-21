@@ -1,4 +1,6 @@
 import { customApiCall } from "../api/customApi";
+import { runtimeConfig } from "../config/runtime";
+import { createMockTokenResponse } from "./mockData";
 import type {
   EmailVerificationRequest,
   ForgotPasswordRequest,
@@ -25,6 +27,10 @@ export const authService = {
   },
 
   signIn(payload: SignInRequest) {
+    if (runtimeConfig.useMocks) {
+      return Promise.resolve(createMockTokenResponse());
+    }
+
     return customApiCall.post<TokenResponse, SignInRequest>("/auth/signin", {
       ...payload,
       email: normalizeEmail(payload.email),
@@ -70,6 +76,10 @@ export const authService = {
   },
 
   refresh(payload: RefreshTokenRequest) {
+    if (runtimeConfig.useMocks) {
+      return Promise.resolve(createMockTokenResponse());
+    }
+
     return customApiCall.post<TokenResponse, RefreshTokenRequest>(
       "/auth/refresh",
       payload
@@ -77,6 +87,10 @@ export const authService = {
   },
 
   logout() {
+    if (runtimeConfig.useMocks) {
+      return Promise.resolve(null);
+    }
+
     return customApiCall.post<null>("/auth/logout", undefined, {
       requiresAuth: true,
       suppressErrorToast: true,

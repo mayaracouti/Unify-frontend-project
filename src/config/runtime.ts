@@ -8,14 +8,21 @@ export type AppProfile = (typeof APP_PROFILES)[number];
 export type RuntimeConfig = {
   profile: AppProfile;
   apiBaseUrl: string;
+  useMocks: boolean;
 };
 
 type RuntimeExtra = {
   appProfile?: string;
   apiBaseUrl?: string;
+  useMocks?: boolean | string;
 };
 
-function readProcessEnv(name: "EXPO_PUBLIC_API_BASE_URL" | "EXPO_PUBLIC_APP_PROFILE") {
+function readProcessEnv(
+  name:
+    | "EXPO_PUBLIC_API_BASE_URL"
+    | "EXPO_PUBLIC_APP_PROFILE"
+    | "EXPO_PUBLIC_USE_MOCKS"
+) {
   const value = (
     globalThis as {
       process?: {
@@ -25,6 +32,18 @@ function readProcessEnv(name: "EXPO_PUBLIC_API_BASE_URL" | "EXPO_PUBLIC_APP_PROF
   ).process?.env?.[name];
 
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function parseBooleanFlag(value: boolean | string | null | undefined): boolean {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 }
 
 function readRuntimeExtra(): RuntimeExtra {
@@ -45,6 +64,7 @@ function readRuntimeExtra(): RuntimeExtra {
       typeof extra.apiBaseUrl === "string" && extra.apiBaseUrl.trim().length > 0
         ? extra.apiBaseUrl.trim()
         : undefined,
+    useMocks: extra.useMocks,
   };
 }
 
@@ -104,11 +124,24 @@ function resolveApiBaseUrl(profile: AppProfile): string {
   return resolveDefaultApiBaseUrl(profile);
 }
 
+function resolveUseMocks(): boolean {
+  const envUseMocks = readProcessEnv("EXPO_PUBLIC_USE_MOCKS");
+
+  if (envUseMocks) {
+    return parseBooleanFlag(envUseMocks);
+  }
+
+  const { useMocks } = readRuntimeExtra();
+
+  return parseBooleanFlag(useMocks);
+}
+
 export const runtimeConfig: RuntimeConfig = (() => {
   const profile = resolveAppProfile();
 
   return {
     profile,
     apiBaseUrl: resolveApiBaseUrl(profile),
+    useMocks: resolveUseMocks(),
   };
 })();
