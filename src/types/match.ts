@@ -23,3 +23,20 @@ export interface MutualMatchResponse {
   userProfileId: string;
   profileImage: UserProfileImageResponse | null;
 }
+
+export interface MutualMatchSummaryResponse {
+  userId: string;
+  userProfileId: string;
+  fullName: string | null;
+  age: number | null;
+  profilePicture: UserProfileImageResponse | null;
+}
+
+export interface MutualMatchPageResponse {
+  matches: MutualMatchSummaryResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  hasNext: boolean;
+}

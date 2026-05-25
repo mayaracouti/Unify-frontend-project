@@ -1,20 +1,13 @@
-import { useEffect, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
+import { useAppShell } from "../../src/context/AppShellContext";
+import { useAuth } from "../../src/context/AuthContext";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
-import { profileService } from "../../src/services/profileService";
-import { getAuthSnapshot } from "../../src/storage/tokenStorage";
-import type { UserProfileResponse } from "../../src/types/profile";
-
-function getPrimaryProfilePhotoUrl(profile: UserProfileResponse | null) {
-  const firstAttachedPhoto = profile?.profilePicture ?? profile?.galleryImages?.[0];
-
-  return profileService.resolveProfileImageUrl(firstAttachedPhoto?.url);
-}
 
 function MatchPhoto({
   borderColor,
@@ -33,14 +26,26 @@ function MatchPhoto({
       style={{ borderColor }}
     >
       {photoUrl ? (
-        <Image
-          accessibilityIgnoresInvertColors
+        <AuthenticatedRemoteImage
+          authToken={token}
           className="h-full w-full"
+          fallback={
+            <LinearGradient
+              colors={["#544066", "#27212F"]}
+              style={{
+                alignItems: "center",
+                height: "100%",
+                justifyContent: "center",
+                width: "100%",
+              }}
+            >
+              <Text className="text-[42px] font-black text-[#E8DEFF]">
+                {initial}
+              </Text>
+            </LinearGradient>
+          }
           resizeMode="cover"
-          source={{
-            uri: photoUrl,
-            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          }}
+          uri={photoUrl}
         />
       ) : (
         <LinearGradient
@@ -65,43 +70,13 @@ export default function MatchSuccess() {
   useRequireCompletedOnboarding();
 
   const router = useRouter();
+  const { session } = useAuth();
+  const { currentUserPhotoUrl } = useAppShell();
   const { name, photo } = useLocalSearchParams<{ name?: string; photo?: string }>();
-  const [currentUserPhoto, setCurrentUserPhoto] = useState<string | null>(null);
-  const [authToken, setAuthToken] = useState<string | null>(null);
-  const [loadingPhoto, setLoadingPhoto] = useState(true);
   const matchedName = typeof name === "string" && name.trim() ? name.trim() : "essa pessoa";
   const matchedInitial = matchedName.charAt(0).toUpperCase();
   const matchedPhoto = typeof photo === "string" && photo.trim() ? photo.trim() : null;
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadCurrentUserPhoto() {
-      try {
-        const [profile, snapshot] = await Promise.all([
-          profileService.getProfile(),
-          getAuthSnapshot(),
-        ]);
-
-        if (!active) {
-          return;
-        }
-
-        setCurrentUserPhoto(getPrimaryProfilePhotoUrl(profile));
-        setAuthToken(snapshot.session?.accessToken ?? null);
-      } finally {
-        if (active) {
-          setLoadingPhoto(false);
-        }
-      }
-    }
-
-    void loadCurrentUserPhoto();
-
-    return () => {
-      active = false;
-    };
-  }, []);
+  const authToken = session?.accessToken ?? null;
 
   return (
     <LinearGradient
@@ -122,18 +97,12 @@ export default function MatchSuccess() {
 
           <View className="mt-14 h-[166px] w-full max-w-[258px] items-center justify-center">
             <View className="absolute left-0 top-4 rotate-[-4deg]">
-              {loadingPhoto ? (
-                <View className="h-[132px] w-[132px] items-center justify-center rounded-full border-[4px] border-[#CDBDFF] bg-[#353534]">
-                  <ActivityIndicator color="#EAEA00" />
-                </View>
-              ) : (
-                <MatchPhoto
-                  borderColor="#CDBDFF"
-                  initial="U"
-                  photoUrl={currentUserPhoto}
-                  token={authToken}
-                />
-              )}
+              <MatchPhoto
+                borderColor="#CDBDFF"
+                initial="U"
+                photoUrl={currentUserPhotoUrl}
+                token={authToken}
+              />
             </View>
             <View className="absolute right-0 top-4 rotate-[3deg]">
               <MatchPhoto

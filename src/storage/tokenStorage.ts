@@ -7,6 +7,12 @@ const ACCESS_TOKEN_KEY = "unify.auth.accessToken";
 const REFRESH_TOKEN_KEY = "unify.auth.refreshToken";
 const ACCESS_TOKEN_EXPIRES_AT_KEY = "unify.auth.accessTokenExpiresAt";
 const PENDING_VERIFICATION_EMAIL_KEY = "unify.auth.pendingVerificationEmail";
+const AUTH_STORAGE_KEYS = [
+  ACCESS_TOKEN_KEY,
+  REFRESH_TOKEN_KEY,
+  ACCESS_TOKEN_EXPIRES_AT_KEY,
+  PENDING_VERIFICATION_EMAIL_KEY,
+];
 
 type AuthStorageListener = (snapshot: StoredAuthSnapshot) => void;
 
@@ -182,6 +188,23 @@ export async function clearPendingVerificationEmail(): Promise<void> {
 
   cachedSnapshot = {
     ...snapshot,
+    pendingVerificationEmail: null,
+  };
+
+  notifyListeners(cachedSnapshot);
+}
+
+export async function clearAllStoredAuthData(options?: {
+  clearEntireWebStorage?: boolean;
+}): Promise<void> {
+  if (webStorageFallback && options?.clearEntireWebStorage) {
+    webStorageFallback.clear();
+  } else {
+    await Promise.all(AUTH_STORAGE_KEYS.map((key) => deleteStoredValue(key)));
+  }
+
+  cachedSnapshot = {
+    session: null,
     pendingVerificationEmail: null,
   };
 

@@ -40,7 +40,7 @@ function toggleId(currentIds: number[], id: number): number[] {
 
 export default function EditProfile() {
   const router = useRouter();
-  useRequireCompletedOnboarding();
+  const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
 
   const [options, setOptions] = useState<ProfileOptionsResponse | null>(null);
   const [bio, setBio] = useState("");
@@ -91,6 +91,10 @@ export default function EditProfile() {
     Platform.OS !== "web" && !hasLocationPermission && !canAskLocationPermissionAgain;
 
   useEffect(() => {
+    if (!canAccessCompletedOnboardingContent) {
+      return;
+    }
+
     let active = true;
 
     async function syncAutomaticLocation(existingLocation: AutoLocation | null) {
@@ -185,7 +189,7 @@ export default function EditProfile() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [canAccessCompletedOnboardingContent]);
 
   async function handleGrantLocationAccess() {
     try {

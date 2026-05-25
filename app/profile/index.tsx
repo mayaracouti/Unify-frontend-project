@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
-  type ImageProps,
   Modal,
   Platform,
   Pressable,
@@ -16,6 +14,9 @@ import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-nav";
+import { GlobalTopNav } from "../../src/components/navigation/global-top-nav";
+import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
+import { useAppShell } from "../../src/context/AppShellContext";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { profileService } from "../../src/services/profileService";
 import { getAuthSnapshot, subscribeToAuthStorage } from "../../src/storage/tokenStorage";
@@ -38,117 +39,10 @@ function isIoniconName(
   return typeof value === "string" && value in Ionicons.glyphMap;
 }
 
-function AuthenticatedRemoteImage({
-  uri,
-  authToken,
-  className,
-  resizeMode = "cover",
-  fallback,
-}: {
-  uri: string;
-  authToken: string | null;
-  className: string;
-  resizeMode?: ImageProps["resizeMode"];
-  fallback: ReactNode;
-}) {
-  const [resolvedUri, setResolvedUri] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasLoadError, setHasLoadError] = useState(false);
-
-  async function blobToDataUri(blob: Blob): Promise<string> {
-    return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          resolve(reader.result);
-          return;
-        }
-
-        reject(new Error("Unable to convert image blob to data URI."));
-      };
-
-      reader.onerror = () => {
-        reject(reader.error ?? new Error("Unable to read image blob."));
-      };
-
-      reader.readAsDataURL(blob);
-    });
-  }
-
-  useEffect(() => {
-    let disposed = false;
-
-    const loadImage = async () => {
-      setIsLoading(true);
-      setHasLoadError(false);
-      setResolvedUri(null);
-
-      const attempts = authToken
-        ? [{ Authorization: `Bearer ${authToken}` }, undefined]
-        : [undefined];
-
-      for (const headers of attempts) {
-        const response = await fetch(uri, headers ? { headers } : undefined);
-
-        if (!response.ok) {
-          continue;
-        }
-
-        const imageBlob = await response.blob();
-        const dataUri = await blobToDataUri(imageBlob);
-
-        if (!disposed) {
-          setResolvedUri(dataUri);
-          setIsLoading(false);
-        }
-
-        return;
-      }
-
-      throw new Error("Image request did not return a successful response.");
-    };
-
-    void loadImage().catch(() => {
-      if (!disposed) {
-        setHasLoadError(true);
-        setIsLoading(false);
-      }
-    });
-
-    return () => {
-      disposed = true;
-    };
-  }, [authToken, uri]);
-
-  if (isLoading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-[#2D2A33]">
-        <ActivityIndicator color="#EAEA00" size="small" />
-      </View>
-    );
-  }
-
-  if (hasLoadError || !resolvedUri) {
-    return <>{fallback}</>;
-  }
-
-  return (
-    <Image
-      source={{ uri: resolvedUri }}
-      className={className}
-      resizeMode={resizeMode}
-      onError={() => {
-        setHasLoadError(true);
-      }}
-    />
-  );
-}
-
 function buildDisplayName(profile: UserProfileResponse | null): string {
-  const firstName = profile?.user?.name ?? profile?.name;
-  const lastName = profile?.user?.lastName ?? profile?.lastName;
-  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+  const userName = profile?.user?.name?.trim();
+  const profileName = profile?.name?.trim();
+  const fullName = userName || profileName;
 
   return fullName || "Seu perfil";
 }
@@ -279,7 +173,8 @@ function SectionLoadingState({ message }: { message: string }) {
 
 export default function Profile() {
   const router = useRouter();
-  useRequireCompletedOnboarding();
+  const { syncProfileSummary } = useAppShell();
+  const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
 
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -311,6 +206,7 @@ export default function Profile() {
     try {
       const nextProfile = await profileService.getProfile();
       setProfile(nextProfile);
+      syncProfileSummary(nextProfile);
     } catch (nextError) {
       setActionError(formatApiErrorMessage(nextError, "Não foi possível carregar seu perfil."));
     } finally {
@@ -320,11 +216,15 @@ export default function Profile() {
 
       setLoading(false);
     }
-  }, []);
+  }, [syncProfileSummary]);
 
   useEffect(() => {
+    if (!canAccessCompletedOnboardingContent) {
+      return;
+    }
+
     void loadProfile();
-  }, [loadProfile]);
+  }, [canAccessCompletedOnboardingContent, loadProfile]);
 
   useEffect(() => {
     let active = true;
@@ -515,17 +415,7 @@ export default function Profile() {
           </View>
         </Modal>
 
-        <View className="h-16 flex-row items-center justify-between border-b border-[#262037] bg-[#090B18] px-6">
-          <Pressable className="h-10 w-10 items-center justify-center rounded-full" onPress={() => router.replace("/home")}>
-            <Ionicons name="menu-outline" size={24} color="#A270FF" />
-          </Pressable>
-
-          <Text className="text-[26px] font-black tracking-[2px] text-[#7C4DFF]">UNIFY</Text>
-
-          <Pressable className="h-10 w-10 items-center justify-center rounded-full" onPress={() => router.push("/profile/edit")}> 
-            <Ionicons name="settings-outline" size={24} color="#A270FF" />
-          </Pressable>
-        </View>
+        <GlobalTopNav settingsRoute="/profile/edit" />
 
         <>
           <ScrollView

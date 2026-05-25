@@ -1,6 +1,6 @@
 import {
   createContext,
-  PropsWithChildren,
+  type PropsWithChildren,
   useContext,
   useEffect,
   useMemo,
@@ -8,6 +8,7 @@ import {
 } from "react";
 
 import { authService } from "../services/authService";
+import { clearEntireClientStorage } from "../storage/clientStorage";
 import {
   clearAuthSession,
   clearPendingVerificationEmail,
@@ -161,8 +162,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     } catch {
       // Local cleanup still wins because the backend only revokes refresh tokens.
     } finally {
-      await clearAuthSession();
-      await clearPendingVerificationEmail();
+      await clearEntireClientStorage();
     }
   };
 

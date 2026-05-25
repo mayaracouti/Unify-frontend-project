@@ -3,6 +3,7 @@ import type {
   MatchCreateRequest,
   MatchDiscoveryRequest,
   MatchResponse,
+  MutualMatchPageResponse,
   MutualMatchResponse,
 } from "../types/match";
 
@@ -29,6 +30,14 @@ export const matchService = {
     return customApiCall.get<MutualMatchResponse[]>(
       `${MATCHES_ENDPOINT}/mutual`,
       undefined,
+      { requiresAuth: true }
+    );
+  },
+
+  getPagedMutualMatches(params?: { page?: number; size?: number }) {
+    return customApiCall.get<MutualMatchPageResponse>(
+      `${MATCHES_ENDPOINT}/mutual/paged`,
+      params,
       { requiresAuth: true }
     );
   },

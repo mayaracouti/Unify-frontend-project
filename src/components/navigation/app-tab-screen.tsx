@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useRequireCompletedOnboarding } from "../../hooks/useRequireCompletedOnboarding";
 import { GlobalBottomNav } from "./global-bottom-nav";
+import { GlobalTopNav } from "./global-top-nav";
 
 type AppTabScreenProps = PropsWithChildren<{
   title: string;
@@ -22,6 +23,8 @@ export function AppTabScreen({
   return (
     <View className="flex-1 bg-[#1F2023]">
       <SafeAreaView className="flex-1">
+        <GlobalTopNav />
+
         <View className="flex-1 px-6 pt-6">
           <View className="mb-6 flex-row items-start justify-between gap-4">
             <View className="flex-1">

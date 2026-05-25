@@ -3,7 +3,6 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import {
   ActivityIndicator,
-  Image,
   Modal,
   PanResponder,
   Pressable,
@@ -14,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { profileService } from "../../src/services/profileService";
 import { getAuthSnapshot, subscribeToAuthStorage } from "../../src/storage/tokenStorage";
@@ -33,100 +33,6 @@ function getPrimaryProfilePhotoUrl(profile: UserProfileResponse | null) {
   const firstAttachedPhoto = profile?.profilePicture ?? profile?.galleryImages?.[0];
 
   return profileService.resolveProfileImageUrl(firstAttachedPhoto?.url);
-}
-
-function AuthenticatedProfileImage({
-  authToken,
-  uri,
-}: {
-  authToken: string | null;
-  uri: string;
-}) {
-  const [resolvedUri, setResolvedUri] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let disposed = false;
-
-    async function blobToDataUri(blob: Blob) {
-      return await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-
-        reader.onloadend = () => {
-          if (typeof reader.result === "string") {
-            resolve(reader.result);
-            return;
-          }
-
-          reject(new Error("Unable to read image."));
-        };
-        reader.onerror = () => reject(reader.error ?? new Error("Unable to read image."));
-        reader.readAsDataURL(blob);
-      });
-    }
-
-    async function loadImage() {
-      setFailed(false);
-      setResolvedUri(null);
-
-      const attempts = authToken
-        ? [{ Authorization: `Bearer ${authToken}` }, undefined]
-        : [undefined];
-
-      for (const headers of attempts) {
-        const response = await fetch(uri, headers ? { headers } : undefined);
-
-        if (!response.ok) {
-          continue;
-        }
-
-        const dataUri = await blobToDataUri(await response.blob());
-
-        if (!disposed) {
-          setResolvedUri(dataUri);
-        }
-
-        return;
-      }
-
-      throw new Error("Image request failed.");
-    }
-
-    void loadImage().catch(() => {
-      if (!disposed) {
-        setFailed(true);
-      }
-    });
-
-    return () => {
-      disposed = true;
-    };
-  }, [authToken, uri]);
-
-  if (failed) {
-    return (
-      <View className="flex-1 items-center justify-center bg-[#2D2A33]">
-        <Ionicons name="person" size={58} color="#CAC3D8" />
-      </View>
-    );
-  }
-
-  if (!resolvedUri) {
-    return (
-      <View className="flex-1 items-center justify-center bg-[#2D2A33]">
-        <ActivityIndicator color="#EAEA00" size="small" />
-      </View>
-    );
-  }
-
-  return (
-    <Image
-      accessibilityIgnoresInvertColors
-      className="h-full w-full"
-      resizeMode="cover"
-      source={{ uri: resolvedUri }}
-    />
-  );
 }
 
 function DiscoverySlider({
@@ -404,7 +310,7 @@ function LocationModal({
 }
 
 export default function MatchMyProfile() {
-  useRequireCompletedOnboarding();
+  const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
 
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
@@ -450,7 +356,9 @@ export default function MatchMyProfile() {
       }
     }
 
-    void loadProfile();
+    if (canAccessCompletedOnboardingContent) {
+      void loadProfile();
+    }
 
     const unsubscribe = subscribeToAuthStorage((snapshot) => {
       if (active) {
@@ -462,7 +370,7 @@ export default function MatchMyProfile() {
       active = false;
       unsubscribe();
     };
-  }, []);
+  }, [canAccessCompletedOnboardingContent]);
 
   const displayName = buildDisplayName(profile);
   const photoUrl = getPrimaryProfilePhotoUrl(profile);
@@ -527,7 +435,17 @@ export default function MatchMyProfile() {
               <View className="relative">
                 <View className="h-20 w-20 overflow-hidden rounded-full bg-[#2D2A33]">
                   {photoUrl ? (
-                    <AuthenticatedProfileImage uri={photoUrl} authToken={authToken} />
+                    <AuthenticatedRemoteImage
+                      uri={photoUrl}
+                      authToken={authToken}
+                      className="h-full w-full"
+                      resizeMode="cover"
+                      fallback={
+                        <View className="flex-1 items-center justify-center bg-[#2D2A33]">
+                          <Ionicons name="person" size={38} color="#CAC3D8" />
+                        </View>
+                      }
+                    />
                   ) : (
                     <View className="flex-1 items-center justify-center">
                       <Ionicons name="person" size={38} color="#CAC3D8" />

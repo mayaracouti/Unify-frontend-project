@@ -22,43 +22,43 @@ function joinDescriptions(items: { description: string }[], fallback: string) {
 
 export default function Explore() {
   const [profiles, setProfiles] = useState<UserProfileDirectoryItemResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    let active = true;
+  // useEffect(() => {
+  //   let active = true;
 
-    async function loadProfiles() {
-      try {
-        const response = await profileService.getAllProfiles();
+  //   async function loadProfiles() {
+  //     try {
+  //       const response = await profileService.getAllProfiles();
 
-        if (!active) {
-          return;
-        }
+  //       if (!active) {
+  //         return;
+  //       }
 
-        setProfiles(response);
-      } catch (nextError) {
-        if (active) {
-          setError(
-            formatApiErrorMessage(
-              nextError,
-              "Não foi possível carregar os perfis agora."
-            )
-          );
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
+  //       setProfiles(response);
+  //     } catch (nextError) {
+  //       if (active) {
+  //         setError(
+  //           formatApiErrorMessage(
+  //             nextError,
+  //             "Não foi possível carregar os perfis agora."
+  //           )
+  //         );
+  //       }
+  //     } finally {
+  //       if (active) {
+  //         setLoading(false);
+  //       }
+  //     }
+  //   }
 
-    void loadProfiles();
+  //   void loadProfiles();
 
-    return () => {
-      active = false;
-    };
-  }, []);
+  //   return () => {
+  //     active = false;
+  //   };
+  // }, []);
 
   return (
     <AppTabScreen
