@@ -1,13 +1,18 @@
-import { type ComponentProps, type PropsWithChildren, useEffect, useState } from "react";
+import { type ComponentProps, type PropsWithChildren, useCallback, useEffect, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useIsFocused } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { Image, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-nav";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
+import { matchService } from "../../src/services/matchService";
+import { profileService } from "../../src/services/profileService";
+import type { UserProfileDirectoryItemResponse, UserProfileImageResponse } from "../../src/types/profile";
+import { formatApiErrorMessage } from "../../src/utils/auth";
+import { showGlobalToast } from "../../src/utils/globalToast";
 import { requestForegroundLocationPermissionState } from "../../src/utils/location";
 
 type MatchProfile = {
@@ -19,7 +24,7 @@ type MatchProfile = {
   communicationPreferences: string[];
   connectionPreferences: string[];
   disabilities: string[];
-  distanceKm: number;
+  distanceKm: number | null;
   energyLevel: string;
   gender: string;
   occupation: string;
@@ -29,10 +34,8 @@ type MatchProfile = {
   location: string;
   loveLanguages: string[];
   name: string;
-  photos: string[];
+  photoUrl: string | null;
 };
-
-const matchProfiles: MatchProfile[] = [];
 
 function ChipList({ items }: { items: string[] }) {
   if (items.length === 0) {
@@ -55,8 +58,12 @@ function InfoRow({
   label,
 }: {
   icon: ComponentProps<typeof Ionicons>["name"];
-  label: string;
+  label?: string | null;
 }) {
+  if (!label?.trim()) {
+    return null;
+  }
+
   return (
     <View className="border-b border-white/10 py-3">
       <View className="flex-row items-center">
@@ -128,7 +135,14 @@ function ProfileDetailsPanel({
         </DetailCard>
 
         <DetailCard title="Informações básicas" icon="id-card-outline">
-          <InfoRow icon="location-outline" label={`${profile.distanceKm} km de distância`} />
+          <InfoRow
+            icon="location-outline"
+            label={
+              typeof profile.distanceKm === "number"
+                ? `${profile.distanceKm} km de distância`
+                : null
+            }
+          />
           <InfoRow icon="briefcase-outline" label={profile.occupation} />
           <InfoRow icon="home-outline" label={profile.location} />
           <InfoRow icon="person-circle-outline" label={profile.pronouns} />
@@ -193,12 +207,57 @@ function ProfileDetailsPanel({
   );
 }
 
-function getFirstAttachedPhoto(profile: Pick<MatchProfile, "photos">) {
-  return profile.photos[0] ?? null;
+function displayName(profile: UserProfileDirectoryItemResponse) {
+  const firstName = profile.user?.name ?? profile.name;
+  const lastName = profile.user?.lastName ?? profile.lastName;
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+
+  return fullName || "Perfil";
+}
+
+function getProfileAge(profile: UserProfileDirectoryItemResponse) {
+  return profile.user?.age ?? profile.age ?? 0;
+}
+
+function descriptions(items: { description: string }[] | null | undefined) {
+  return (items ?? []).map((item) => item.description);
+}
+
+function getFirstAttachedPhoto(profile: UserProfileDirectoryItemResponse) {
+  const firstAttachedPhoto: UserProfileImageResponse | null | undefined =
+    profile.profilePicture ?? profile.galleryImages?.[0];
+
+  return profileService.resolveProfileImageUrl(firstAttachedPhoto?.url);
+}
+
+function toMatchProfile(profile: UserProfileDirectoryItemResponse): MatchProfile {
+  return {
+    accessibilityNeeds: descriptions(profile.accessibilityNeeds),
+    age: getProfileAge(profile),
+    autonomyLevel: profile.autonomyLevel?.description ?? "",
+    bio: profile.bio?.trim() || "",
+    communicationPreferences: descriptions(profile.communicationForms),
+    connectionPreferences: profile.matchPreferences?.connectionType?.description
+      ? [profile.matchPreferences.connectionType.description]
+      : [],
+    disabilities: descriptions(profile.disabilities),
+    distanceKm: null,
+    energyLevel: profile.energyLevel?.description ?? "",
+    gender: profile.gender?.description ?? "",
+    id: profile.id ?? "",
+    interests: descriptions(profile.interestTypes),
+    lifestyleTypes: descriptions(profile.lifestyleTypes),
+    location: profile.activeLocation ? "Localização ativa" : "",
+    loveLanguages: descriptions(profile.loveLanguages),
+    name: displayName(profile),
+    occupation: "",
+    photoUrl: getFirstAttachedPhoto(profile),
+    pronouns: profile.pronouns?.description ?? "",
+  };
 }
 
 function ProfilePhoto({ profile }: { profile: MatchProfile }) {
-  const photoUrl = getFirstAttachedPhoto(profile);
+  const photoUrl = profile.photoUrl;
 
   if (photoUrl) {
     return (
@@ -231,9 +290,50 @@ export default function Matches() {
 
   const isFocused = useIsFocused();
   const router = useRouter();
+  const [matchProfiles, setMatchProfiles] = useState<MatchProfile[]>([]);
   const [currentProfileIndex, setCurrentProfileIndex] = useState(0);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [usedProfileIds, setUsedProfileIds] = useState<string[]>([]);
+  const [loadingProfiles, setLoadingProfiles] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const currentProfile = matchProfiles[currentProfileIndex] ?? null;
+
+  const loadDiscoveryProfiles = useCallback(async () => {
+    setLoadingProfiles(true);
+    setLoadError("");
+
+    try {
+      const [discoveryIds, directoryProfiles] = await Promise.all([
+        matchService.getDiscoveryFeed({ alreadyUsedProfileIds: usedProfileIds }),
+        profileService.getAllProfiles(),
+      ]);
+      const directoryById = new Map(
+        directoryProfiles
+          .filter((profile) => Boolean(profile.id))
+          .map((profile) => [profile.id as string, profile])
+      );
+      const nextProfiles = discoveryIds
+        .map((profileId) => directoryById.get(profileId))
+        .filter((profile): profile is UserProfileDirectoryItemResponse => Boolean(profile))
+        .map(toMatchProfile);
+
+      setMatchProfiles(nextProfiles);
+      setCurrentProfileIndex(0);
+      setDetailsOpen(false);
+    } catch (nextError) {
+      setLoadError(
+        formatApiErrorMessage(
+          nextError,
+          "Não foi possível carregar perfis para descoberta agora."
+        )
+      );
+      setMatchProfiles([]);
+      setCurrentProfileIndex(0);
+    } finally {
+      setLoadingProfiles(false);
+    }
+  }, [usedProfileIds]);
 
   useEffect(() => {
     if (!isFocused) {
@@ -261,34 +361,93 @@ export default function Matches() {
     };
   }, [isFocused]);
 
+  useEffect(() => {
+    if (isFocused) {
+      void loadDiscoveryProfiles();
+    }
+  }, [isFocused]);
+
   function showNextProfile() {
+    if (currentProfile) {
+      setUsedProfileIds((previousIds) =>
+        previousIds.includes(currentProfile.id)
+          ? previousIds
+          : [...previousIds, currentProfile.id]
+      );
+    }
+
     setCurrentProfileIndex((previousIndex) => previousIndex + 1);
     setDetailsOpen(false);
   }
 
   function restartProfiles() {
-    setCurrentProfileIndex(0);
+    void loadDiscoveryProfiles();
     setDetailsOpen(false);
   }
 
-  function acceptCurrentProfile() {
-    if (!currentProfile) {
+  async function acceptCurrentProfile() {
+    if (!currentProfile || submitting) {
       return;
     }
 
-    router.push({
-      pathname: "/matches/success",
-      params: {
-        name: currentProfile.name,
-      },
-    });
+    setSubmitting(true);
+
+    try {
+      const response = await matchService.createOrAnswerMatch({
+        targetProfileId: currentProfile.id,
+        accepted: true,
+      });
+
+      setUsedProfileIds((previousIds) =>
+        previousIds.includes(currentProfile.id)
+          ? previousIds
+          : [...previousIds, currentProfile.id]
+      );
+
+      if (response.mutualMatch) {
+        router.push({
+          pathname: "/matches/success",
+          params: {
+            name: currentProfile.name,
+            photo: currentProfile.photoUrl ?? undefined,
+          },
+        });
+        return;
+      }
+
+      showGlobalToast({
+        title: "Interesse enviado",
+        message: "Se a outra pessoa também curtir você, o match aparece aqui.",
+        variant: "success",
+      });
+      setCurrentProfileIndex((previousIndex) => previousIndex + 1);
+      setDetailsOpen(false);
+    } catch (nextError) {
+      showGlobalToast({
+        title: "Não foi possível enviar",
+        message: formatApiErrorMessage(
+          nextError,
+          "Não foi possível registrar seu interesse agora."
+        ),
+        variant: "error",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1 bg-black">
         <View className="flex-1 overflow-hidden rounded-b-[44px] bg-[#111214]">
-          {currentProfile ? (
+          {loadingProfiles ? (
+            <View className="flex-1 items-center justify-center px-8">
+              <ActivityIndicator color="#EAEA00" />
+              <Text className="mt-4 text-center text-[16px] font-semibold text-[#CAC3D8]">
+                Buscando perfis compatíveis...
+              </Text>
+            </View>
+          ) : currentProfile ? (
             <>
               <ProfilePhoto profile={currentProfile} />
 
@@ -363,9 +522,14 @@ export default function Matches() {
                 <Pressable
                   accessibilityLabel="Dar match"
                   className="h-[68px] w-[68px] items-center justify-center rounded-full bg-[#26282B]"
+                  disabled={submitting}
                   onPress={acceptCurrentProfile}
                 >
-                  <Ionicons name="heart" size={36} color="#65E568" />
+                  {submitting ? (
+                    <ActivityIndicator color="#65E568" size="small" />
+                  ) : (
+                    <Ionicons name="heart" size={36} color="#65E568" />
+                  )}
                 </Pressable>
               </View>
 
@@ -384,7 +548,7 @@ export default function Matches() {
                 Você chegou ao fim da lista
               </Text>
               <Text className="mt-4 text-center text-[16px] font-semibold leading-6 text-[#CAC3D8]">
-                Novos perfis aparecerão aqui quando estiverem disponíveis.
+                {loadError || "Novos perfis aparecerão aqui quando estiverem disponíveis."}
               </Text>
               <Pressable
                 className="mt-8 rounded-full bg-[#EAEA00] px-8 py-4"
