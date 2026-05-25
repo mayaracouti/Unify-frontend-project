@@ -15,7 +15,7 @@ const tabs: NavTab[] = [
   { label: "Início", icon: "home-outline", iconActive: "home", route: "/home" },
   { label: "Explorar", icon: "search-outline", iconActive: "search", route: "/explore" },
   { label: "Encontros", icon: "heart-outline", iconActive: "heart", route: "/matches", badge: "99+" },
-  { label: "Comunidade", icon: "people-outline", iconActive: "people" , route: "/community" },
+  { label: "Comunidades", icon: "people-outline", iconActive: "people" , route: "/community" },
   { label: "Perfil", icon: "person-outline", iconActive: "person", route: "/profile" },
 ];
 
@@ -24,23 +24,26 @@ export function GlobalBottomNav() {
   const router = useRouter();
 
   return (
-    <View className="mb-0 w-full bg-black px-4 py-4">
-      <View className="flex-row items-center justify-between">
+    <View className="mb-0 w-full border-t-2 border-[#353534] bg-black px-2">
+      <View className="flex-row items-stretch justify-between">
         {tabs.map((tab) => {
           const active = pathname === tab.route || pathname.startsWith(`${tab.route}/`);
 
           return (
             <Pressable
               key={tab.route}
-              className="min-w-[52px] items-center"
+              className="min-h-[72px] flex-1 items-center justify-center"
               onPress={() => {
                 if (!active) {
                   router.replace(tab.route);
                 }
               }}
             >
+              {active ? (
+                <View className="absolute top-0 h-1 w-full max-w-[90px] bg-[#7C4DFF]" />
+              ) : null}
               <View className="relative h-8 w-8 items-center justify-center">
-                <Ionicons name={active && tab.iconActive ? tab.iconActive : tab.icon} size={24} color={active ? "#fff" : "#6D6E75"} />
+                <Ionicons name={active && tab.iconActive ? tab.iconActive : tab.icon} size={26} color={active ? "#7C4DFF" : "#CAC3D8"} />
 
                 {tab.badge ? (
                   <View className="absolute -right-4 -top-1 rounded-full bg-[#814DFF] px-1.5 py-0.5">
@@ -50,6 +53,15 @@ export function GlobalBottomNav() {
                   </View>
                 ) : null}
               </View>
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                className={`mt-1 text-[11px] font-black ${
+                  active ? "text-[#7C4DFF]" : "text-[#CAC3D8]"
+                }`}
+              >
+                {tab.label}
+              </Text>
             </Pressable>
           );
         })}
