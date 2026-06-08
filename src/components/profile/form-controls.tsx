@@ -53,7 +53,7 @@ export function OptionChip({
 
 export function SingleChoice({
   title,
-  options,
+  options = [],
   value,
   onChange,
   onClear,
@@ -90,7 +90,7 @@ export function SingleChoice({
 
 export function MultiChoice({
   title,
-  options,
+  options = [],
   values,
   onChange,
   toggleId,
@@ -169,7 +169,7 @@ export function SectionTitle({
 export function SimilaritySelector({
   title,
   value,
-  options,
+  options = [],
   onChange,
   onClear,
 }: {

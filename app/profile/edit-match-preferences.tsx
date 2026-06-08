@@ -40,7 +40,7 @@ function toggleId(currentIds: number[], id: number): number[] {
 
 export default function EditMatchPreferences() {
   const router = useRouter();
-  useRequireCompletedOnboarding();
+  const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
 
   const [options, setOptions] = useState<ProfileOptionsResponse | null>(null);
   const [connectionTypeId, setConnectionTypeId] = useState<number | undefined>();
@@ -48,13 +48,13 @@ export default function EditMatchPreferences() {
   const [accessibilityNeedSimilarity, setAccessibilityNeedSimilarity] =
     useState<SimilarityPreference>("ANY");
   const [autonomyCompatibility, setAutonomyCompatibility] =
-    useState<SimilarityPreference>("SIMILAR");
+    useState<SimilarityPreference>("ANY");
   const [lifestyleSimilarity, setLifestyleSimilarity] =
-    useState<SimilarityPreference>("SIMILAR");
+    useState<SimilarityPreference>("ANY");
   const [energyLevelSimilarity, setEnergyLevelSimilarity] =
     useState<SimilarityPreference>("ANY");
   const [loveLanguageSimilarity, setLoveLanguageSimilarity] =
-    useState<SimilarityPreference | null>(null);
+    useState<SimilarityPreference>("ANY");
   const [minAge, setMinAge] = useState("");
   const [maxAge, setMaxAge] = useState("");
   const [maxMatchDistanceKm, setMaxMatchDistanceKm] = useState("30");
@@ -104,6 +104,10 @@ export default function EditMatchPreferences() {
     Platform.OS !== "web" && !hasLocationPermission && !canAskLocationPermissionAgain;
 
   useEffect(() => {
+    if (!canAccessCompletedOnboardingContent) {
+      return;
+    }
+
     let active = true;
 
     async function loadPreferences() {
@@ -121,10 +125,10 @@ export default function EditMatchPreferences() {
         setConnectionTypeId(preferences.connectionType?.id);
         setDesiredGenderIds(preferences.desiredGenders?.map((gender) => gender.id) ?? []);
         setAccessibilityNeedSimilarity(preferences.accessibilityNeedSimilarity ?? "ANY");
-        setAutonomyCompatibility(preferences.autonomyCompatibility ?? "SIMILAR");
-        setLifestyleSimilarity(preferences.lifestyleSimilarity ?? "SIMILAR");
+        setAutonomyCompatibility(preferences.autonomyCompatibility ?? "ANY");
+        setLifestyleSimilarity(preferences.lifestyleSimilarity ?? "ANY");
         setEnergyLevelSimilarity(preferences.energyLevelSimilarity ?? "ANY");
-        setLoveLanguageSimilarity(preferences.loveLanguageSimilarity ?? null);
+        setLoveLanguageSimilarity(preferences.loveLanguageSimilarity ?? "ANY");
         setMinAge(preferences.minAge == null ? "" : String(preferences.minAge));
         setMaxAge(preferences.maxAge == null ? "" : String(preferences.maxAge));
         setMaxMatchDistanceKm(String(preferences.maxMatchDistanceKm ?? 30));
@@ -146,7 +150,7 @@ export default function EditMatchPreferences() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [canAccessCompletedOnboardingContent]);
 
   useEffect(() => {
     let active = true;
@@ -469,7 +473,6 @@ export default function EditMatchPreferences() {
                     value={loveLanguageSimilarity}
                     options={similarityOptions}
                     onChange={setLoveLanguageSimilarity}
-                    onClear={() => setLoveLanguageSimilarity(null)}
                   />
                 </View>
               </View>

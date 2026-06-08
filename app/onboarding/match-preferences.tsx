@@ -44,13 +44,13 @@ export default function MatchPreferencesOnboarding() {
   const [accessibilityNeedSimilarity, setAccessibilityNeedSimilarity] =
     useState<SimilarityPreference>("ANY");
   const [autonomyCompatibility, setAutonomyCompatibility] =
-    useState<SimilarityPreference>("SIMILAR");
+    useState<SimilarityPreference>("ANY");
   const [lifestyleSimilarity, setLifestyleSimilarity] =
-    useState<SimilarityPreference>("SIMILAR");
+    useState<SimilarityPreference>("ANY");
   const [energyLevelSimilarity, setEnergyLevelSimilarity] =
     useState<SimilarityPreference>("ANY");
   const [loveLanguageSimilarity, setLoveLanguageSimilarity] =
-    useState<SimilarityPreference | null>(null);
+    useState<SimilarityPreference>("ANY");
   const [minAge, setMinAge] = useState("18");
   const [maxAge, setMaxAge] = useState("");
   const [maxMatchDistanceKm, setMaxMatchDistanceKm] = useState("30");
@@ -120,10 +120,10 @@ export default function MatchPreferencesOnboarding() {
         setConnectionTypeId(preferences.connectionType?.id);
         setDesiredGenderIds(preferences.desiredGenders?.map((gender) => gender.id) ?? []);
         setAccessibilityNeedSimilarity(preferences.accessibilityNeedSimilarity ?? "ANY");
-        setAutonomyCompatibility(preferences.autonomyCompatibility ?? "SIMILAR");
-        setLifestyleSimilarity(preferences.lifestyleSimilarity ?? "SIMILAR");
+        setAutonomyCompatibility(preferences.autonomyCompatibility ?? "ANY");
+        setLifestyleSimilarity(preferences.lifestyleSimilarity ?? "ANY");
         setEnergyLevelSimilarity(preferences.energyLevelSimilarity ?? "ANY");
-        setLoveLanguageSimilarity(preferences.loveLanguageSimilarity ?? null);
+        setLoveLanguageSimilarity(preferences.loveLanguageSimilarity ?? "ANY");
         setMinAge(preferences.minAge == null ? "" : String(preferences.minAge));
         setMaxAge(preferences.maxAge == null ? "" : String(preferences.maxAge));
         setMaxMatchDistanceKm(String(preferences.maxMatchDistanceKm ?? 30));
@@ -449,7 +449,6 @@ export default function MatchPreferencesOnboarding() {
                 value={loveLanguageSimilarity}
                 options={similarityOptions}
                 onChange={setLoveLanguageSimilarity}
-                onClear={() => setLoveLanguageSimilarity(null)}
               />
             </View>
 

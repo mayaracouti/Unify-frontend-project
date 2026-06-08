@@ -7,6 +7,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AuthLoadingScreen } from "../src/components/ui/auth-loading-screen";
 import { GlobalToastViewport } from "../src/components/ui/global-toast-viewport";
+import { AppShellProvider } from "../src/context/AppShellContext";
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
 
 function NavigationGuard() {
@@ -93,7 +94,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <RootNavigator />
+        <AppShellProvider>
+          <RootNavigator />
+        </AppShellProvider>
         <GlobalToastViewport />
       </AuthProvider>
     </SafeAreaProvider>

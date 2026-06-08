@@ -1,18 +1,40 @@
 import { customApiCall } from "../api/customApi";
 import { runtimeConfig } from "../config/runtime";
 import type {
+  PublicProfileImageIdsResponse,
   ProfileCompletionResponse,
   ProfileOptionsResponse,
   UserProfileDirectoryItemResponse,
   UserProfileImageResponse,
   UserMatchPreferencesResponse,
+  UserPublicProfileResponse,
   UserMatchPreferencesUpsertRequest,
   UserProfileResponse,
   UserProfileUpsertRequest,
 } from "../types/profile";
 
 const ALL_USER_PROFILES_ENDPOINT = "/users/profiles";
+const PUBLIC_PROFILE_ENDPOINT = "/users/me/profile/public";
 const PROFILE_IMAGES_ENDPOINT = "/users/me/profile/images";
+
+function normalizeProfileOptions(
+  options: Partial<ProfileOptionsResponse>
+): ProfileOptionsResponse {
+  return {
+    genders: options.genders ?? [],
+    pronouns: options.pronouns ?? [],
+    disabilities: options.disabilities ?? [],
+    accessibilityNeeds: options.accessibilityNeeds ?? [],
+    autonomyLevels: options.autonomyLevels ?? [],
+    communicationForms: options.communicationForms ?? [],
+    lifestyleTypes: options.lifestyleTypes ?? [],
+    energyLevels: options.energyLevels ?? [],
+    interestTypes: options.interestTypes ?? [],
+    loveLanguages: options.loveLanguages ?? [],
+    connectionTypes: options.connectionTypes ?? [],
+    similarityPreferences: options.similarityPreferences ?? [],
+  };
+}
 
 export const profileService = {
   getCompletion() {
@@ -23,12 +45,14 @@ export const profileService = {
     );
   },
 
-  getOptions() {
-    return customApiCall.get<ProfileOptionsResponse>(
+  async getOptions() {
+    const options = await customApiCall.get<Partial<ProfileOptionsResponse>>(
       "/users/me/profile/options",
       undefined,
       { requiresAuth: true }
     );
+
+    return normalizeProfileOptions(options);
   },
 
   getProfile() {
@@ -41,6 +65,30 @@ export const profileService = {
     return customApiCall.get<UserProfileDirectoryItemResponse[]>(
       ALL_USER_PROFILES_ENDPOINT,
       undefined,
+      { requiresAuth: true }
+    );
+  },
+
+  getProfileById(profileId: string) {
+    return customApiCall.get<UserProfileDirectoryItemResponse>(
+      `${ALL_USER_PROFILES_ENDPOINT}/${profileId}`,
+      undefined,
+      { requiresAuth: true }
+    );
+  },
+
+  getPublicProfile(userProfileId: string) {
+    return customApiCall.get<UserPublicProfileResponse>(
+      PUBLIC_PROFILE_ENDPOINT,
+      { userProfileId },
+      { requiresAuth: true }
+    );
+  },
+
+  getPublicProfileImageIds(userProfileId: string) {
+    return customApiCall.get<PublicProfileImageIdsResponse>(
+      `${PUBLIC_PROFILE_ENDPOINT}/images`,
+      { userProfileId },
       { requiresAuth: true }
     );
   },
@@ -99,6 +147,24 @@ export const profileService = {
       : `/${relativeUrl}`;
 
     return `${normalizedBaseUrl}${normalizedPath}`;
+  },
+
+  resolvePublicProfileImageUrl(userProfileId: string, imageId?: string | null) {
+    const normalizedImageId = imageId?.trim();
+    const normalizedUserProfileId = userProfileId?.trim();
+
+    if (!normalizedImageId || !normalizedUserProfileId) {
+      return null;
+    }
+
+    const normalizedBaseUrl = runtimeConfig.apiBaseUrl.endsWith("/")
+      ? runtimeConfig.apiBaseUrl.slice(0, -1)
+      : runtimeConfig.apiBaseUrl;
+
+    const encodedUserProfileId = encodeURIComponent(normalizedUserProfileId);
+    const encodedImageId = encodeURIComponent(normalizedImageId);
+
+    return `${normalizedBaseUrl}${PUBLIC_PROFILE_ENDPOINT}/images/${encodedImageId}?userProfileId=${encodedUserProfileId}`;
   },
 
   getMatchPreferences() {

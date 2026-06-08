@@ -27,6 +27,11 @@ export interface UserProfileImageResponse {
   url: string;
 }
 
+export interface PublicProfileImageIdsResponse {
+  userProfileId: string;
+  galleryImageIds: string[];
+}
+
 export interface ProfileOptionsResponse {
   genders: LookupOptionResponse[];
   pronouns: LookupOptionResponse[];
@@ -84,6 +89,24 @@ export interface UserProfileDirectoryItemResponse extends UserProfileResponse {
   email?: string | null;
   cellphone?: string | null;
   matchPreferences?: UserMatchPreferencesResponse | null;
+}
+
+export interface UserPublicProfileResponse {
+  userProfileId: string;
+  name: string;
+  age: number;
+  bio: string | null;
+  gender: LookupOptionResponse | null;
+  pronouns: LookupOptionResponse | null;
+  disabilities: DisabilityOptionResponse[];
+  accessibilityNeeds: LookupOptionResponse[];
+  autonomyLevel: LookupOptionResponse | null;
+  communicationForms: LookupOptionResponse[];
+  lifestyleTypes: LookupOptionResponse[];
+  loveLanguages: LookupOptionResponse[];
+  energyLevel: LookupOptionResponse | null;
+  interestTypes: LookupOptionResponse[];
+  galleryImageIds: string[];
 }
 
 export interface UserProfileUpsertRequest {

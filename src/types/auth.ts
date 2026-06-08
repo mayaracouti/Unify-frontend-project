@@ -49,14 +49,6 @@ export interface MessageResponse {
   message: string;
 }
 
-export interface CurrentUserResponse {
-  id: string;
-  name: string;
-  lastName: string;
-  email: string;
-  cellphone: string;
-}
-
 export interface ApiErrorBody {
   code?: number;
   error?: string;

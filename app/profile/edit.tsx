@@ -40,7 +40,7 @@ function toggleId(currentIds: number[], id: number): number[] {
 
 export default function EditProfile() {
   const router = useRouter();
-  useRequireCompletedOnboarding();
+  const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
 
   const [options, setOptions] = useState<ProfileOptionsResponse | null>(null);
   const [bio, setBio] = useState("");
@@ -65,18 +65,22 @@ export default function EditProfile() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const hasPronounOptions = (options?.pronouns.length ?? 0) > 0;
+  const hasLoveLanguageOptions = (options?.loveLanguages.length ?? 0) > 0;
   const bioLength = bio.trim().length;
   const canSave = useMemo(
     () =>
       Boolean(genderId) &&
-      Boolean(pronounsId) &&
+      (!hasPronounOptions || Boolean(pronounsId)) &&
       communicationFormIds.length > 0 &&
       lifestyleTypeIds.length > 0 &&
       interestTypeIds.length > 0 &&
-      loveLanguageIds.length > 0,
+      (!hasLoveLanguageOptions || loveLanguageIds.length > 0),
     [
       communicationFormIds.length,
       genderId,
+      hasLoveLanguageOptions,
+      hasPronounOptions,
       interestTypeIds.length,
       lifestyleTypeIds.length,
       loveLanguageIds.length,
@@ -87,6 +91,10 @@ export default function EditProfile() {
     Platform.OS !== "web" && !hasLocationPermission && !canAskLocationPermissionAgain;
 
   useEffect(() => {
+    if (!canAccessCompletedOnboardingContent) {
+      return;
+    }
+
     let active = true;
 
     async function syncAutomaticLocation(existingLocation: AutoLocation | null) {
@@ -181,7 +189,7 @@ export default function EditProfile() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [canAccessCompletedOnboardingContent]);
 
   async function handleGrantLocationAccess() {
     try {
@@ -225,7 +233,7 @@ export default function EditProfile() {
   async function handleSave() {
     if (!canSave) {
       setError(
-        "Preencha gênero, pronomes, comunicação, estilo de vida, interesses e linguagens do amor para salvar."
+        "Preencha os campos obrigatórios disponíveis para salvar."
       );
       return;
     }
@@ -326,13 +334,15 @@ export default function EditProfile() {
             {options ? (
               <View className="rounded-[28px] bg-[#111214] p-6">
                 <SingleChoice title="Gênero" options={options.genders} value={genderId} onChange={setGenderId} />
-                <SingleChoice
-                  title="Pronomes"
-                  options={options.pronouns}
-                  value={pronounsId}
-                  onChange={setPronounsId}
-                  onClear={() => setPronounsId(undefined)}
-                />
+                {hasPronounOptions ? (
+                  <SingleChoice
+                    title="Pronomes"
+                    options={options.pronouns}
+                    value={pronounsId}
+                    onChange={setPronounsId}
+                    onClear={() => setPronounsId(undefined)}
+                  />
+                ) : null}
                 <MultiChoice title="Tipo de deficiência" options={options.disabilities} values={disabilityIds} onChange={setDisabilityIds} toggleId={toggleId} showOptionIcons />
                 <MultiChoice title="Necessidades de acessibilidade" options={options.accessibilityNeeds} values={accessibilityNeedIds} onChange={setAccessibilityNeedIds} toggleId={toggleId} />
                 <SingleChoice title="Nível de autonomia" options={options.autonomyLevels} value={autonomyLevelId} onChange={setAutonomyLevelId} />
@@ -340,7 +350,9 @@ export default function EditProfile() {
                 <MultiChoice title="Estilo de vida" options={options.lifestyleTypes} values={lifestyleTypeIds} onChange={setLifestyleTypeIds} toggleId={toggleId} />
                 <SingleChoice title="Nível de energia" options={options.energyLevels} value={energyLevelId} onChange={setEnergyLevelId} />
                 <MultiChoice title="Interesses & Hobbies" options={options.interestTypes} values={interestTypeIds} onChange={setInterestTypeIds} toggleId={toggleId} />
-                <MultiChoice title="Linguagens do amor" options={options.loveLanguages} values={loveLanguageIds} onChange={setLoveLanguageIds} toggleId={toggleId} />
+                {hasLoveLanguageOptions ? (
+                  <MultiChoice title="Linguagens do amor" options={options.loveLanguages} values={loveLanguageIds} onChange={setLoveLanguageIds} toggleId={toggleId} />
+                ) : null}
 
                 <View className="mb-2 rounded-2xl border border-[#353534] bg-[#201F1F] px-4 py-4">
                   <View className="flex-row items-start">
