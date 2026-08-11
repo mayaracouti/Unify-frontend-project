@@ -2,13 +2,22 @@
 import "../global.css";
 import { Stack, useRootNavigationState, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
-import { Platform } from "react-native";
+import { Platform, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { applyGlobalTextAdjustmentsPatch } from "../src/accessibility/global-text-adjustments";
 import { AuthLoadingScreen } from "../src/components/ui/auth-loading-screen";
 import { GlobalToastViewport } from "../src/components/ui/global-toast-viewport";
+import {
+  AccessibilityProvider,
+  useAccessibility,
+} from "../src/context/AccessibilityContext";
 import { AppShellProvider } from "../src/context/AppShellContext";
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
+
+// Aplica o patch global de `Text`/`TextInput` antes de qualquer tela renderizar,
+// para que a escala de fonte e o alto contraste valham no app inteiro.
+applyGlobalTextAdjustmentsPatch();
 
 function NavigationGuard() {
   const router = useRouter();
@@ -69,24 +78,32 @@ function NavigationGuard() {
 function RootNavigator() {
   const navigationState = useRootNavigationState();
   const { isReady } = useAuth();
+  const { settings } = useAccessibility();
+
+  // Em alto contraste o fundo raiz vira preto puro: combinado com o mapeamento
+  // de cor de texto do patch global, e o que garante o contraste maximo sem
+  // precisar editar as telas uma a uma.
+  const backgroundColor = settings.highContrast ? "#000000" : "#201233";
+  const reduceMotion = settings.reduceMotion;
 
   if (!navigationState?.key || !isReady) {
     return <AuthLoadingScreen />;
   }
 
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor }}>
       <NavigationGuard />
       <Stack
         screenOptions={{
           headerShown: false,
-          animation: Platform.OS === "android" ? "none" : "default",
+          animation:
+            reduceMotion || Platform.OS === "android" ? "none" : "default",
           contentStyle: {
-            backgroundColor: "#201233",
+            backgroundColor,
           },
         }}
       />
-    </>
+    </View>
   );
 }
 
@@ -94,9 +111,11 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <AppShellProvider>
-          <RootNavigator />
-        </AppShellProvider>
+        <AccessibilityProvider>
+          <AppShellProvider>
+            <RootNavigator />
+          </AppShellProvider>
+        </AccessibilityProvider>
         <GlobalToastViewport />
       </AuthProvider>
     </SafeAreaProvider>

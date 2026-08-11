@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Pressable,
   Text,
@@ -14,6 +15,7 @@ import { formatApiErrorMessage, normalizeVerificationCode } from "../../../src/u
 import { clearPendingVerificationEmail } from "../../../src/storage/tokenStorage";
 import { showGlobalToast } from "../../../src/utils/globalToast";
 import Ionicicons from '@expo/vector-icons/Ionicons';
+import { speak } from "../../../src/accessibility/screen-reader";
 
 export default function EmailCode() {
   const router = useRouter();
@@ -36,6 +38,22 @@ export default function EmailCode() {
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // `accessibilityLiveRegion` e Android-only: no iOS os anuncios precisam
+  // ser disparados manualmente quando a mensagem muda.
+  useEffect(() => {
+    if (errorMessage) {
+      AccessibilityInfo.announceForAccessibility(errorMessage);
+      speak(errorMessage);
+    }
+  }, [errorMessage]);
+
+  useEffect(() => {
+    if (infoMessage) {
+      AccessibilityInfo.announceForAccessibility(infoMessage);
+      speak(infoMessage);
+    }
+  }, [infoMessage]);
 
   const handleVerifyEmail = async () => {
     if (!resolvedEmail) {
@@ -99,12 +117,18 @@ export default function EmailCode() {
           <Pressable
             className="mb-14 h-14 w-14 items-center justify-center rounded-full bg-white/8"
             onPress={goBackLoginScreen}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar"
+            accessibilityHint="Retorna para a tela de login"
           >
             <Ionicicons name="arrow-back-outline" size={24} color="#fff" />
           </Pressable>
 
-          <Text className="mb-6 text-[48px] font-semibold leading-[58px] text-[#F4F4F5]">
-            Insira o código recebido 
+          <Text
+            className="mb-6 text-[48px] font-semibold leading-[58px] text-[#F4F4F5]"
+            accessibilityRole="header"
+          >
+            Insira o código recebido
           </Text>
 
           <Text className="mb-10 text-[18px] font-semibold tracking-[1px] text-[#A7AAB2]">
@@ -112,6 +136,7 @@ export default function EmailCode() {
           </Text>
 
           <TextInput
+            ref={inputRef}
             className="mb-5 rounded-md bg-[#F3F3F3] px-4 py-4 text-center text-[22px] font-semibold tracking-[6px] text-zinc-900"
             keyboardType="default"
             textContentType="oneTimeCode"
@@ -120,6 +145,8 @@ export default function EmailCode() {
             placeholder="000000"
             placeholderTextColor="#A1A1AA"
             value={code}
+            accessibilityLabel="Código de verificação de 6 dígitos"
+            accessibilityHint="Digite o código enviado para seu e-mail"
             onChangeText={(value) => {
               setCode(normalizeVerificationCode(value));
 
@@ -138,7 +165,34 @@ export default function EmailCode() {
             conta não for confirmada, o app mantém você nesta etapa.
           </Text>
 
-          <Pressable className="mb-10 self-start" onPress={handleResendCode} disabled={isResending}>
+          {errorMessage ? (
+            <Text
+              className="mb-2 text-[15px] font-semibold text-danger"
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+            >
+              {errorMessage}
+            </Text>
+          ) : null}
+
+          {infoMessage ? (
+            <Text
+              className="mb-2 text-[15px] font-semibold text-success"
+              accessibilityLiveRegion="polite"
+            >
+              {infoMessage}
+            </Text>
+          ) : null}
+
+          <Pressable
+            className="mb-10 self-start"
+            onPress={handleResendCode}
+            disabled={isResending}
+            accessibilityRole="button"
+            accessibilityLabel="Reenviar código"
+            accessibilityHint="Envia um novo código de verificação para o seu e-mail"
+            accessibilityState={{ disabled: isResending, busy: isResending }}
+          >
             <Text className="text-[18px] font-bold text-[#2F90D8]">
               {isResending ? "Reenviando..." : "Reenviar código"}
             </Text>
@@ -150,6 +204,10 @@ export default function EmailCode() {
             }`}
             disabled={!isComplete || loading}
             onPress={handleVerifyEmail}
+            accessibilityRole="button"
+            accessibilityLabel="Confirmar código"
+            accessibilityHint="Valida o código digitado e conclui a verificação do e-mail"
+            accessibilityState={{ disabled: !isComplete || loading, busy: loading }}
           >
             {loading ? (
               <ActivityIndicator />

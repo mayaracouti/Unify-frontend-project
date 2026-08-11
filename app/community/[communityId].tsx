@@ -15,6 +15,11 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import {
+  CommunityRoleBadge,
+  canModerateRole,
+  formatMemberCount,
+} from "../../src/components/community/community-card";
 import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-nav";
 import { GlobalTopNav } from "../../src/components/navigation/global-top-nav";
 import {
@@ -55,10 +60,6 @@ function normalizeCommunityTab(value?: string | string[]) {
   return normalizeRouteParam(value).trim().toLowerCase() === "members"
     ? "members"
     : "posts";
-}
-
-function canModerateRole(role?: CommunityRole | null) {
-  return role === "ADMIN" || role === "MODERATOR";
 }
 
 function getEffectiveCommunityRole(
@@ -198,24 +199,6 @@ function removePost(currentFeed: NormalizedCommunityFeed | null, postId: string)
   };
 }
 
-function formatMemberCount(memberCount?: number | null) {
-  if (typeof memberCount !== "number") {
-    return null;
-  }
-
-  if (memberCount >= 1000) {
-    const compactValue = memberCount / 1000;
-    const formattedValue = compactValue.toLocaleString("pt-BR", {
-      maximumFractionDigits: compactValue >= 10 ? 1 : 1,
-      minimumFractionDigits: compactValue % 1 === 0 ? 0 : 1,
-    });
-
-    return `${formattedValue}k membros`;
-  }
-
-  return `${memberCount.toLocaleString("pt-BR")} membros`;
-}
-
 function getInitials(name?: string | null) {
   return (name ?? "")
     .trim()
@@ -225,57 +208,6 @@ function getInitials(name?: string | null) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
-}
-
-function traduzirNomeRole(role: CommunityRole | null | undefined) {
-  switch (role) {
-    case "ADMIN":
-      return "Administrador";
-    case "MODERATOR":
-      return "Moderador";
-    case "MEMBER":
-      return "Membro";
-    default:
-      return role;
-  }
-}
-
-function CommunityRoleBadge({
-  isOwner,
-  role,
-}: {
-  isOwner?: boolean | null;
-  role?: CommunityRole | null;
-}) {
-  const label = isOwner ? "Criador" : traduzirNomeRole(role);
-
-  if (!label) {
-    return null;
-  }
-
-  return (
-    <View
-      className={`rounded-full px-3 py-2 ${
-        isOwner
-          ? "bg-[#312114]"
-          : canModerateRole(role)
-            ? "bg-[#1B2631]"
-            : "bg-[#1E1A28]"
-      }`}
-    >
-      <Text
-        className={`text-[12px] font-black uppercase tracking-[1.1px] ${
-          isOwner
-            ? "text-[#FFD28A]"
-            : canModerateRole(role)
-              ? "text-[#9FD9FF]"
-              : "text-[#CDBDFF]"
-        }`}
-      >
-        {label}
-      </Text>
-    </View>
-  );
 }
 
 function CommunityBadge({
@@ -494,19 +426,17 @@ function CommunityHeader({
   activeTab,
   authToken,
   community,
-  deletingCommunity,
   membershipBusy,
   onChangeTab,
-  onDeleteCommunity,
+  onOpenSettings,
   onToggleMembership,
 }: {
   activeTab: CommunityViewTab;
   authToken: string | null;
   community: CommunitySummaryResponse;
-  deletingCommunity: boolean;
   membershipBusy: boolean;
   onChangeTab: (tab: CommunityViewTab) => void;
-  onDeleteCommunity: () => void;
+  onOpenSettings: () => void;
   onToggleMembership: () => void;
 }) {
   const memberCountLabel = formatMemberCount(community.memberCount);
@@ -516,21 +446,15 @@ function CommunityHeader({
       <View className="flex-row items-start justify-between gap-4">
         <CommunityBadge authToken={authToken} community={community} />
 
-        {community.isOwner ? (
+        {community.isOwner || community.currentUserRole === "ADMIN" ? (
           <Pressable
-            className={`rounded-full border border-[#6A4456] px-4 py-3 ${
-              deletingCommunity ? "bg-[#3A202A]" : "bg-[#2A1C24]"
-            }`}
-            onPress={onDeleteCommunity}
-            disabled={deletingCommunity}
+            className="rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-3"
+            onPress={onOpenSettings}
+            accessibilityRole="button"
+            accessibilityLabel="Configurações da comunidade"
+            accessibilityHint="Abre a tela para editar, sair ou excluir esta comunidade"
           >
-            {deletingCommunity ? (
-              <ActivityIndicator color="#FFD3DD" size="small" />
-            ) : (
-              <View className="flex-row items-center gap-2">
-                <Ionicons name="trash-outline" size={16} color="#FFD3DD" />
-              </View>
-            )}
+            <Ionicons name="settings-outline" size={16} color="#E5E2E1" />
           </Pressable>
         ) : null}
       </View>
@@ -800,6 +724,11 @@ function CommunityMemberCard({
 
         <View className="flex-1">
           <Text className="text-[17px] font-black text-[#E5E2E1]">{member.name}</Text>
+          {member.joinedAt ? (
+            <Text className="mt-1 text-[12px] font-semibold text-[#948EA1]">
+              Membro desde {new Date(member.joinedAt).toLocaleDateString("pt-BR")}
+            </Text>
+          ) : null}
           <View className="mt-2 flex-row flex-wrap items-center gap-2">
             <CommunityRoleBadge
               isOwner={isCommunityMemberOwner(member, community)}
@@ -862,7 +791,6 @@ export default function CommunityDetailScreen() {
   const [membersLoading, setMembersLoading] = useState(false);
   const [membersLoadError, setMembersLoadError] = useState<string | null>(null);
   const [membershipBusy, setMembershipBusy] = useState(false);
-  const [communityDeleteBusy, setCommunityDeleteBusy] = useState(false);
   const [pendingLikePostId, setPendingLikePostId] = useState<string | null>(null);
   const [pendingDeletePostId, setPendingDeletePostId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -1174,46 +1102,21 @@ export default function CommunityDetailScreen() {
     [confirmDeletePost]
   );
 
-  const confirmDeleteCommunity = useCallback(async () => {
+  // Excluir/sair da comunidade migrou para `app/community/settings.tsx`
+  // (hook `use-community-danger-actions`), acessivel pela engrenagem do
+  // cabecalho para owner/admin.
+  const handleOpenCommunitySettings = useCallback(() => {
     const communityId = feed?.community?.id ?? requestedCommunityId;
 
-    if (!communityId || communityDeleteBusy) {
+    if (!communityId) {
       return;
     }
 
-    setCommunityDeleteBusy(true);
-
-    try {
-      await communityService.deleteCommunity(communityId);
-      showGlobalToast({
-        title: "Comunidade removida",
-        variant: "success",
-        message: "A comunidade foi excluída com sucesso.",
-      });
-      router.replace("/community");
-    } catch {
-      // Global API error toast already explains the failure.
-    } finally {
-      setCommunityDeleteBusy(false);
-    }
-  }, [communityDeleteBusy, feed?.community?.id, requestedCommunityId, router]);
-
-  const handleDeleteCommunity = useCallback(() => {
-    Alert.alert(
-      "Excluir comunidade",
-      "Essa ação apaga a comunidade permanentemente. Deseja continuar?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Excluir",
-          style: "destructive",
-          onPress: () => {
-            void confirmDeleteCommunity();
-          },
-        },
-      ]
-    );
-  }, [confirmDeleteCommunity]);
+    router.push({
+      pathname: "/community/settings",
+      params: { communityId },
+    });
+  }, [feed?.community?.id, requestedCommunityId, router]);
 
   const handleOpenComments = useCallback(
     (post: CommunityPostResponse) => {
@@ -1352,10 +1255,9 @@ export default function CommunityDetailScreen() {
                     activeTab={activeTab}
                     authToken={authToken}
                     community={community}
-                    deletingCommunity={communityDeleteBusy}
                     membershipBusy={membershipBusy}
                     onChangeTab={handleChangeTab}
-                    onDeleteCommunity={handleDeleteCommunity}
+                    onOpenSettings={handleOpenCommunitySettings}
                     onToggleMembership={handleToggleMembership}
                   />
 

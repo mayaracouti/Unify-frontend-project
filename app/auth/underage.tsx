@@ -19,21 +19,34 @@ export default function UnderageScreen() {
 
       <SafeAreaView className="flex-1 px-6 py-6">
         <View className="flex-1 items-center justify-center">
-          <View className="mb-6 h-20 w-20 items-center justify-center rounded-full bg-[#F97316]/20">
+          <View
+            className="mb-6 h-20 w-20 items-center justify-center rounded-full bg-[#F97316]/20"
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden
+          >
             <Ionicons name="hand-right-outline" size={36} color="#FDBA74" />
           </View>
 
-          <Text className="mb-4 text-center text-[28px] font-extrabold text-white">
-            Desculpe
-          </Text>
+          <View
+            accessible
+            accessibilityRole="header"
+            accessibilityLabel="Desculpe. O aplicativo é destinado apenas para usuários com 18 anos ou mais."
+          >
+            <Text className="mb-4 text-center text-[28px] font-extrabold text-white">
+              Desculpe
+            </Text>
 
-          <Text className="mb-8 max-w-[320px] text-center text-[15px] font-semibold leading-6 text-[#D6D2E1]">
-            O aplicativo é destinado apenas para usuários com 18 anos ou mais.
-          </Text>
+            <Text className="mb-8 max-w-[320px] text-center text-[15px] font-semibold leading-6 text-[#D6D2E1]">
+              O aplicativo é destinado apenas para usuários com 18 anos ou mais.
+            </Text>
+          </View>
 
           <Pressable
             className="w-full max-w-[320px] items-center justify-center rounded-md bg-[#F2F500] px-6 py-4"
             onPress={() => router.replace("/auth/login")}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar para o login"
+            accessibilityHint="Retorna para a tela de login"
           >
             <Text className="text-[15px] font-extrabold text-[#191919]">
               Voltar para o Login

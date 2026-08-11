@@ -1,5 +1,6 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Platform,
   Pressable,
@@ -19,6 +20,7 @@ import { FormField, type FormFieldHandle } from "../../../src/components/ui/form
 import { useAuth } from "../../../src/context/AuthContext";
 import { formatApiErrorMessage } from "../../../src/utils/auth";
 import { isApiError } from "../../../src/types/auth";
+import { speak } from "../../../src/accessibility/screen-reader";
 
 const UNDERAGE_SIGNUP_ERROR_CODE = 3008;
 
@@ -87,7 +89,13 @@ function PasswordRequirement({
   label: string;
 }) {
   return (
-    <View className="mb-2 flex-row items-center">
+    <View
+      className="mb-2 flex-row items-center"
+      accessible
+      accessibilityLabel={`${label}: ${
+        isValid ? "requisito atendido" : "requisito pendente"
+      }`}
+    >
       <View
         className={`mr-3 h-2.5 w-2.5 rounded-full ${
           isValid ? "bg-[#8BFFF3]" : "bg-white/20"
@@ -127,6 +135,15 @@ export default function Cadastro() {
       setError(null);
     }
   };
+
+  // `accessibilityLiveRegion` e Android-only: no iOS o anuncio do erro
+  // precisa ser disparado manualmente quando a mensagem muda.
+  useEffect(() => {
+    if (error) {
+      AccessibilityInfo.announceForAccessibility(error);
+      speak(error);
+    }
+  }, [error]);
 
   const passwordChecks = useMemo(() => checkPasswordRequirements(password), [password]);
 
@@ -241,11 +258,18 @@ export default function Cadastro() {
           keyboardShouldPersistTaps="handled"
         >
           <View className="mb-5 items-center">
-            <View className="mb-5 h-16 w-16 items-center justify-center rounded-md bg-[#814DFF]">
+            <View
+              className="mb-5 h-16 w-16 items-center justify-center rounded-md bg-[#814DFF]"
+              importantForAccessibility="no-hide-descendants"
+              accessibilityElementsHidden
+            >
               <Ionicicons name="person-add-outline" size={28} color="#fff" />
             </View>
 
-            <Text className="mb-3 text-center text-[25px] font-extrabold text-white">
+            <Text
+              className="mb-3 text-center text-[25px] font-extrabold text-white"
+              accessibilityRole="header"
+            >
               Criar Conta
             </Text>
 
@@ -317,8 +341,13 @@ export default function Cadastro() {
             className="mb-4 flex-row items-center border-b border-white/35 bg-black/24 px-4 py-4"
             onPress={() => setShowBirthdatePicker((currentValue) => !currentValue)}
             accessibilityRole="button"
-            accessibilityLabel="Data de nascimento"
+            accessibilityLabel={
+              birthdate
+                ? `Data de nascimento selecionada: ${formatBirthdateForDisplay(birthdate)}`
+                : "Selecionar data de nascimento"
+            }
             accessibilityHint="Abre o seletor de data para informar quando você nasceu"
+            accessibilityState={{ expanded: showBirthdatePicker }}
             accessibilityValue={birthdate ? { text: formatBirthdateForDisplay(birthdate) } : undefined}
           >
             <Text
@@ -436,6 +465,9 @@ export default function Cadastro() {
           <Pressable
             className="items-center justify-center rounded-md border border-white/35 py-3"
             onPress={() => router.replace("/auth/login")}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar para o login"
+            accessibilityHint="Retorna para a tela de login"
           >
             <Text className="text-[14px] font-extrabold text-white">
               Voltar para o Login

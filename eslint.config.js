@@ -8,6 +8,17 @@ module.exports = defineConfig([
     ignores: ["dist/*", "dist-*/*", "android/*", "node_modules/*"],
   },
   {
+    // Arquivos de infraestrutura Node (fora do bundle React Native)
+    files: ["app.config.js", "scripts/**/*.js"],
+    languageOptions: {
+      globals: { __dirname: "readonly", process: "readonly", require: "readonly", module: "readonly" },
+    },
+    rules: {
+      "expo/no-dynamic-env-var": "off",
+      "no-undef": "off",
+    },
+  },
+  {
     plugins: { "react-native-a11y": a11y },
     rules: {
       // Fase 1 (este documento): warn, para nao travar o build enquanto

@@ -350,7 +350,13 @@ export default function ProfileOnboarding() {
       <SafeAreaView className="flex-1">
         <View className="h-16 flex-row items-center justify-between border-b-2 border-[#262626] bg-[#0E0E0E] px-6">
           <View className="flex-row items-center">
-            <Pressable className="mr-3 h-10 w-10 items-center justify-center rounded-full" onPress={() => router.back()}>
+            <Pressable
+              className="mr-3 h-10 w-10 items-center justify-center rounded-full"
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Voltar"
+              accessibilityHint="Retorna para a tela anterior"
+            >
               <Ionicons name="arrow-back" size={24} color="#E5E2E1" />
             </Pressable>
             <Text className="text-2xl font-black text-[#7C4DFF]">Unify</Text>
@@ -359,7 +365,11 @@ export default function ProfileOnboarding() {
         </View>
 
         {loading ? (
-          <View className="flex-1 items-center justify-center">
+          <View
+            className="flex-1 items-center justify-center"
+            accessible
+            accessibilityLabel="Carregando dados"
+          >
             <ActivityIndicator color="#CDBDFF" />
           </View>
         ) : (
@@ -388,6 +398,8 @@ export default function ProfileOnboarding() {
                 textAlignVertical="top"
                 value={bio}
                 onChangeText={setBio}
+                accessibilityLabel="Sobre você"
+                accessibilityHint="Descreva um pouco sobre você, até 500 caracteres"
               />
               <Text className="mt-1 text-right text-[12px] font-semibold text-[#948EA1]">
                 {bioLength} / 500
@@ -437,35 +449,46 @@ export default function ProfileOnboarding() {
                     color={hasLocationPermission ? "#5DDB85" : "#00DAF3"}
                   />
                   <View className="ml-3 flex-1">
-                    <Text className="text-[16px] font-bold text-white">
-                      {hasLocationPermission
-                        ? "Localização liberada"
-                        : locationStatus === "requesting"
-                          ? "Solicitando acesso à localização"
-                          : "Localização automática"}
-                    </Text>
-                    {hasLocationPermission ? (
-                      <Text className="mt-2 text-[13px] font-bold text-[#5DDB85]">
-                        Acesso à localização já está liberado.
+                    {/* Agrupado em um unico no de acessibilidade: o texto muda
+                        de forma assincrona conforme a permissao de GPS. */}
+                    <View accessible accessibilityLiveRegion="polite">
+                      <Text className="text-[16px] font-bold text-white">
+                        {hasLocationPermission
+                          ? "Localização liberada"
+                          : locationStatus === "requesting"
+                            ? "Solicitando acesso à localização"
+                            : "Localização automática"}
                       </Text>
-                    ) : null}
-                    <Text className="mt-1 text-[13px] font-semibold leading-5 text-[#CAC3D8]">
-                      {locationStatus === "failed"
-                          ? "Não conseguimos atualizar sua localização agora. Você ainda pode continuar e tentar novamente depois."
-                          : hasLocationPermission
-                            ? autoLocation
-                              ? "Sua localização atual será usada para alimentar as preferências de distância."
-                              : "O acesso já foi concedido. Assim que a posição estiver disponível, ela será usada nos matches por distância."
-                            : showLocationSettingsButton
-                              ? "O acesso foi bloqueado no celular. Abra os ajustes do aparelho para liberar a localização."
-                              : "Conceda o acesso à sua localização para melhorar os matches por distância. Você ainda pode continuar sem isso."}
-                    </Text>
+                      {hasLocationPermission ? (
+                        <Text className="mt-2 text-[13px] font-bold text-[#5DDB85]">
+                          Acesso à localização já está liberado.
+                        </Text>
+                      ) : null}
+                      <Text className="mt-1 text-[13px] font-semibold leading-5 text-[#CAC3D8]">
+                        {locationStatus === "failed"
+                            ? "Não conseguimos atualizar sua localização agora. Você ainda pode continuar e tentar novamente depois."
+                            : hasLocationPermission
+                              ? autoLocation
+                                ? "Sua localização atual será usada para alimentar as preferências de distância."
+                                : "O acesso já foi concedido. Assim que a posição estiver disponível, ela será usada nos matches por distância."
+                              : showLocationSettingsButton
+                                ? "O acesso foi bloqueado no celular. Abra os ajustes do aparelho para liberar a localização."
+                                : "Conceda o acesso à sua localização para melhorar os matches por distância. Você ainda pode continuar sem isso."}
+                      </Text>
+                    </View>
 
                     {!hasLocationPermission ? (
                       <Pressable
                         className={`mt-4 h-12 items-center justify-center rounded-xl ${locationStatus === "requesting" ? "bg-[#CFCF62]" : "bg-[#EAEA00]"}`}
                         disabled={locationStatus === "requesting"}
                         onPress={() => void handleGrantLocationAccess()}
+                        accessibilityRole="button"
+                        accessibilityLabel="Habilitar localização"
+                        accessibilityHint="Solicita a permissão de localização do aparelho"
+                        accessibilityState={{
+                          disabled: locationStatus === "requesting",
+                          busy: locationStatus === "requesting",
+                        }}
                       >
                         {locationStatus === "requesting" ? (
                           <ActivityIndicator color="#323200" size="small" />
@@ -481,6 +504,9 @@ export default function ProfileOnboarding() {
                       <Pressable
                         className="mt-4 h-12 items-center justify-center rounded-xl border border-[#5DDB85] bg-[#132519]"
                         onPress={() => void handleOpenLocationSettings()}
+                        accessibilityRole="button"
+                        accessibilityLabel="Abrir configurações do celular"
+                        accessibilityHint="Isso vai abrir as configurações do sistema, fora do aplicativo"
                       >
                         <Text className="text-[15px] font-black text-[#5DDB85]">
                           Ir para os ajustes do celular
@@ -493,7 +519,11 @@ export default function ProfileOnboarding() {
             </View>
 
             {error ? (
-              <Text className="mb-4 text-center text-[13px] font-semibold text-red-300">
+              <Text
+                className="mb-4 text-center text-[13px] font-semibold text-red-300"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+              >
                 {error}
               </Text>
             ) : null}
@@ -511,6 +541,10 @@ export default function ProfileOnboarding() {
               className={`h-14 items-center justify-center rounded-lg ${saving ? "bg-[#CDCD00]" : "bg-[#EAEA00]"}`}
               disabled={saving}
               onPress={handleSave}
+              accessibilityRole="button"
+              accessibilityLabel="Continuar"
+              accessibilityHint="Salva seu perfil e segue para as preferências de match"
+              accessibilityState={{ disabled: saving, busy: saving }}
             >
               {saving ? (
                 <ActivityIndicator color="#323200" />

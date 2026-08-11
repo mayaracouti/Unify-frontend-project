@@ -11,6 +11,8 @@ import {
   type ViewProps,
 } from "react-native";
 
+import { useGlobalAccessibilityState } from "../../accessibility/global-text-adjustments";
+
 const webAnimatedCharacterStyle = {
   display: "inline-block",
 } as unknown as TextStyle;
@@ -78,6 +80,7 @@ export function WormRiseText({
   const progressValuesRef = useRef<Animated.Value[]>([]);
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   const useNativeDriver = Platform.OS === "ios";
+  const { reduceMotion } = useGlobalAccessibilityState();
 
   if (progressValuesRef.current.length !== segments.length) {
     progressValuesRef.current = segments.map(
@@ -87,6 +90,16 @@ export function WormRiseText({
 
   useEffect(() => {
     animationRef.current?.stop();
+
+    // `reduceMotion`: o texto entra direto no estado final, sem a animacao de
+    // entrada caractere a caractere.
+    if (reduceMotion) {
+      progressValuesRef.current.forEach((value) => {
+        value.setValue(1);
+      });
+
+      return;
+    }
 
     progressValuesRef.current.forEach((value) => {
       value.setValue(autoPlay ? 0 : 1);
@@ -116,7 +129,17 @@ export function WormRiseText({
     return () => {
       animation.stop();
     };
-  }, [autoPlay, delay, duration, replayKey, segments.length, stagger, text, useNativeDriver]);
+  }, [
+    autoPlay,
+    delay,
+    duration,
+    reduceMotion,
+    replayKey,
+    segments.length,
+    stagger,
+    text,
+    useNativeDriver,
+  ]);
 
   return (
     <Text {...textProps} accessibilityLabel={accessibilityLabel ?? text}>
@@ -186,6 +209,7 @@ export function WormRiseWrapText({
   const progressValuesRef = useRef<Animated.Value[]>([]);
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   const useNativeDriver = Platform.OS !== "web";
+  const { reduceMotion } = useGlobalAccessibilityState();
 
   if (progressValuesRef.current.length !== segments.length) {
     progressValuesRef.current = segments.map(
@@ -195,6 +219,15 @@ export function WormRiseWrapText({
 
   useEffect(() => {
     animationRef.current?.stop();
+
+    // `reduceMotion`: sem animacao de entrada, o texto ja aparece posicionado.
+    if (reduceMotion) {
+      progressValuesRef.current.forEach((value) => {
+        value.setValue(1);
+      });
+
+      return;
+    }
 
     progressValuesRef.current.forEach((value) => {
       value.setValue(0);
@@ -224,7 +257,17 @@ export function WormRiseWrapText({
     return () => {
       animation.stop();
     };
-  }, [autoPlay, delay, duration, replayKey, segments.length, stagger, text, useNativeDriver]);
+  }, [
+    autoPlay,
+    delay,
+    duration,
+    reduceMotion,
+    replayKey,
+    segments.length,
+    stagger,
+    text,
+    useNativeDriver,
+  ]);
 
   return (
     <View

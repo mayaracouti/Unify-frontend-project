@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Pressable,
   Text,
@@ -12,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { authService } from "../../../src/services/authService";
 import { formatApiErrorMessage } from "../../../src/utils/auth";
+import { speak } from "../../../src/accessibility/screen-reader";
 
 function readTokenParam(tokenParam: string | string[] | undefined): string {
   if (Array.isArray(tokenParam)) {
@@ -32,6 +34,22 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+
+  // `accessibilityLiveRegion` e Android-only: no iOS os anuncios precisam
+  // ser disparados manualmente quando a mensagem muda.
+  useEffect(() => {
+    if (error) {
+      AccessibilityInfo.announceForAccessibility(error);
+      speak(error);
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (successMessage) {
+      AccessibilityInfo.announceForAccessibility(successMessage);
+      speak(successMessage);
+    }
+  }, [successMessage]);
 
   async function handleResetPassword() {
     if (isTokenMissing) {
@@ -88,7 +106,10 @@ export default function ResetPassword() {
 
       <SafeAreaView className="flex-1">
         <View className="flex-1 px-6 pt-6 mt-10">
-          <Text className="mb-3 text-[34px] font-extrabold leading-[40px] text-white">
+          <Text
+            className="mb-3 text-[34px] font-extrabold leading-[40px] text-white"
+            accessibilityRole="header"
+          >
             Nova senha
           </Text>
 
@@ -99,7 +120,10 @@ export default function ResetPassword() {
           </Text>
 
           {successMessage ? (
-            <View className="mb-6 rounded-md border border-emerald-300/35 bg-emerald-400/10 px-4 py-4">
+            <View
+              className="mb-6 rounded-md border border-emerald-300/35 bg-emerald-400/10 px-4 py-4"
+              accessibilityLiveRegion="polite"
+            >
               <Text className="text-center text-[13px] font-semibold text-emerald-100">
                 {successMessage}
               </Text>
@@ -107,7 +131,11 @@ export default function ResetPassword() {
           ) : null}
 
           {error ? (
-            <Text className="mb-4 text-center text-[12px] font-semibold text-red-300">
+            <Text
+              className="mb-4 text-center text-[12px] font-semibold text-red-300"
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+            >
               {error}
             </Text>
           ) : null}
@@ -124,6 +152,8 @@ export default function ResetPassword() {
                 placeholderTextColor="#8C8F99"
                 secureTextEntry
                 value={password}
+                accessibilityLabel="Nova senha"
+                accessibilityHint="A senha deve ter pelo menos 8 caracteres"
                 onChangeText={(value) => {
                   setPassword(value);
 
@@ -143,6 +173,8 @@ export default function ResetPassword() {
                 placeholderTextColor="#8C8F99"
                 secureTextEntry
                 value={confirmPassword}
+                accessibilityLabel="Confirmar nova senha"
+                accessibilityHint="Repita exatamente a nova senha digitada acima"
                 onChangeText={(value) => {
                   setConfirmPassword(value);
 
@@ -158,6 +190,10 @@ export default function ResetPassword() {
                 }`}
                 disabled={loading}
                 onPress={handleResetPassword}
+                accessibilityRole="button"
+                accessibilityLabel="Redefinir senha"
+                accessibilityHint="Salva a nova senha e conclui a recuperação da conta"
+                accessibilityState={{ disabled: loading, busy: loading }}
               >
                 {loading ? (
                   <ActivityIndicator />
@@ -173,6 +209,13 @@ export default function ResetPassword() {
           <Pressable
             className="mt-6 items-center justify-center rounded-md border border-white/35 py-3"
             onPress={() => router.replace("/auth/forgot-password")}
+            accessibilityRole="button"
+            accessibilityLabel={
+              successMessage || isTokenMissing
+                ? "Solicitar novo link"
+                : "Voltar para recuperar senha"
+            }
+            accessibilityHint="Abre a tela de recuperação de senha"
           >
             <Text className="text-[14px] font-extrabold text-white">
               {successMessage || isTokenMissing
@@ -184,6 +227,9 @@ export default function ResetPassword() {
           <Pressable
             className="mt-4 items-center justify-center rounded-md border border-white/20 py-3"
             onPress={() => router.replace("/auth/login")}
+            accessibilityRole="button"
+            accessibilityLabel="Ir para o login"
+            accessibilityHint="Abre a tela de login"
           >
             <Text className="text-[14px] font-extrabold text-white/90">
               Ir para o login

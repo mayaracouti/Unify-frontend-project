@@ -288,6 +288,9 @@ export default function EditProfile() {
             <Pressable
               className="mr-3 h-10 w-10 items-center justify-center rounded-full"
               onPress={() => router.replace("/profile")}
+              accessibilityRole="button"
+              accessibilityLabel="Voltar"
+              accessibilityHint="Retorna para o seu perfil"
             >
               <Ionicons name="arrow-back" size={24} color="#E5E2E1" />
             </Pressable>
@@ -297,7 +300,11 @@ export default function EditProfile() {
         </View>
 
         {loading ? (
-          <View className="flex-1 items-center justify-center">
+          <View
+            className="flex-1 items-center justify-center"
+            accessible
+            accessibilityLabel="Carregando dados"
+          >
             <ActivityIndicator color="#CDBDFF" />
           </View>
         ) : (
@@ -377,31 +384,42 @@ export default function EditProfile() {
                       color={hasLocationPermission ? "#5DDB85" : "#00DAF3"}
                     />
                     <View className="ml-3 flex-1">
-                      <Text className="text-[16px] font-bold text-white">
-                        Localização automática
-                      </Text>
-                      {hasLocationPermission ? (
-                        <Text className="mt-2 text-[13px] font-bold text-[#5DDB85]">
-                          Acesso à localização já está liberado.
+                      {/* Agrupado em um unico no de acessibilidade: o texto muda
+                          de forma assincrona conforme a permissao de GPS. */}
+                      <View accessible accessibilityLiveRegion="polite">
+                        <Text className="text-[16px] font-bold text-white">
+                          Localização automática
                         </Text>
-                      ) : null}
-                      <Text className="mt-1 text-[13px] font-semibold leading-5 text-[#CAC3D8]">
-                        {locationStatus === "failed"
-                          ? "Não conseguimos atualizar sua localização agora. Você pode tentar novamente em instantes."
-                          : hasLocationPermission
-                            ? autoLocation
-                              ? "Sua última localização ativa será mantida e atualizada automaticamente quando necessário."
-                              : "O acesso já foi concedido. Assim que a posição estiver disponível, ela será usada para os matches por distância."
-                            : showLocationSettingsButton
-                              ? "O acesso foi bloqueado no celular. Abra os ajustes do aparelho para liberar a localização."
-                              : "Conceda o acesso à sua localização para atualizar seus matches por distância quando quiser."}
-                      </Text>
+                        {hasLocationPermission ? (
+                          <Text className="mt-2 text-[13px] font-bold text-[#5DDB85]">
+                            Acesso à localização já está liberado.
+                          </Text>
+                        ) : null}
+                        <Text className="mt-1 text-[13px] font-semibold leading-5 text-[#CAC3D8]">
+                          {locationStatus === "failed"
+                            ? "Não conseguimos atualizar sua localização agora. Você pode tentar novamente em instantes."
+                            : hasLocationPermission
+                              ? autoLocation
+                                ? "Sua última localização ativa será mantida e atualizada automaticamente quando necessário."
+                                : "O acesso já foi concedido. Assim que a posição estiver disponível, ela será usada para os matches por distância."
+                              : showLocationSettingsButton
+                                ? "O acesso foi bloqueado no celular. Abra os ajustes do aparelho para liberar a localização."
+                                : "Conceda o acesso à sua localização para atualizar seus matches por distância quando quiser."}
+                        </Text>
+                      </View>
 
                       {!hasLocationPermission ? (
                         <Pressable
                           className={`mt-4 h-12 items-center justify-center rounded-xl ${locationStatus === "requesting" ? "bg-[#CFCF62]" : "bg-[#EAEA00]"}`}
                           disabled={locationStatus === "requesting"}
                           onPress={() => void handleGrantLocationAccess()}
+                          accessibilityRole="button"
+                          accessibilityLabel="Habilitar localização"
+                          accessibilityHint="Solicita a permissão de localização do aparelho"
+                          accessibilityState={{
+                            disabled: locationStatus === "requesting",
+                            busy: locationStatus === "requesting",
+                          }}
                         >
                           {locationStatus === "requesting" ? (
                             <ActivityIndicator color="#323200" size="small" />
@@ -417,6 +435,9 @@ export default function EditProfile() {
                         <Pressable
                           className="mt-4 h-12 items-center justify-center rounded-xl border border-[#5DDB85] bg-[#132519]"
                           onPress={() => void handleOpenLocationSettings()}
+                          accessibilityRole="button"
+                          accessibilityLabel="Abrir configurações do celular"
+                          accessibilityHint="Isso vai abrir as configurações do sistema, fora do aplicativo"
                         >
                           <Text className="text-[15px] font-black text-[#5DDB85]">
                             Ir para os ajustes do celular
@@ -454,6 +475,7 @@ export default function EditProfile() {
               onPress={handleSave}
               accessibilityRole="button"
               accessibilityLabel={saving ? "Salvando…" : "Salvar alterações"}
+              accessibilityHint="Salva as alterações feitas no seu perfil"
               accessibilityState={{ disabled: saving, busy: saving }}
             >
               {saving ? (

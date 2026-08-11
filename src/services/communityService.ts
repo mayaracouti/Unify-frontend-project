@@ -1,6 +1,7 @@
 import { customApiCall } from "../api/customApi";
 import { runtimeConfig } from "../config/runtime";
 import type {
+  CommunityCategoryResponse,
   CommunityDirectoryResponse,
   CommunityCommentResponse,
   CommunityCommentsResponse,
@@ -16,6 +17,8 @@ import type {
 } from "../types/community";
 
 const COMMUNITIES_ENDPOINT = "/communities";
+const COMMUNITY_CATEGORIES_ENDPOINT = "/communities/categories";
+const MY_COMMUNITIES_ENDPOINT = "/communities/mine";
 const COMMUNITY_FEED_ENDPOINT = "/communities/feed";
 const COMMUNITY_MEMBERSHIP_ENDPOINT = "/communities/membership";
 const COMMUNITY_POSTS_ENDPOINT = "/communities/posts";
@@ -70,18 +73,40 @@ function appendQueryParams(
 }
 
 export const communityService = {
-  listCommunities(args?: { page?: number; size?: number }) {
+  listCategories() {
+    return customApiCall.get<CommunityCategoryResponse[]>(
+      COMMUNITY_CATEGORIES_ENDPOINT,
+      undefined,
+      { requiresAuth: true }
+    );
+  },
+
+  listCommunities(args?: { page?: number; size?: number; categoryId?: number | null }) {
     return customApiCall.get<CommunityDirectoryResponse>(COMMUNITIES_ENDPOINT, {
       page: args?.page ?? 0,
       size: args?.size ?? 20,
+      categoryId: args?.categoryId ?? undefined,
     }, {
       requiresAuth: true,
     });
   },
 
-  searchCommunities(query: string, args?: { page?: number; size?: number }) {
+  searchCommunities(
+    query: string,
+    args?: { page?: number; size?: number; categoryId?: number | null }
+  ) {
     return customApiCall.get<CommunityDirectoryResponse>(`${COMMUNITIES_ENDPOINT}/search`, {
       query,
+      page: args?.page ?? 0,
+      size: args?.size ?? 20,
+      categoryId: args?.categoryId ?? undefined,
+    }, {
+      requiresAuth: true,
+    });
+  },
+
+  getMyCommunities(args?: { page?: number; size?: number }) {
+    return customApiCall.get<CommunityDirectoryResponse>(MY_COMMUNITIES_ENDPOINT, {
       page: args?.page ?? 0,
       size: args?.size ?? 20,
     }, {
@@ -92,6 +117,18 @@ export const communityService = {
   createCommunity(formData: FormData) {
     return customApiCall.post<CommunitySummaryResponse, FormData>(
       COMMUNITIES_ENDPOINT,
+      formData,
+      { requiresAuth: true }
+    );
+  },
+
+  // O interceptor de request (src/api/interceptors.ts) so injeta
+  // `Content-Type: application/json` quando o body NAO e FormData, e essa
+  // checagem independe do metodo HTTP — logo PUT com FormData mantem o
+  // multipart montado pelo fetch, igual ao POST de `createCommunity`.
+  updateCommunity(communityId: string, formData: FormData) {
+    return customApiCall.put<CommunitySummaryResponse, FormData>(
+      `${COMMUNITIES_ENDPOINT}/${encodePathSegment(communityId)}`,
       formData,
       { requiresAuth: true }
     );

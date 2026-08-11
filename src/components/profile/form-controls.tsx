@@ -18,11 +18,13 @@ export function OptionChip({
   selected,
   iconName,
   onPress,
+  role = "button",
 }: {
   label: string;
   selected: boolean;
   iconName?: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
+  role?: "button" | "radio" | "checkbox";
 }) {
   return (
     <Pressable
@@ -32,6 +34,11 @@ export function OptionChip({
           : "border-[#494455] bg-transparent"
       }`}
       onPress={onPress}
+      accessibilityRole={role}
+      accessibilityLabel={label}
+      accessibilityState={
+        role === "checkbox" ? { checked: selected } : { selected }
+      }
     >
       {iconName ? (
         <Ionicons
@@ -73,6 +80,7 @@ export function SingleChoice({
             key={option.id}
             label={option.description}
             selected={value === option.id}
+            role="radio"
             onPress={() => {
               if (value === option.id && onClear) {
                 onClear();
@@ -112,6 +120,7 @@ export function MultiChoice({
             key={option.id}
             label={option.description}
             selected={values.includes(option.id)}
+            role="checkbox"
             iconName={
               showOptionIcons && isIoniconName(option.ionicIcon)
                 ? option.ionicIcon
@@ -142,6 +151,9 @@ export function ChoiceCard({
           : "border-[#262626] bg-[#201F1F]"
       }`}
       onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
     >
       <Text className="flex-1 text-[16px] font-bold text-white">{label}</Text>
       {selected ? (
@@ -161,7 +173,12 @@ export function SectionTitle({
   return (
     <View className="mb-3 flex-row items-center">
       <Ionicons name={icon} size={22} color="#00DAF3" />
-      <Text className="ml-2 text-[22px] font-bold text-white">{title}</Text>
+      <Text
+        className="ml-2 text-[22px] font-bold text-white"
+        accessibilityRole="header"
+      >
+        {title}
+      </Text>
     </View>
   );
 }
@@ -202,6 +219,9 @@ export function SimilaritySelector({
 
                 onChange(option.value);
               }}
+              accessibilityRole="radio"
+              accessibilityLabel={option.description}
+              accessibilityState={{ selected }}
             >
               <Text className="text-[14px] font-bold text-white">
                 {option.description}

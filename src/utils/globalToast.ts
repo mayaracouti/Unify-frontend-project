@@ -1,3 +1,5 @@
+import { speak } from "../accessibility/screen-reader";
+
 export type GlobalToastVariant = "error" | "info" | "success" | "warning";
 
 export interface GlobalToastInput {
@@ -62,6 +64,11 @@ export function showGlobalToast(input: GlobalToastInput): void {
     variant,
     durationMs: input.durationMs ?? 4200,
   };
+
+  // O toast e um feedback visual: com o leitor de tela in-app ligado ele
+  // tambem precisa ser audivel. `speak` ignora a chamada quando a preferencia
+  // esta desligada ou quando o leitor do sistema esta ativo.
+  speak(`${title}. ${message}`);
 
   listeners.forEach((listener) => {
     try {

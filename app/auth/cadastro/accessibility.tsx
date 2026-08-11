@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  AccessibilityInfo,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -8,225 +9,218 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 
-type SupportFocus = "Visual" | "Auditiva" | "Motora" | "Cognitiva";
-type FontSize = "Pequena" | "Média" | "Grande" | "Extra";
+import { useAccessibility } from "../../../src/context/AccessibilityContext";
+import type { FontScaleOption } from "../../../src/types/accessibility";
+import { formatApiErrorMessage } from "../../../src/utils/auth";
+import { speak } from "../../../src/accessibility/screen-reader";
 
-const supportOptions: Array<{
-  label: SupportFocus;
-  icon: string;
-}> = [
-  { label: "Visual", icon: "◉" },
-  { label: "Auditiva", icon: "◔" },
-  { label: "Motora", icon: "♿" },
-  { label: "Cognitiva", icon: "●" },
-];
-
-const fontSizes: Array<{
-  label: FontSize;
+const FONT_SCALE_OPTIONS: Array<{
+  value: FontScaleOption;
+  label: string;
   previewSize: number;
 }> = [
-  { label: "Pequena", previewSize: 12 },
-  { label: "Média", previewSize: 14 },
-  { label: "Grande", previewSize: 17 },
-  { label: "Extra", previewSize: 20 },
+  { value: "SMALL", label: "Pequena", previewSize: 12 },
+  { value: "MEDIUM", label: "Média", previewSize: 14 },
+  { value: "LARGE", label: "Grande", previewSize: 17 },
+  { value: "EXTRA_LARGE", label: "Extra", previewSize: 20 },
 ];
-
-/**
- * FUNÇÃO OFICIAL - BACKEND REAL
- * Use essa quando sua API estiver pronta.
- */
-/*
-async function saveAccessibilityPreferencesWithBackend(data: {
-  userId?: string;
-  supportFocuses: SupportFocus[];
-  fontSize: FontSize;
-  highContrast: boolean;
-  screenReader: boolean;
-}) {
-  const response = await fetch("https://sua-api.com/users/accessibility", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  const responseData = await response.json();
-
-  if (!response.ok) {
-    throw new Error(responseData.message || "Erro ao salvar preferências.");
-  }
-
-  return responseData;
-}
-*/
-
-/**
- * FUNÇÃO MOCK - SIMULA SALVAR PREFERÊNCIAS COM SUCESSO
- * Mantenha essa ativa enquanto o backend real não estiver pronto.
- */
-async function saveAccessibilityPreferencesWithBackend(_data: {
-  userId?: string;
-  supportFocuses: SupportFocus[];
-  fontSize: FontSize;
-  highContrast: boolean;
-  screenReader: boolean;
-}) {
-  await new Promise((resolve) => setTimeout(resolve, 700));
-
-  return {
-    success: true,
-  };
-}
 
 export default function CadastroAccessibility() {
   const router = useRouter();
-  const { userId } = useLocalSearchParams<{ userId?: string }>();
+  const { settings, updateSettings } = useAccessibility();
 
-  const [supportFocuses, setSupportFocuses] = useState<SupportFocus[]>([
-    "Visual",
-  ]);
-  const [fontSize, setFontSize] = useState<FontSize>("Média");
-  const [highContrast, setHighContrast] = useState(true);
-  const [screenReader, setScreenReader] = useState(false);
+  const [fontScale, setFontScale] = useState<FontScaleOption>(settings.fontScale);
+  const [highContrast, setHighContrast] = useState(settings.highContrast);
+  const [screenReaderOptimized, setScreenReaderOptimized] = useState(
+    settings.screenReaderOptimized
+  );
+  const [reduceMotion, setReduceMotion] = useState(settings.reduceMotion);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  function handleToggleSupportFocus(option: SupportFocus) {
-    setSupportFocuses((currentOptions) => {
-      if (currentOptions.includes(option)) {
-        return currentOptions.filter(
-          (currentOption) => currentOption !== option
-        );
-      }
+  // `accessibilityLiveRegion` e Android-only: no iOS o anuncio do erro
+  // precisa ser disparado manualmente quando a mensagem muda.
+  useEffect(() => {
+    if (error) {
+      AccessibilityInfo.announceForAccessibility(error);
+      speak(error);
+    }
+  }, [error]);
 
-      return [...currentOptions, option];
-    });
-  }
+  const selectedOption =
+    FONT_SCALE_OPTIONS.find((option) => option.value === fontScale) ??
+    FONT_SCALE_OPTIONS[1];
 
   async function handleSavePreferences() {
     try {
       setLoading(true);
       setError("");
 
-      await saveAccessibilityPreferencesWithBackend({
-        userId,
-        supportFocuses,
-        fontSize,
+      await updateSettings({
+        fontScale,
         highContrast,
-        screenReader,
+        screenReaderOptimized,
+        reduceMotion,
       });
 
-      router.replace("/auth/login");
-    } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError("Erro ao salvar preferências.");
-      }
+      router.replace("/onboarding/profile");
+    } catch (nextError) {
+      setError(
+        formatApiErrorMessage(
+          nextError,
+          "Erro ao salvar preferências de acessibilidade."
+        )
+      );
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <View className="flex-1 bg-[#202225]">
+    <View className={highContrast ? "flex-1 bg-hc-bg" : "flex-1 bg-[#202225]"}>
       <SafeAreaView className="flex-1">
-        <View className="border-b border-white/30 bg-[#070B1D] px-5 py-5">
+        <View
+          className={`border-b px-5 py-5 ${
+            highContrast
+              ? "border-hc-border bg-hc-bg"
+              : "border-white/30 bg-[#070B1D]"
+          }`}
+        >
           <View className="flex-row items-center">
             <Pressable
               className="mr-5 h-12 w-12 items-center justify-center rounded-full bg-white/8"
               onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Voltar"
+              accessibilityHint="Retorna para a tela anterior"
             >
-              <Text className="text-[40px] font-bold leading-[42px] text-white">
+              <Text
+                className={`text-[40px] font-bold leading-[42px] ${
+                  highContrast ? "text-hc-text" : "text-white"
+                }`}
+              >
                 ‹
               </Text>
             </Pressable>
-            <Text className="text-[17px] font-bold text-white">Unify</Text>
+            <Text
+              className={`text-[17px] font-bold ${
+                highContrast ? "text-hc-text" : "text-white"
+              }`}
+              accessibilityRole="header"
+            >
+              Unify
+            </Text>
           </View>
         </View>
 
         <ScrollView
-          className="flex-1 bg-[#111111]"
+          className={highContrast ? "flex-1 bg-hc-bg" : "flex-1 bg-[#111111]"}
           contentContainerClassName="px-5 pb-8 pt-6"
           keyboardShouldPersistTaps="handled"
         >
-          <Text className="mb-3 text-[27px] font-extrabold leading-8 text-white">
+          <Text
+            className={`mb-3 text-[27px] font-extrabold leading-8 ${
+              highContrast ? "text-hc-text" : "text-white"
+            }`}
+            accessibilityRole="header"
+          >
             Personalize sua Experiência
           </Text>
 
-          <Text className="mb-6 text-[14px] font-semibold leading-6 text-[#B9BAC4]">
-            Configure o Unify para melhor atender às suas necessidades. Você
-            pode alterar isso mais tarde nas configurações.
+          <Text
+            className={`mb-4 text-[14px] font-semibold leading-6 ${
+              highContrast ? "text-hc-text" : "text-[#B9BAC4]"
+            }`}
+          >
+            Configure o Unify para melhor atender às suas necessidades. Você pode
+            alterar isso mais tarde nas configurações do seu perfil.
           </Text>
 
-          <Text className="mb-3 text-[12px] font-extrabold uppercase tracking-[2px] text-[#DCD5FF]">
-            Foco de Suporte
+          <Text
+            className={`mb-6 text-[13px] font-semibold leading-5 ${
+              highContrast ? "text-hc-text" : "text-[#9C9DA6]"
+            }`}
+          >
+            Estas preferências ajustam o tamanho do texto, o contraste das cores,
+            a otimização para leitores de tela e a redução de animações dentro do
+            aplicativo.
           </Text>
 
-          <View className="mb-6 flex-row flex-wrap justify-between">
-            {supportOptions.map((option) => {
-              const selected = supportFocuses.includes(option.label);
-
-              return (
-                <Pressable
-                  key={option.label}
-                  className={`mb-3 w-[48%] rounded-md border px-4 py-4 ${
-                    selected
-                      ? "border-[#8C55FF] bg-[#303033]"
-                      : "border-transparent bg-[#28282B]"
-                  }`}
-                  onPress={() => handleToggleSupportFocus(option.label)}
-                >
-                  <View className="mb-3 h-11 w-11 items-center justify-center rounded-md bg-[#814DFF]">
-                    <Text className="text-[22px] font-black text-white">
-                      {option.icon}
-                    </Text>
-                  </View>
-                  <Text className="text-[14px] font-extrabold text-white">
-                    {option.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <Text className="mb-3 text-[12px] font-extrabold uppercase tracking-[2px] text-[#DCD5FF]">
+          <Text
+            className={`mb-3 text-[12px] font-extrabold uppercase tracking-[2px] ${
+              highContrast ? "text-hc-accent" : "text-[#DCD5FF]"
+            }`}
+            accessibilityRole="header"
+          >
             Ajustes
           </Text>
 
-          <View className="mb-4 rounded-md border border-[#5A5A61] bg-[#19191C] p-4">
+          <View
+            className={`mb-4 rounded-md border p-4 ${
+              highContrast
+                ? "border-hc-border bg-hc-surface"
+                : "border-[#5A5A61] bg-[#19191C]"
+            }`}
+          >
             <View className="mb-4 flex-row items-center justify-between">
-              <Text className="text-[18px] font-extrabold text-white">
+              <Text
+                className={`text-[18px] font-extrabold ${
+                  highContrast ? "text-hc-text" : "text-white"
+                }`}
+                accessibilityRole="header"
+              >
                 Tamanho da Fonte
               </Text>
-              <Text className="text-[11px] font-extrabold text-[#F2F500]">
-                {fontSize === "Média" ? "Padrão" : fontSize}
+              <Text
+                className={`text-[11px] font-extrabold ${
+                  highContrast ? "text-hc-accent" : "text-[#F2F500]"
+                }`}
+              >
+                {fontScale === "MEDIUM" ? "Padrão" : selectedOption.label}
               </Text>
             </View>
 
-            <View className="mb-4 flex-row items-center">
-              <Text className="mr-3 text-[12px] font-bold text-[#999AA3]">
+            <View
+              className="mb-4 flex-row items-center"
+              accessibilityRole="radiogroup"
+              accessibilityLabel="Tamanho da fonte"
+            >
+              <Text
+                className={`mr-3 text-[12px] font-bold ${
+                  highContrast ? "text-hc-text" : "text-[#999AA3]"
+                }`}
+                importantForAccessibility="no"
+              >
                 A
               </Text>
               <View className="relative h-8 flex-1 justify-center">
-                <View className="absolute left-0 right-0 h-2 rounded-full bg-[#3B3B40]" />
+                <View
+                  className={`absolute left-0 right-0 h-2 rounded-full ${
+                    highContrast ? "bg-hc-border" : "bg-[#3B3B40]"
+                  }`}
+                />
                 <View className="flex-row items-center justify-between">
-                  {fontSizes.map((size) => {
-                    const selected = fontSize === size.label;
+                  {FONT_SCALE_OPTIONS.map((option) => {
+                    const selected = fontScale === option.value;
 
                     return (
                       <Pressable
-                        key={size.label}
+                        key={option.value}
                         className="h-8 w-8 items-center justify-center"
-                        onPress={() => setFontSize(size.label)}
+                        onPress={() => setFontScale(option.value)}
+                        accessibilityRole="radio"
+                        accessibilityLabel={`Tamanho de fonte ${option.label}`}
+                        accessibilityHint="Ajusta o tamanho do texto em todo o aplicativo"
+                        accessibilityState={{ selected }}
                       >
                         <View
                           className={`rounded-full ${
                             selected
-                              ? "h-6 w-6 bg-[#F2F500]"
+                              ? highContrast
+                                ? "h-6 w-6 bg-hc-accent"
+                                : "h-6 w-6 bg-[#F2F500]"
                               : "h-3 w-3 bg-[#686A72]"
                           }`}
                         />
@@ -235,48 +229,78 @@ export default function CadastroAccessibility() {
                   })}
                 </View>
               </View>
-              <Text className="ml-3 text-[18px] font-bold text-[#999AA3]">
+              <Text
+                className={`ml-3 text-[18px] font-bold ${
+                  highContrast ? "text-hc-text" : "text-[#999AA3]"
+                }`}
+                importantForAccessibility="no"
+              >
                 A
               </Text>
             </View>
 
             <View className="mb-4 flex-row justify-between">
-              {fontSizes.map((size) => (
-                <Pressable
-                  key={size.label}
-                  onPress={() => setFontSize(size.label)}
-                >
-                  <Text
-                    className={`text-[10px] font-bold ${
-                      fontSize === size.label
-                        ? "text-[#F2F500]"
-                        : "text-[#8D8D96]"
-                    }`}
+              {FONT_SCALE_OPTIONS.map((option) => {
+                const selected = fontScale === option.value;
+
+                return (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => setFontScale(option.value)}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`Tamanho de fonte ${option.label}`}
+                    accessibilityHint="Ajusta o tamanho do texto em todo o aplicativo"
+                    accessibilityState={{ selected }}
                   >
-                    {size.label}
-                  </Text>
-                </Pressable>
-              ))}
+                    <Text
+                      className={`text-[10px] font-bold ${
+                        selected
+                          ? highContrast
+                            ? "text-hc-accent"
+                            : "text-[#F2F500]"
+                          : highContrast
+                            ? "text-hc-text"
+                            : "text-[#909099]"
+                      }`}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
 
             <Text
-              className="font-semibold leading-5 text-[#D7D7DE]"
-              style={{
-                fontSize:
-                  fontSizes.find((size) => size.label === fontSize)
-                    ?.previewSize ?? 14,
-              }}
+              className={`font-semibold leading-5 ${
+                highContrast ? "text-hc-text" : "text-[#D7D7DE]"
+              }`}
+              style={{ fontSize: selectedOption.previewSize }}
+              accessibilityLabel={`Texto de exemplo no tamanho ${selectedOption.label}`}
             >
               Texto de exemplo
             </Text>
           </View>
 
-          <View className="mb-4 flex-row items-center justify-between rounded-md border border-[#5A5A61] bg-[#19191C] p-4">
-            <View>
-              <Text className="mb-1 text-[17px] font-extrabold text-white">
+          <View
+            className={`mb-4 flex-row items-center justify-between rounded-md border p-4 ${
+              highContrast
+                ? "border-hc-border bg-hc-surface"
+                : "border-[#5A5A61] bg-[#19191C]"
+            }`}
+          >
+            <View className="flex-1 pr-4">
+              <Text
+                className={`mb-1 text-[17px] font-extrabold ${
+                  highContrast ? "text-hc-text" : "text-white"
+                }`}
+              >
                 Alto Contraste
               </Text>
-              <Text className="text-[12px] font-semibold text-[#A9A9B2]">
+              <Text
+                className={`text-[12px] font-semibold ${
+                  highContrast ? "text-hc-text" : "text-[#A9A9B2]"
+                }`}
+              >
                 Texto e bordas mais nítidos
               </Text>
             </View>
@@ -285,60 +309,137 @@ export default function CadastroAccessibility() {
               onValueChange={setHighContrast}
               trackColor={{ false: "#5F6068", true: "#F2F500" }}
               thumbColor="#FFFFFF"
+              accessibilityRole="switch"
+              accessibilityLabel="Alto contraste"
+              accessibilityHint="Aumenta o contraste entre texto, bordas e fundo"
+              accessibilityState={{ checked: highContrast }}
             />
           </View>
 
-          <View className="mb-5 flex-row items-center justify-between rounded-md border border-[#5A5A61] bg-[#19191C] p-4">
-            <View>
-              <Text className="mb-1 text-[17px] font-extrabold text-white">
+          <View
+            className={`mb-4 flex-row items-center justify-between rounded-md border p-4 ${
+              highContrast
+                ? "border-hc-border bg-hc-surface"
+                : "border-[#5A5A61] bg-[#19191C]"
+            }`}
+          >
+            <View className="flex-1 pr-4">
+              <Text
+                className={`mb-1 text-[17px] font-extrabold ${
+                  highContrast ? "text-hc-text" : "text-white"
+                }`}
+              >
                 Leitor de Tela
               </Text>
-              <Text className="text-[12px] font-semibold text-[#A9A9B2]">
-                Orientação por voz
+              <Text
+                className={`text-[12px] font-semibold ${
+                  highContrast ? "text-hc-text" : "text-[#A9A9B2]"
+                }`}
+              >
+                Otimizar telas para leitores de tela
               </Text>
             </View>
             <Switch
-              value={screenReader}
-              onValueChange={setScreenReader}
+              value={screenReaderOptimized}
+              onValueChange={setScreenReaderOptimized}
               trackColor={{ false: "#5F6068", true: "#F2F500" }}
               thumbColor="#FFFFFF"
+              accessibilityRole="switch"
+              accessibilityLabel="Otimizar para leitor de tela"
+              accessibilityHint="Simplifica a leitura das telas por leitores de tela"
+              accessibilityState={{ checked: screenReaderOptimized }}
+            />
+          </View>
+
+          <View
+            className={`mb-5 flex-row items-center justify-between rounded-md border p-4 ${
+              highContrast
+                ? "border-hc-border bg-hc-surface"
+                : "border-[#5A5A61] bg-[#19191C]"
+            }`}
+          >
+            <View className="flex-1 pr-4">
+              <Text
+                className={`mb-1 text-[17px] font-extrabold ${
+                  highContrast ? "text-hc-text" : "text-white"
+                }`}
+              >
+                Reduzir movimento
+              </Text>
+              <Text
+                className={`text-[12px] font-semibold ${
+                  highContrast ? "text-hc-text" : "text-[#A9A9B2]"
+                }`}
+              >
+                Menos animações e transições
+              </Text>
+            </View>
+            <Switch
+              value={reduceMotion}
+              onValueChange={setReduceMotion}
+              trackColor={{ false: "#5F6068", true: "#F2F500" }}
+              thumbColor="#FFFFFF"
+              accessibilityRole="switch"
+              accessibilityLabel="Reduzir movimento"
+              accessibilityHint="Diminui animações e transições dentro do aplicativo"
+              accessibilityState={{ checked: reduceMotion }}
             />
           </View>
 
           <LinearGradient
-            colors={["#8752FF", "#5328AA"]}
+            colors={highContrast ? ["#000000", "#101010"] : ["#8752FF", "#5328AA"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={{ borderRadius: 6, marginBottom: 20, padding: 20 }}
           >
-            <Text className="mb-2 text-[13px] font-bold leading-5 text-white">
+            <Text
+              className={`mb-2 text-[13px] font-bold leading-5 ${
+                highContrast ? "text-hc-text" : "text-white"
+              }`}
+            >
               Feito para Autonomia
             </Text>
-            <Text className="text-[13px] font-semibold leading-5 text-white/90">
+            <Text
+              className={`text-[13px] font-semibold leading-5 ${
+                highContrast ? "text-hc-text" : "text-white/90"
+              }`}
+            >
               O Unify se adapta a você, garantindo que cada conexão seja
               significativa e acessível.
             </Text>
           </LinearGradient>
 
           {error ? (
-            <Text className="mb-4 text-center text-[12px] font-semibold text-red-300">
+            <Text
+              className="mb-4 text-center text-[13px] font-semibold text-danger"
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+            >
               {error}
             </Text>
           ) : null}
 
           <Pressable
             className={`items-center justify-center rounded-md py-4 ${
-              loading ? "bg-[#BFC200]" : "bg-[#F2F500]"
+              loading ? "bg-[#BFC200]" : highContrast ? "bg-hc-accent" : "bg-[#F2F500]"
             }`}
             disabled={loading}
             onPress={handleSavePreferences}
+            accessibilityRole="button"
+            accessibilityLabel="Salvar e continuar"
+            accessibilityHint="Salva suas preferências de acessibilidade e segue para o cadastro do perfil"
+            accessibilityState={{ disabled: loading, busy: loading }}
           >
             <Text className="text-[15px] font-extrabold text-[#191919]">
               {loading ? "Salvando..." : "Salvar e Continuar  ›"}
             </Text>
           </Pressable>
 
-          <Text className="mt-3 text-center text-[9px] font-bold uppercase tracking-[1px] text-[#B9BAC4]">
+          <Text
+            className={`mt-3 text-center text-[9px] font-bold uppercase tracking-[1px] ${
+              highContrast ? "text-hc-text" : "text-[#B9BAC4]"
+            }`}
+          >
             Passo 1 de 1: Configuração do Perfil
           </Text>
         </ScrollView>

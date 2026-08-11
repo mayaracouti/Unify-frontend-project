@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Platform,
   Pressable,
@@ -17,6 +18,7 @@ import { FormField, type FormFieldHandle } from "../../../src/components/ui/form
 import { useAuth } from "../../../src/context/AuthContext";
 import { profileService } from "../../../src/services/profileService";
 import { formatApiErrorMessage } from "../../../src/utils/auth";
+import { speak } from "../../../src/accessibility/screen-reader";
 
 function validateEmailField(value: string): string | null {
   if (!value.trim()) {
@@ -64,6 +66,15 @@ export default function Login() {
   const emailFieldRef = useRef<FormFieldHandle>(null);
   const passwordFieldRef = useRef<FormFieldHandle>(null);
 
+  // `accessibilityLiveRegion` e Android-only; no iOS o anuncio precisa ser
+  // disparado manualmente quando a mensagem muda.
+  useEffect(() => {
+    if (error) {
+      AccessibilityInfo.announceForAccessibility(error);
+      speak(error);
+    }
+  }, [error]);
+
   const handleLogin = async () => {
     const isEmailValid = emailFieldRef.current?.validate() ?? true;
     const isPasswordValid = passwordFieldRef.current?.validate() ?? true;
@@ -95,7 +106,10 @@ export default function Login() {
         const completion = await profileService.getCompletion();
 
         if (!completion.profileCompleted) {
-          router.replace("/onboarding/profile");
+          // Primeira vez do usuario: configura acessibilidade antes do
+          // onboarding de perfil (a tela de acessibilidade segue para
+          // /onboarding/profile ao salvar).
+          router.replace("/auth/cadastro/accessibility");
           return;
         }
 
@@ -305,6 +319,9 @@ export default function Login() {
             <Pressable
               className="mb-6 self-end"
               onPress={() => router.push("/auth/forgot-password")}
+              accessibilityRole="button"
+              accessibilityLabel="Esqueci minha senha"
+              accessibilityHint="Abre a tela de recuperacao de senha"
             >
               <Text className="text-[12px] font-extrabold text-[#F2F500]">
                 Esqueceu a senha?
@@ -345,6 +362,9 @@ export default function Login() {
             <Pressable
               className="items-center justify-center rounded-md border border-white/70 py-3.5"
               onPress={() => router.push("/auth/cadastro")}
+              accessibilityRole="button"
+              accessibilityLabel="Criar uma conta"
+              accessibilityHint="Abre a tela de cadastro"
             >
               <Text className="text-[15px] font-extrabold text-white">
                 Inscrever-se

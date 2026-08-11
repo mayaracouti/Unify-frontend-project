@@ -259,7 +259,13 @@ export default function MatchPreferencesOnboarding() {
       <SafeAreaView className="flex-1">
         <View className="h-16 flex-row items-center justify-between border-b-2 border-[#262626] bg-[#0E0E0E] px-6">
           <View className="flex-row items-center">
-            <Pressable className="mr-3 h-10 w-10 items-center justify-center rounded-full" onPress={() => router.replace("/onboarding/profile")}>
+            <Pressable
+              className="mr-3 h-10 w-10 items-center justify-center rounded-full"
+              onPress={() => router.replace("/onboarding/profile")}
+              accessibilityRole="button"
+              accessibilityLabel="Voltar"
+              accessibilityHint="Retorna para o cadastro de perfil"
+            >
               <Ionicons name="arrow-back" size={24} color="#E5E2E1" />
             </Pressable>
             <Text className="text-2xl font-black text-[#7C4DFF]">Unify</Text>
@@ -268,7 +274,11 @@ export default function MatchPreferencesOnboarding() {
         </View>
 
         {loading ? (
-          <View className="flex-1 items-center justify-center">
+          <View
+            className="flex-1 items-center justify-center"
+            accessible
+            accessibilityLabel="Carregando dados"
+          >
             <ActivityIndicator color="#CDBDFF" />
           </View>
         ) : (
@@ -315,6 +325,12 @@ export default function MatchPreferencesOnboarding() {
                             : "border-[#262626] bg-[#201F1F]"
                         }`}
                         onPress={() => setDesiredGenderIds(toggleId(desiredGenderIds, option.id))}
+                        accessibilityRole="checkbox"
+                        accessibilityLabel={option.description}
+                        accessibilityHint="Marca ou desmarca este gênero como interesse"
+                        accessibilityState={{
+                          checked: desiredGenderIds.includes(option.id),
+                        }}
                       >
                         <View className="flex-row items-center justify-center">
                           {desiredGenderIds.includes(option.id) ? (
@@ -342,6 +358,8 @@ export default function MatchPreferencesOnboarding() {
                   placeholderTextColor="#948EA1"
                   value={minAge}
                   onChangeText={setMinAge}
+                  accessibilityLabel="Idade mínima"
+                  accessibilityHint="Idade mínima das pessoas que você deseja encontrar"
                 />
                 <TextInput
                   className="min-h-[56px] flex-1 rounded-t-lg border-b-2 border-[#948EA1] bg-[#1C1B1B] px-4 text-[16px] text-white"
@@ -350,6 +368,8 @@ export default function MatchPreferencesOnboarding() {
                   placeholderTextColor="#948EA1"
                   value={maxAge}
                   onChangeText={setMaxAge}
+                  accessibilityLabel="Idade máxima"
+                  accessibilityHint="Idade máxima das pessoas que você deseja encontrar"
                 />
               </View>
               <Text className="mt-2 text-[13px] font-semibold text-[#CAC3D8]">
@@ -367,27 +387,40 @@ export default function MatchPreferencesOnboarding() {
                   placeholderTextColor="#948EA1"
                   value={maxMatchDistanceKm}
                   onChangeText={setMaxMatchDistanceKm}
+                  accessibilityLabel="Distância máxima em quilômetros"
+                  accessibilityHint="Distância máxima até a conexão sugerida"
                 />
                 <Text className="mt-2 text-[13px] font-semibold text-[#CAC3D8]">
                   Quilômetros até a conexão sugerida.
                 </Text>
-                {hasLocationPermission ? (
-                  <Text className="mt-3 text-[13px] font-bold text-[#5DDB85]">
-                    Acesso à localização já está liberado.
-                  </Text>
-                ) : (
-                  <Text className="mt-3 text-[13px] font-semibold text-[#CAC3D8]">
-                    {showLocationSettingsButton
-                      ? "O acesso foi bloqueado no celular. Abra os ajustes do aparelho para liberar a localização."
-                      : "Conceda o acesso à localização para usar a distância dos matches com base no GPS."}
-                  </Text>
-                )}
+                {/* Agrupado em um unico no de acessibilidade: o texto muda de
+                    forma assincrona conforme a permissao de GPS. */}
+                <View accessible accessibilityLiveRegion="polite">
+                  {hasLocationPermission ? (
+                    <Text className="mt-3 text-[13px] font-bold text-[#5DDB85]">
+                      Acesso à localização já está liberado.
+                    </Text>
+                  ) : (
+                    <Text className="mt-3 text-[13px] font-semibold text-[#CAC3D8]">
+                      {showLocationSettingsButton
+                        ? "O acesso foi bloqueado no celular. Abra os ajustes do aparelho para liberar a localização."
+                        : "Conceda o acesso à localização para usar a distância dos matches com base no GPS."}
+                    </Text>
+                  )}
+                </View>
 
                 {!hasLocationPermission && !showLocationSettingsButton ? (
                   <Pressable
                     className={`mt-4 h-12 items-center justify-center rounded-xl ${locationStatus === "requesting" ? "bg-[#CFCF62]" : "bg-[#EAEA00]"}`}
                     disabled={locationStatus === "requesting"}
                     onPress={() => void handleGrantLocationAccess()}
+                    accessibilityRole="button"
+                    accessibilityLabel="Habilitar localização"
+                    accessibilityHint="Solicita a permissão de localização do aparelho"
+                    accessibilityState={{
+                      disabled: locationStatus === "requesting",
+                      busy: locationStatus === "requesting",
+                    }}
                   >
                     {locationStatus === "requesting" ? (
                       <ActivityIndicator color="#323200" size="small" />
@@ -403,6 +436,9 @@ export default function MatchPreferencesOnboarding() {
                   <Pressable
                     className="mt-4 h-12 items-center justify-center rounded-xl border border-[#5DDB85] bg-[#132519]"
                     onPress={() => void handleOpenLocationSettings()}
+                    accessibilityRole="button"
+                    accessibilityLabel="Abrir configurações do celular"
+                    accessibilityHint="Isso vai abrir as configurações do sistema, fora do aplicativo"
                   >
                     <Text className="text-[15px] font-black text-[#5DDB85]">
                       Ir para os ajustes do celular
@@ -411,7 +447,11 @@ export default function MatchPreferencesOnboarding() {
                 ) : null}
 
                 {locationStatus === "failed" && !hasLocationPermission ? (
-                  <Text className="mt-3 text-[13px] font-semibold text-red-300">
+                  <Text
+                    className="mt-3 text-[13px] font-semibold text-red-300"
+                    accessibilityRole="alert"
+                    accessibilityLiveRegion="polite"
+                  >
                     Não foi possível obter a permissão de localização agora. Tente novamente.
                   </Text>
                 ) : null}
@@ -453,7 +493,11 @@ export default function MatchPreferencesOnboarding() {
             </View>
 
             {error ? (
-              <Text className="mb-4 text-center text-[13px] font-semibold text-red-300">
+              <Text
+                className="mb-4 text-center text-[13px] font-semibold text-red-300"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+              >
                 {error}
               </Text>
             ) : null}
@@ -462,6 +506,10 @@ export default function MatchPreferencesOnboarding() {
               className={`h-14 items-center justify-center rounded-lg ${saving ? "bg-[#CDCD00]" : "bg-[#EAEA00]"}`}
               disabled={saving}
               onPress={handleSave}
+              accessibilityRole="button"
+              accessibilityLabel="Finalizar cadastro"
+              accessibilityHint="Salva suas preferências de match e conclui o cadastro"
+              accessibilityState={{ disabled: saving, busy: saving }}
             >
               {saving ? (
                 <ActivityIndicator color="#323200" />

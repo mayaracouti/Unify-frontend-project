@@ -1,6 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -15,8 +15,10 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { CommunityCategoryChips } from "../../src/components/community/category-chips";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { communityService } from "../../src/services/communityService";
+import type { CommunityCategoryResponse } from "../../src/types/community";
 import { showGlobalToast } from "../../src/utils/globalToast";
 
 const IMAGE_MEDIA_TYPES: ImagePicker.MediaType[] = ["images"];
@@ -24,6 +26,7 @@ const IMAGE_MEDIA_TYPES: ImagePicker.MediaType[] = ["images"];
 function createCommunityFormData(
   name: string,
   description: string,
+  categoryId: number | null,
   asset: ImagePicker.ImagePickerAsset | null
 ) {
   const formData = new FormData();
@@ -32,6 +35,10 @@ function createCommunityFormData(
 
   if (description.trim().length > 0) {
     formData.append("description", description.trim());
+  }
+
+  if (categoryId) {
+    formData.append("categoryId", String(categoryId));
   }
 
   if (!asset) {
@@ -71,8 +78,32 @@ export default function CommunityCreateScreen() {
   );
   const [pickingImage, setPickingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [categories, setCategories] = useState<CommunityCategoryResponse[]>([]);
+  const [categoryId, setCategoryId] = useState<number | null>(null);
 
   const trimmedName = useMemo(() => name.trim(), [name]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadCategories = async () => {
+      try {
+        const response = await communityService.listCategories();
+
+        if (active) {
+          setCategories(Array.isArray(response) ? response : []);
+        }
+      } catch {
+        // A categoria e opcional: sem a lista o formulario segue utilizavel.
+      }
+    };
+
+    void loadCategories();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handlePickImage = useCallback(async () => {
     if (pickingImage) {
@@ -130,7 +161,12 @@ export default function CommunityCreateScreen() {
     setSubmitting(true);
 
     try {
-      const formData = createCommunityFormData(trimmedName, description, selectedImage);
+      const formData = createCommunityFormData(
+        trimmedName,
+        description,
+        categoryId,
+        selectedImage
+      );
       const community = await communityService.createCommunity(formData);
 
       showGlobalToast({
@@ -148,7 +184,7 @@ export default function CommunityCreateScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [description, router, selectedImage, submitting, trimmedName]);
+  }, [categoryId, description, router, selectedImage, submitting, trimmedName]);
 
   return (
     <View className="flex-1 bg-[#09090A]">
@@ -229,6 +265,22 @@ export default function CommunityCreateScreen() {
                 {description.length} / 400
               </Text>
             </View>
+
+            {categories.length > 0 ? (
+              <View className="mt-6 rounded-[28px] bg-[#111214] p-6">
+                <Text className="mb-1 text-[22px] font-bold text-white">Categoria</Text>
+                <Text className="text-[14px] font-semibold leading-6 text-[#CAC3D8]">
+                  Escolha uma categoria opcional para ajudar outras pessoas a encontrarem
+                  esta comunidade.
+                </Text>
+
+                <CommunityCategoryChips
+                  categories={categories}
+                  selectedCategoryId={categoryId}
+                  onSelect={setCategoryId}
+                />
+              </View>
+            ) : null}
 
             <View className="mt-6 rounded-[28px] bg-[#111214] p-6">
               <View className="flex-row items-center justify-between">

@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 
 import { clearAuthenticatedRemoteImageCache } from "../components/profile/authenticated-remote-image";
 import { clearOnboardingCompletionCache } from "../services/onboardingCompletionService";
+import { clearCachedAccessibilitySettings } from "./accessibilitySettingsStorage";
 import { clearAllStoredMatchDiscoveryState } from "./matchDiscoveryStorage";
 import { clearAllStoredAuthData } from "./tokenStorage";
 
@@ -14,4 +15,5 @@ export async function clearEntireClientStorage() {
 
   clearAuthenticatedRemoteImageCache();
   clearOnboardingCompletionCache();
+  await clearCachedAccessibilitySettings();
 }

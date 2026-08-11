@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Pressable,
   Text,
@@ -11,6 +12,7 @@ import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { authService } from "../../../src/services/authService";
 import { formatApiErrorMessage } from "../../../src/utils/auth";
+import { speak } from "../../../src/accessibility/screen-reader";
 
 export default function ForgotPassword() {
   const router = useRouter();
@@ -19,6 +21,22 @@ export default function ForgotPassword() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+
+  // `accessibilityLiveRegion` e Android-only: no iOS os anuncios precisam
+  // ser disparados manualmente quando a mensagem muda.
+  useEffect(() => {
+    if (error) {
+      AccessibilityInfo.announceForAccessibility(error);
+      speak(error);
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (successMessage) {
+      AccessibilityInfo.announceForAccessibility(successMessage);
+      speak(successMessage);
+    }
+  }, [successMessage]);
 
   async function handleSendResetLink() {
     if (!email.trim()) {
@@ -59,7 +77,10 @@ export default function ForgotPassword() {
 
       <SafeAreaView className="flex-1">
         <View className="flex-1 px-6 pt-6 mt-10">
-          <Text className="mb-3 text-[34px] font-extrabold leading-[40px] text-white">
+          <Text
+            className="mb-3 text-[34px] font-extrabold leading-[40px] text-white"
+            accessibilityRole="header"
+          >
             Recuperar senha
           </Text>
 
@@ -78,6 +99,8 @@ export default function ForgotPassword() {
             autoCapitalize="none"
             keyboardType="email-address"
             value={email}
+            accessibilityLabel="Endereço de e-mail cadastrado"
+            accessibilityHint="Digite o e-mail usado no cadastro para receber o link de redefinição"
             onChangeText={(value) => {
               setEmail(value);
 
@@ -92,7 +115,10 @@ export default function ForgotPassword() {
           />
 
           {successMessage ? (
-            <View className="mb-4 rounded-md border border-emerald-300/35 bg-emerald-400/10 px-4 py-3">
+            <View
+              className="mb-4 rounded-md border border-emerald-300/35 bg-emerald-400/10 px-4 py-3"
+              accessibilityLiveRegion="polite"
+            >
               <Text className="text-center text-[12px] font-semibold text-emerald-100">
                 {successMessage}
               </Text>
@@ -103,7 +129,11 @@ export default function ForgotPassword() {
           ) : null}
 
           {error ? (
-            <Text className="mb-4 text-center text-[12px] font-semibold text-red-300">
+            <Text
+              className="mb-4 text-center text-[12px] font-semibold text-red-300"
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+            >
               {error}
             </Text>
           ) : null}
@@ -114,6 +144,14 @@ export default function ForgotPassword() {
             }`}
             disabled={loading}
             onPress={handleSendResetLink}
+            accessibilityRole="button"
+            accessibilityLabel={
+              successMessage
+                ? "Enviar link novamente"
+                : "Enviar link de redefinição"
+            }
+            accessibilityHint="Envia um e-mail com o link para redefinir sua senha"
+            accessibilityState={{ disabled: loading, busy: loading }}
           >
             {loading ? (
               <ActivityIndicator />
@@ -127,6 +165,9 @@ export default function ForgotPassword() {
           <Pressable
             className="mt-6 items-center justify-center rounded-md border border-white/35 py-3"
             onPress={() => router.replace("/auth/login")}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar para o login"
+            accessibilityHint="Retorna para a tela de login"
           >
             <Text className="text-[14px] font-extrabold text-white">
               Voltar para o login

@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useGlobalAccessibilityState } from "../../accessibility/global-text-adjustments";
 import {
   subscribeToGlobalToasts,
   type GlobalToast,
@@ -84,8 +85,17 @@ function GlobalToastCard({
 }) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-18)).current;
+  // `reduceMotion`: o toast aparece/some sem transicao (ver AccessibilityContext).
+  const { reduceMotion } = useGlobalAccessibilityState();
 
   const dismissToast = useCallback(() => {
+    if (reduceMotion) {
+      opacity.setValue(0);
+      translateY.setValue(-14);
+      onDismiss(toast.id);
+      return;
+    }
+
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 0,
@@ -100,21 +110,26 @@ function GlobalToastCard({
     ]).start(() => {
       onDismiss(toast.id);
     });
-  }, [onDismiss, opacity, toast.id, translateY]);
+  }, [onDismiss, opacity, reduceMotion, toast.id, translateY]);
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 220,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    if (reduceMotion) {
+      opacity.setValue(1);
+      translateY.setValue(0);
+    } else {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
 
     const timeout = setTimeout(() => {
       dismissToast();
@@ -123,7 +138,7 @@ function GlobalToastCard({
     return () => {
       clearTimeout(timeout);
     };
-  }, [dismissToast, opacity, toast.durationMs, translateY]);
+  }, [dismissToast, opacity, reduceMotion, toast.durationMs, translateY]);
 
   return (
     <Animated.View

@@ -547,6 +547,9 @@ export default function Profile() {
             <Pressable
               className="mt-6 h-14 flex-row items-center justify-center rounded-[18px] bg-[#F1EF00]"
               onPress={() => router.push("/profile/edit")}
+              accessibilityRole="button"
+              accessibilityLabel="Editar perfil"
+              accessibilityHint="Abre a tela de edição do seu perfil"
             >
               <Ionicons name="create-outline" size={18} color="#212000" />
               <Text className="ml-2 text-[17px] font-black text-[#212000]">
@@ -557,10 +560,26 @@ export default function Profile() {
             <Pressable
               className="mt-3 h-14 flex-row items-center justify-center rounded-[18px] border border-[#494455] bg-[#1A1C1F]"
               onPress={() => router.push("/profile/edit-match-preferences")}
+              accessibilityRole="button"
+              accessibilityLabel="Editar preferências de match"
+              accessibilityHint="Abre a tela de preferências de match"
             >
               <Ionicons name="options-outline" size={18} color="#FFFFFF" />
               <Text className="ml-2 text-[16px] font-black text-white">
                 Editar preferências de match
+              </Text>
+            </Pressable>
+
+            <Pressable
+              className="mt-3 h-14 flex-row items-center justify-center rounded-[18px] border border-[#494455] bg-[#1A1C1F]"
+              onPress={() => router.push("/profile/accessibility-settings")}
+              accessibilityRole="button"
+              accessibilityLabel="Configurações de acessibilidade"
+              accessibilityHint="Abre os ajustes de fonte, contraste, leitor de tela e movimento"
+            >
+              <Ionicons name="accessibility-outline" size={18} color="#FFFFFF" />
+              <Text className="ml-2 text-[16px] font-black text-white">
+                Configurações de acessibilidade
               </Text>
             </Pressable>
 

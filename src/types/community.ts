@@ -9,6 +9,12 @@ export interface CommunityUserSummaryResponse {
   avatarData?: string | null;
 }
 
+export interface CommunityCategoryResponse {
+  id: number;
+  description: string;
+  ionicIcon?: string | null;
+}
+
 export interface CommunitySummaryResponse {
   id: string;
   name: string;
@@ -19,6 +25,15 @@ export interface CommunitySummaryResponse {
   owner?: CommunityUserSummaryResponse | null;
   currentUserRole?: CommunityRole | null;
   isOwner?: boolean | null;
+  category?: CommunityCategoryResponse | null;
+}
+
+// TODO: campo `visibility` de comunidade permanece fora de escopo (ver plano,
+// seção 7 item 9) — nao criar enum/filtro de visibilidade por enquanto.
+export interface CommunityUpdateRequestFields {
+  name: string;
+  description?: string | null;
+  categoryId?: number | null;
 }
 
 export interface CommunityDirectoryResponse {
@@ -77,6 +92,7 @@ export interface CommunityMemberResponse {
   role?: CommunityRole | null;
   isOwner?: boolean | null;
   owner?: boolean | null;
+  joinedAt?: string | null;
 }
 
 export type CommunityMembersResponse = PageResponse<CommunityMemberResponse>;

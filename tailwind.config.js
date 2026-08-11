@@ -44,6 +44,13 @@ module.exports = {
         danger: "#FF6B6B",
         success: "#4ADE80",
         info: "#9DDCFF",
+        // Alto contraste (WCAG AAA-orientado). Consumidos condicionalmente
+        // via `settings.highContrast ? "bg-hc-bg" : "bg-[#111214]"`.
+        "hc-bg": "#000000",
+        "hc-surface": "#101010",
+        "hc-text": "#FFFFFF",
+        "hc-accent": "#FFD400",
+        "hc-border": "#FFFFFF",
       },
       fontSize: {
         // Escala base. A escala do usuario e aplicada em runtime
