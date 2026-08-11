@@ -16,7 +16,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-nav";
 import { GlobalTopNav } from "../../src/components/navigation/global-top-nav";
 import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
+import { ScreenError } from "../../src/components/ui/screen-error";
+import { ScreenLoading } from "../../src/components/ui/screen-loading";
 import { useAppShell } from "../../src/context/AppShellContext";
+import { useAsyncState } from "../../src/hooks/useAsyncState";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { profileService } from "../../src/services/profileService";
 import { getAuthSnapshot, subscribeToAuthStorage } from "../../src/storage/tokenStorage";
@@ -162,12 +165,10 @@ function GalleryImageCard({
 
 function SectionLoadingState({ message }: { message: string }) {
   return (
-    <View className="items-center justify-center rounded-[22px] border border-[#3A3246] bg-[#17181C] px-5 py-6">
-      <ActivityIndicator color="#EAEA00" size="small" />
-      <Text className="mt-3 text-center text-[14px] font-semibold text-[#CAC3D8]">
-        {message}
-      </Text>
-    </View>
+    <ScreenLoading
+      label={message}
+      className="items-center justify-center rounded-[22px] border border-[#3A3246] bg-[#17181C] px-5 py-6"
+    />
   );
 }
 
@@ -176,10 +177,14 @@ export default function Profile() {
   const { syncProfileSummary } = useAppShell();
   const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
 
-  const [profile, setProfile] = useState<UserProfileResponse | null>(null);
+  const {
+    data: profile,
+    setData: setProfile,
+    error: actionError,
+    setError: setActionError,
+  } = useAsyncState<UserProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [actionError, setActionError] = useState("");
   const [uploadingTarget, setUploadingTarget] = useState<UploadTarget | null>(null);
   const [removingImageId, setRemovingImageId] = useState<string | null>(null);
   const [sourcePickerTarget, setSourcePickerTarget] = useState<UploadTarget | null>(null);
@@ -364,13 +369,13 @@ export default function Profile() {
               onPress={closeImageSourcePicker}
             />
 
-            <View className="rounded-[28px] border border-[#393145] bg-[#111214] p-6">
+            <View className="rounded-[28px] border border-[#393145] bg-surface-alt p-6">
               <Text className="text-[21px] font-black text-white">
                 {sourcePickerTarget === "profilePicture"
                   ? "Atualizar foto de perfil"
                   : "Adicionar foto ao carrossel"}
               </Text>
-              <Text className="mt-2 text-[14px] font-semibold leading-6 text-[#CAC3D8]">
+              <Text className="mt-2 text-[14px] font-semibold leading-6 text-content-secondary">
                 Escolha como deseja enviar a imagem.
               </Text>
 
@@ -409,7 +414,7 @@ export default function Profile() {
                 onPress={closeImageSourcePicker}
                 disabled={uploadingTarget !== null}
               >
-                <Text className="text-[14px] font-bold text-[#CAC3D8]">Cancelar</Text>
+                <Text className="text-[14px] font-bold text-content-secondary">Cancelar</Text>
               </Pressable>
             </View>
           </View>
@@ -468,7 +473,7 @@ export default function Profile() {
                 <View className="mt-4 w-full max-w-[320px] rounded-[22px] border border-[#3A3246] bg-[#17181C] px-5 py-4">
                   <View className="flex-row items-center justify-center">
                     <ActivityIndicator color="#EAEA00" size="small" />
-                    <Text className="ml-3 text-center text-[14px] font-semibold text-[#CAC3D8]">
+                    <Text className="ml-3 text-center text-[14px] font-semibold text-content-secondary">
                       Buscando seus dados principais...
                     </Text>
                   </View>
@@ -483,7 +488,7 @@ export default function Profile() {
             <View className="mt-8">
               <View className="mb-4 flex-row items-center justify-between">
                 <Text className="text-[20px] font-black text-white">Exibição do perfil</Text>
-                <Text className="text-[13px] font-bold text-[#CAC3D8]">
+                <Text className="text-[13px] font-bold text-content-secondary">
                   {loading ? "Carregando fotos..." : `${galleryImages.length} / 5 fotos ativas`}
                 </Text>
               </View>
@@ -560,18 +565,18 @@ export default function Profile() {
             </Pressable>
 
             {actionError ? (
-              <Text className="mt-5 text-center text-[13px] font-semibold text-red-300">
-                {actionError}
-              </Text>
+              <ScreenError
+                className="mt-5 items-center rounded-2xl bg-transparent px-0 py-0"
+                title="Não foi possível concluir a ação"
+                message={actionError}
+              />
             ) : null}
 
             {refreshing ? (
-              <View className="mt-5 flex-row items-center justify-center">
-                <ActivityIndicator color="#EAEA00" size="small" />
-                <Text className="ml-2 text-[13px] font-semibold text-[#CAC3D8]">
-                  Atualizando perfil...
-                </Text>
-              </View>
+              <ScreenLoading
+                label="Atualizando perfil..."
+                className="mt-5 flex-row items-center justify-center"
+              />
             ) : null}
 
             <View className="mt-10">
@@ -593,7 +598,7 @@ export default function Profile() {
 
                         <View className="ml-4 flex-1">
                           <Text className="text-[18px] font-black text-white">{card.title}</Text>
-                          <Text className="mt-1 text-[14px] font-semibold leading-5 text-[#CAC3D8]">
+                          <Text className="mt-1 text-[14px] font-semibold leading-5 text-content-secondary">
                             {card.subtitle}
                           </Text>
                         </View>
@@ -606,9 +611,9 @@ export default function Profile() {
               )}
             </View>
 
-            <View className="mt-8 rounded-[28px] bg-[#111214] p-6">
+            <View className="mt-8 rounded-[28px] bg-surface-alt p-6">
               <Text className="text-[18px] font-black text-white">Comunicação</Text>
-              <Text className="mt-3 text-[15px] font-semibold leading-6 text-[#CAC3D8]">
+              <Text className="mt-3 text-[15px] font-semibold leading-6 text-content-secondary">
                 {loading
                   ? "Carregando suas formas de comunicação..."
                   : joinDescriptions(
@@ -618,7 +623,7 @@ export default function Profile() {
               </Text>
 
               <Text className="mt-6 text-[18px] font-black text-white">Interesses</Text>
-              <Text className="mt-3 text-[15px] font-semibold leading-6 text-[#CAC3D8]">
+              <Text className="mt-3 text-[15px] font-semibold leading-6 text-content-secondary">
                 {loading
                   ? "Carregando seus interesses e hobbies..."
                   : joinDescriptions(

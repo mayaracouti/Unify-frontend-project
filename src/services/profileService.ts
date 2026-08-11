@@ -61,6 +61,7 @@ export const profileService = {
     });
   },
 
+  // TODO(semana-0X): depende de GET /users/profiles
   getAllProfiles() {
     return customApiCall.get<UserProfileDirectoryItemResponse[]>(
       ALL_USER_PROFILES_ENDPOINT,
@@ -69,6 +70,7 @@ export const profileService = {
     );
   },
 
+  // TODO(semana-0X): depende de GET /users/profiles
   getProfileById(profileId: string) {
     return customApiCall.get<UserProfileDirectoryItemResponse>(
       `${ALL_USER_PROFILES_ENDPOINT}/${profileId}`,

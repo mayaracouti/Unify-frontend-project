@@ -119,6 +119,10 @@ function extractMessage(body: unknown, status: number): string {
     return "Sua sessão expirou. Faça login novamente.";
   }
 
+  if (status === 429) {
+    return "Muitas tentativas. Aguarde um instante e tente novamente.";
+  }
+
   return "Não foi possível concluir a solicitação.";
 }
 
@@ -260,7 +264,8 @@ async function performRequest<T>(
             ? config.data
             : JSON.stringify(config.data),
       signal: controller.signal,
-      credentials: "include",
+      // API stateless com JWT em header. Nao enviamos nem aceitamos cookies.
+      credentials: "omit",
     });
 
     const rawText = await response.text();

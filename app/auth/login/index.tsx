@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
   Pressable,
   Text,
-  TextInput,
   type TextStyle,
   View,
 } from "react-native";
@@ -14,9 +13,30 @@ import { useIsFocused } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WormRiseText, WormRiseWrapText } from "../../../src/components/ui/hello-wave";
 import { UnifyMark } from "../../../src/components/ui/unify-mark";
+import { FormField, type FormFieldHandle } from "../../../src/components/ui/form-field";
 import { useAuth } from "../../../src/context/AuthContext";
 import { profileService } from "../../../src/services/profileService";
 import { formatApiErrorMessage } from "../../../src/utils/auth";
+
+function validateEmailField(value: string): string | null {
+  if (!value.trim()) {
+    return "Informe seu e-mail.";
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) {
+    return "Informe um e-mail válido.";
+  }
+
+  return null;
+}
+
+function validatePasswordField(value: string): string | null {
+  if (!value.trim()) {
+    return "Informe sua senha.";
+  }
+
+  return null;
+}
 
 
 const webTitleShadowStyle = {
@@ -41,13 +61,24 @@ export default function Login() {
   const animationReplayKey = isFocused ? "login-focused" : "login-blurred";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
+  const emailFieldRef = useRef<FormFieldHandle>(null);
+  const passwordFieldRef = useRef<FormFieldHandle>(null);
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      setError("Informe seu email e sua senha para continuar.");
+    const isEmailValid = emailFieldRef.current?.validate() ?? true;
+    const isPasswordValid = passwordFieldRef.current?.validate() ?? true;
+
+    if (!isEmailValid) {
+      emailFieldRef.current?.focus();
       return;
     }
+
+    if (!isPasswordValid) {
+      passwordFieldRef.current?.focus();
+      return;
+    }
+
+    setError("");
     setLoading(true);
     try {
       const result = await signIn({ email, password });
@@ -207,40 +238,69 @@ export default function Login() {
           }
 
           <View className="flex-1 justify-start mt-10">
-            <Text className="mb-2 text-[12px] font-extrabold text-white/80">
-              Endereço de E-mail
-            </Text>
-            <TextInput
-              className="mb-4 rounded-md bg-[#F3F3F3] px-4 py-4 text-[14px] text-zinc-900"
+            <FormField
+              ref={emailFieldRef}
+              label="Endereço de E-mail"
+              labelClassName="mb-2 text-[12px] font-extrabold text-white/80"
+              containerClassName="mb-4"
+              value={email}
+              onChangeText={(value) => {
+                setEmail(value);
+                if (error) {
+                  setError("");
+                }
+              }}
+              validator={validateEmailField}
+              hint="Use o mesmo e-mail cadastrado na sua conta Unify."
               placeholder="nome@example.com"
               placeholderTextColor="#A1A1AA"
               autoCapitalize="none"
+              autoComplete="email"
               keyboardType="email-address"
-              value={email}
-              onChangeText={setEmail}
+              disabled={loading}
             />
 
-            <Text className="mb-2 text-[12px] font-extrabold text-white/80">
-              Senha
-            </Text>
-            <View className="mb-4 flex-row items-center rounded-md bg-[#F3F3F3] px-4">
-              <TextInput
-                className="flex-1 py-4 text-[14px] text-zinc-900"
-                placeholder="••••••••"
-                placeholderTextColor="#A1A1AA"
-                secureTextEntry={!showPassword}
-                value={password}
-                onChangeText={setPassword}
-              />
-              <Pressable
-                className="ml-3 rounded px-2 py-1"
-                onPress={() => setShowPassword((value) => !value)}
+            <FormField
+              ref={passwordFieldRef}
+              label="Senha"
+              labelClassName="mb-2 text-[12px] font-extrabold text-white/80"
+              containerClassName="mb-4"
+              value={password}
+              onChangeText={(value) => {
+                setPassword(value);
+                if (error) {
+                  setError("");
+                }
+              }}
+              validator={validatePasswordField}
+              hint="Informe a senha da sua conta."
+              placeholder="••••••••"
+              placeholderTextColor="#A1A1AA"
+              secureTextEntry={!showPassword}
+              disabled={loading}
+              rightElement={
+                <Pressable
+                  className="ml-3 rounded px-2 py-1"
+                  onPress={() => setShowPassword((value) => !value)}
+                  accessibilityRole="button"
+                  accessibilityLabel={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                >
+                  <Text className="text-[12px] font-semibold text-[#2B1257]">
+                    {showPassword ? "Ocultar" : "Mostrar"}
+                  </Text>
+                </Pressable>
+              }
+            />
+
+            {error ? (
+              <Text
+                className="mb-4 text-center text-[13px] font-semibold text-danger"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
               >
-                <Text className="text-[12px] font-semibold text-[#2B1257]">
-                  {showPassword ? "Ocultar" : "Mostrar"}
-                </Text>
-              </Pressable>
-            </View>
+                {error}
+              </Text>
+            ) : null}
 
             <Pressable
               className="mb-6 self-end"
@@ -255,12 +315,15 @@ export default function Login() {
               className="mt-1 items-center justify-center rounded-md bg-[#2B1257] py-3.5"
               onPress={handleLogin}
               disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel={loading ? "Entrando…" : "Entrar"}
+              accessibilityState={{ disabled: loading, busy: loading }}
             >
               {loading ? (
                 <ActivityIndicator />
               ) : (
                 <Text className="text-[15px] font-semibold text-white">
-                  Login
+                  Entrar
                 </Text>
               )}
             </Pressable>

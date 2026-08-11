@@ -1,11 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -16,6 +15,7 @@ import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 
+import { FormField, type FormFieldHandle } from "../../../src/components/ui/form-field";
 import { useAuth } from "../../../src/context/AuthContext";
 import { formatApiErrorMessage } from "../../../src/utils/auth";
 import { isApiError } from "../../../src/types/auth";
@@ -34,6 +34,49 @@ function formatBirthdateForApi(date: Date): string {
   const day = `${date.getDate()}`.padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+function validateRequiredTextField(fieldLabel: string) {
+  return (value: string): string | null => {
+    if (!value.trim()) {
+      return `Informe ${fieldLabel}.`;
+    }
+
+    return null;
+  };
+}
+
+function validateEmailField(value: string): string | null {
+  if (!value.trim()) {
+    return "Informe seu e-mail.";
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) {
+    return "Informe um e-mail válido.";
+  }
+
+  return null;
+}
+
+function checkPasswordRequirements(value: string) {
+  return {
+    minLength: value.length >= 8,
+    hasUppercase: /[A-Z]/.test(value),
+    hasLowercase: /[a-z]/.test(value),
+    hasNumber: /\d/.test(value),
+    hasSpecialCharacter: /[^A-Za-z0-9]/.test(value),
+  };
+}
+
+function validatePasswordField(value: string): string | null {
+  if (!value.trim()) {
+    return "Informe uma senha.";
+  }
+
+  const checks = checkPasswordRequirements(value);
+  const isValid = Object.values(checks).every(Boolean);
+
+  return isValid ? null : "A senha precisa atender a todos os requisitos abaixo.";
 }
 
 function PasswordRequirement({
@@ -74,6 +117,10 @@ export default function Cadastro() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const nameFieldRef = useRef<FormFieldHandle>(null);
+  const lastNameFieldRef = useRef<FormFieldHandle>(null);
+  const emailFieldRef = useRef<FormFieldHandle>(null);
+  const passwordFieldRef = useRef<FormFieldHandle>(null);
 
   const clearError = () => {
     if (error) {
@@ -81,16 +128,7 @@ export default function Cadastro() {
     }
   };
 
-  const passwordChecks = useMemo(
-    () => ({
-      minLength: password.length >= 8,
-      hasUppercase: /[A-Z]/.test(password),
-      hasLowercase: /[a-z]/.test(password),
-      hasNumber: /\d/.test(password),
-      hasSpecialCharacter: /[^A-Za-z0-9]/.test(password),
-    }),
-    [password]
-  );
+  const passwordChecks = useMemo(() => checkPasswordRequirements(password), [password]);
 
   const isPasswordValid =
     passwordChecks.minLength &&
@@ -118,19 +156,35 @@ export default function Cadastro() {
   }
 
   async function handleCreateAccount() {
-    if (
-      !name.trim() ||
-      !lastName.trim() ||
-      !email.trim() ||
-      !birthdate ||
-      !password.trim()
-    ) {
-      setError("Preencha nome, sobrenome, email, data de nascimento e senha para continuar.");
+    const isNameValid = nameFieldRef.current?.validate() ?? true;
+    const isLastNameValid = lastNameFieldRef.current?.validate() ?? true;
+    const isEmailValid = emailFieldRef.current?.validate() ?? true;
+    const isPasswordFieldValid = passwordFieldRef.current?.validate() ?? true;
+
+    if (!isNameValid) {
+      nameFieldRef.current?.focus();
       return;
     }
 
-    if (!isPasswordValid) {
+    if (!isLastNameValid) {
+      lastNameFieldRef.current?.focus();
+      return;
+    }
+
+    if (!isEmailValid) {
+      emailFieldRef.current?.focus();
+      return;
+    }
+
+    if (!birthdate) {
+      setError("Informe sua data de nascimento para continuar.");
+      setShowBirthdatePicker(true);
+      return;
+    }
+
+    if (!isPasswordFieldValid) {
       setError("A senha precisa atender a todos os requisitos exibidos abaixo.");
+      passwordFieldRef.current?.focus();
       return;
     }
 
@@ -201,8 +255,13 @@ export default function Cadastro() {
           </View>
 
           <View className="mb-4 flex-row">
-            <TextInput
-              className="mr-3 flex-1 border-b border-white/35 bg-black/24 px-4 py-4 text-[14px] text-white"
+            <FormField
+              ref={nameFieldRef}
+              label="Nome"
+              containerClassName="mr-3 flex-1 mb-0"
+              labelClassName="mb-1 text-[11px] font-bold text-white/70"
+              fieldClassName="border-b border-white/35 bg-black/24 px-4"
+              inputClassName="py-4 text-[14px] text-white"
               placeholder="Nome"
               placeholderTextColor="#8F90A0"
               value={name}
@@ -210,10 +269,17 @@ export default function Cadastro() {
                 setName(value);
                 clearError();
               }}
+              validator={validateRequiredTextField("seu nome")}
+              disabled={loading}
             />
 
-            <TextInput
-              className="flex-1 border-b border-white/35 bg-black/24 px-4 py-4 text-[14px] text-white"
+            <FormField
+              ref={lastNameFieldRef}
+              label="Sobrenome"
+              containerClassName="flex-1 mb-0"
+              labelClassName="mb-1 text-[11px] font-bold text-white/70"
+              fieldClassName="border-b border-white/35 bg-black/24 px-4"
+              inputClassName="py-4 text-[14px] text-white"
               placeholder="Sobrenome"
               placeholderTextColor="#8F90A0"
               value={lastName}
@@ -221,25 +287,39 @@ export default function Cadastro() {
                 setLastName(value);
                 clearError();
               }}
+              validator={validateRequiredTextField("seu sobrenome")}
+              disabled={loading}
             />
           </View>
 
-          <TextInput
-            className="mb-4 border-b border-[#8BFFF3] bg-black/24 px-4 py-4 text-[14px] text-white"
+          <FormField
+            ref={emailFieldRef}
+            label="E-mail"
+            labelClassName="sr-only"
+            containerClassName="mb-4"
+            fieldClassName="border-b border-[#8BFFF3] bg-black/24 px-4"
+            inputClassName="py-4 text-[14px] text-white"
             placeholder="E-mail"
             placeholderTextColor="#8F90A0"
             autoCapitalize="none"
+            autoComplete="email"
             keyboardType="email-address"
             value={email}
             onChangeText={(value) => {
               setEmail(value);
               clearError();
             }}
+            validator={validateEmailField}
+            disabled={loading}
           />
 
           <Pressable
             className="mb-4 flex-row items-center border-b border-white/35 bg-black/24 px-4 py-4"
             onPress={() => setShowBirthdatePicker((currentValue) => !currentValue)}
+            accessibilityRole="button"
+            accessibilityLabel="Data de nascimento"
+            accessibilityHint="Abre o seletor de data para informar quando você nasceu"
+            accessibilityValue={birthdate ? { text: formatBirthdateForDisplay(birthdate) } : undefined}
           >
             <Text
               className={`flex-1 text-[14px] ${
@@ -266,24 +346,36 @@ export default function Cadastro() {
             </View>
           ) : null}
 
-          <View className="mb-5 flex-row items-center border-b border-white/35 bg-black/24 px-4">
-            <TextInput
-              className="flex-1 py-4 text-[14px] text-white"
-              placeholder="Senha"
-              placeholderTextColor="#8F90A0"
-              secureTextEntry={!showPassword}
-              value={password}
-              onChangeText={(value) => {
-                setPassword(value);
-                clearError();
-              }}
-            />
-            <Pressable onPress={() => setShowPassword((value) => !value)}>
-              <Text className="text-[12px] font-bold text-[#B7A8D8]">
-                {showPassword ? "Ocultar" : "Ver"}
-              </Text>
-            </Pressable>
-          </View>
+          <FormField
+            ref={passwordFieldRef}
+            label="Senha"
+            labelClassName="mb-1 text-[11px] font-bold text-white/70"
+            containerClassName="mb-5"
+            fieldClassName="flex-row items-center border-b border-white/35 bg-black/24 px-4"
+            inputClassName="flex-1 py-4 text-[14px] text-white"
+            placeholder="Senha"
+            placeholderTextColor="#8F90A0"
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={(value) => {
+              setPassword(value);
+              clearError();
+            }}
+            validator={validatePasswordField}
+            hint="Veja a lista de requisitos logo abaixo do campo."
+            disabled={loading}
+            rightElement={
+              <Pressable
+                onPress={() => setShowPassword((value) => !value)}
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? "Ocultar senha" : "Mostrar senha"}
+              >
+                <Text className="text-[12px] font-bold text-[#B7A8D8]">
+                  {showPassword ? "Ocultar" : "Ver"}
+                </Text>
+              </Pressable>
+            }
+          />
 
           <View className="mb-5 rounded-md bg-black/28 px-4 py-3">
             <Text className="mb-3 text-[12px] font-bold leading-4 text-[#D7D7DE]">
@@ -313,7 +405,11 @@ export default function Cadastro() {
           </View>
 
           {error ? (
-            <Text className="mb-4 text-center text-[12px] font-semibold text-red-300">
+            <Text
+              className="mb-4 text-center text-[12px] font-semibold text-red-300"
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+            >
               {error}
             </Text>
           ) : null}
@@ -324,6 +420,9 @@ export default function Cadastro() {
             }`}
             disabled={loading}
             onPress={handleCreateAccount}
+            accessibilityRole="button"
+            accessibilityLabel={loading ? "Cadastrando…" : "Cadastrar"}
+            accessibilityState={{ disabled: loading, busy: loading }}
           >
             {loading ? (
               <ActivityIndicator color="#191919" />

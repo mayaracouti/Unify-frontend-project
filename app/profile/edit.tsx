@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Linking,
@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -17,6 +16,7 @@ import {
   MultiChoice,
   SingleChoice,
 } from "../../src/components/profile/form-controls";
+import { FormField, type FormFieldHandle } from "../../src/components/ui/form-field";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { profileService } from "../../src/services/profileService";
 import type { LookupOptionResponse, ProfileOptionsResponse } from "../../src/types/profile";
@@ -64,6 +64,7 @@ export default function EditProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const bioFieldRef = useRef<FormFieldHandle>(null);
 
   const hasPronounOptions = (options?.pronouns.length ?? 0) > 0;
   const hasLoveLanguageOptions = (options?.loveLanguages.length ?? 0) > 0;
@@ -315,9 +316,13 @@ export default function EditProfile() {
             </View>
 
             <View className="mb-8 rounded-[28px] bg-[#111214] p-6">
-              <Text className="mb-3 text-[22px] font-bold text-white">Sobre você</Text>
-              <TextInput
-                className="min-h-[128px] rounded-lg border-2 border-[#494455] bg-[#1C1B1B] px-4 py-4 text-[16px] leading-6 text-white"
+              <FormField
+                ref={bioFieldRef}
+                label="Sobre você"
+                labelClassName="mb-3 text-[22px] font-bold text-white"
+                containerClassName="mb-0"
+                fieldClassName="rounded-lg border-2 border-[#494455] bg-[#1C1B1B] px-4"
+                inputClassName="min-h-[128px] py-4 text-[16px] leading-6 text-white"
                 multiline
                 maxLength={500}
                 placeholder="Conte-nos um pouco sobre você..."
@@ -325,6 +330,8 @@ export default function EditProfile() {
                 textAlignVertical="top"
                 value={bio}
                 onChangeText={setBio}
+                hint="Campo opcional. Conte um pouco sobre você para as próximas conexões."
+                disabled={saving}
               />
               <Text className="mt-1 text-right text-[12px] font-semibold text-[#948EA1]">
                 {bioLength} / 500
@@ -423,7 +430,11 @@ export default function EditProfile() {
             ) : null}
 
             {error ? (
-              <Text className="mb-4 mt-6 text-center text-[13px] font-semibold text-red-300">
+              <Text
+                className="mb-4 mt-6 text-center text-[13px] font-semibold text-red-300"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+              >
                 {error}
               </Text>
             ) : null}
@@ -441,6 +452,9 @@ export default function EditProfile() {
               className={`mt-6 h-14 items-center justify-center rounded-2xl ${saving ? "bg-[#CDCD00]" : "bg-[#EAEA00]"}`}
               disabled={saving}
               onPress={handleSave}
+              accessibilityRole="button"
+              accessibilityLabel={saving ? "Salvando…" : "Salvar alterações"}
+              accessibilityState={{ disabled: saving, busy: saving }}
             >
               {saving ? (
                 <ActivityIndicator color="#323200" />

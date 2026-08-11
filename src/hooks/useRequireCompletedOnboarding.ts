@@ -50,6 +50,10 @@ export function useRequireCompletedOnboarding(): UseRequireCompletedOnboardingRe
     setIsCheckingOnboardingCompletion(true);
 
     async function routeByProfileCompletion() {
+      if (!sessionKey) {
+        return;
+      }
+
       try {
         const completion = await getCompletionForSessionKey(sessionKey);
 

@@ -218,8 +218,10 @@ export default function CommunityCommentsScreen() {
       try {
         setLoadError(null);
 
+        // TODO: paginação incremental — hoje sempre carregamos a primeira página
+        // (size padrão do backend) dos comentários da publicação.
         const response = await communityService.getComments(postId);
-        const nextComments = Array.isArray(response.comments) ? response.comments : [];
+        const nextComments = Array.isArray(response.content) ? response.content : [];
         setComments(nextComments);
 
         const avatarUrls = nextComments

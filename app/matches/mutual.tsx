@@ -18,7 +18,10 @@ import {
   AuthenticatedRemoteImage,
   preloadAuthenticatedRemoteImages,
 } from "../../src/components/profile/authenticated-remote-image";
+import { ScreenEmpty } from "../../src/components/ui/screen-empty";
+import { ScreenLoading } from "../../src/components/ui/screen-loading";
 import { useAuth } from "../../src/context/AuthContext";
+import { useAsyncState } from "../../src/hooks/useAsyncState";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { matchService } from "../../src/services/matchService";
 import { profileService } from "../../src/services/profileService";
@@ -96,31 +99,20 @@ function MutualMatchesEmptyState({
   onRetry?: () => void;
 }) {
   return (
-    <View className="rounded-[28px] border border-[#353534] bg-[#111214] px-6 py-10">
-      {/* <View className="h-16 w-16 items-center justify-center rounded-full bg-[#201F1F]">
-        <Ionicons name="heart-half-outline" size={30} color="#7C4DFF" />
-      </View> */}
-
-      <Text className="text-[22px] font-black text-[#E5E2E1]">
-        Sem matches por enquanto
-      </Text>
-
-      <Text className="mt-3 text-[15px] font-semibold leading-6 text-[#CAC3D8]">
-        {message}
-      </Text>
-      <Text className="mt-3 text-[15px] font-semibold leading-6 text-[#CAC3D8]">
-        Arraste a tela para baixo para atualizar.
-      </Text>
-
-      {/* {onRetry ? (
-        <Pressable
-          className="mt-6 self-start rounded-full border border-[#494455] bg-[#201F1F] px-5 py-3"
-          onPress={onRetry}
-        >
-          <Text className="text-[14px] font-bold text-white">Tentar novamente</Text>
-        </Pressable>
-      ) : null} */}
-    </View>
+    <ScreenEmpty
+      className="rounded-[28px] border border-[#353534] bg-[#111214] px-6 py-10"
+      title="Sem matches por enquanto"
+      description={`${message} Arraste a tela para baixo para atualizar.`}
+      action={
+        onRetry
+          ? {
+              label: "Tentar novamente",
+              onPress: onRetry,
+              accessibilityHint: "Atualiza a lista de matches confirmados",
+            }
+          : undefined
+      }
+    />
   );
 }
 
@@ -198,13 +190,16 @@ export default function MutualMatchesScreen() {
   const isFocused = useIsFocused();
   const { session } = useAuth();
   const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
-  const [matchesPage, setMatchesPage] = useState<MutualMatchPageResponse>(
-    createEmptyMutualMatchesResponse
-  );
-  const [loading, setLoading] = useState(true);
+  const {
+    data: matchesPage,
+    setData: setMatchesPage,
+    error: loadError,
+    setError: setLoadError,
+    run: runLoadMutualMatches,
+    isLoading: loading,
+  } = useAsyncState<MutualMatchPageResponse>(createEmptyMutualMatchesResponse());
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
   const authToken = session?.accessToken ?? null;
 
@@ -213,49 +208,28 @@ export default function MutualMatchesScreen() {
       return;
     }
 
-    setLoading(true);
     const requestId = ++requestIdRef.current;
 
-    const loadMutualMatches = async () => {
-      try {
-        setLoadError(null);
+    void runLoadMutualMatches(
+      () => matchService.getPagedMutualMatches({ page: 0, size: MUTUAL_MATCHES_PAGE_SIZE }),
+      "Não foi possível carregar seus matches agora."
+    ).then((response) => {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
 
-        const response = await matchService.getPagedMutualMatches({
-          page: 0,
-          size: MUTUAL_MATCHES_PAGE_SIZE,
-        });
-
-        if (requestId !== requestIdRef.current) {
-          return;
-        }
-
-        setMatchesPage(response);
-
+      if (response) {
         const imageUrls = collectMutualMatchImageUrls(response);
 
         if (imageUrls.length > 0) {
           void preloadAuthenticatedRemoteImages(imageUrls, authToken);
         }
-      } catch (error) {
-        if (requestId !== requestIdRef.current) {
-          return;
-        }
-
-        setLoadError(
-          formatApiErrorMessage(error, "Não foi possível carregar seus matches agora.")
-        );
-        setMatchesPage(createEmptyMutualMatchesResponse());
-      } finally {
-        if (requestId === requestIdRef.current) {
-          setLoading(false);
-          setRefreshing(false);
-          setLoadingMore(false);
-        }
       }
-    };
 
-    void loadMutualMatches();
-  }, [authToken, canAccessCompletedOnboardingContent, isFocused]);
+      setRefreshing(false);
+      setLoadingMore(false);
+    });
+  }, [authToken, canAccessCompletedOnboardingContent, isFocused, runLoadMutualMatches]);
 
   const handleRefresh = async () => {
     if (!canAccessCompletedOnboardingContent) {
@@ -266,7 +240,7 @@ export default function MutualMatchesScreen() {
     const requestId = ++requestIdRef.current;
 
     try {
-      setLoadError(null);
+      setLoadError("");
 
       const response = await matchService.getPagedMutualMatches({
         page: 0,
@@ -294,7 +268,6 @@ export default function MutualMatchesScreen() {
       );
     } finally {
       if (requestId === requestIdRef.current) {
-        setLoading(false);
         setRefreshing(false);
       }
     }
@@ -381,12 +354,7 @@ export default function MutualMatchesScreen() {
             </View>
 
           {loading && matchesPage.matches.length === 0 ? (
-            <View className="flex-1 items-center justify-center px-8">
-              <ActivityIndicator color="#EAEA00" />
-              <Text className="mt-4 text-center text-[16px] font-semibold text-[#CAC3D8]">
-                Buscando matches confirmados...
-              </Text>
-            </View>
+            <ScreenLoading label="Buscando matches confirmados..." />
           ) : (
             <ScrollView
               className="flex-1"
@@ -429,11 +397,10 @@ export default function MutualMatchesScreen() {
                 {matchesPage.matches.length === 0 ? (
                   <MutualMatchesEmptyState
                     message={
-                      loadError ??
+                      loadError ||
                       "Se uma pessoa também curtir você, o encontro aparece aqui automaticamente."
                     }
                     onRetry={() => {
-                      setLoading(true);
                       void handleRefresh();
                     }}
                   />

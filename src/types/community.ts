@@ -1,3 +1,5 @@
+import type { PageResponse } from "./pagination";
+
 export type CommunityRole = "ADMIN" | "MEMBER" | "MODERATOR";
 
 export interface CommunityUserSummaryResponse {
@@ -77,10 +79,7 @@ export interface CommunityMemberResponse {
   owner?: boolean | null;
 }
 
-export interface CommunityMembersResponse {
-  communityId: string;
-  members: CommunityMemberResponse[];
-}
+export type CommunityMembersResponse = PageResponse<CommunityMemberResponse>;
 
 export interface CommunityCommentResponse {
   id: string;
@@ -90,10 +89,7 @@ export interface CommunityCommentResponse {
   commentedByCurrentUser?: boolean | null;
 }
 
-export interface CommunityCommentsResponse {
-  postId: string;
-  comments: CommunityCommentResponse[];
-}
+export type CommunityCommentsResponse = PageResponse<CommunityCommentResponse>;
 
 export interface CommunityCreateCommentRequest {
   body: string;
@@ -101,5 +97,5 @@ export interface CommunityCreateCommentRequest {
 
 export interface CommunityFeedResponse {
   community: CommunitySummaryResponse | null;
-  posts: CommunityPostResponse[];
+  posts: PageResponse<CommunityPostResponse>;
 }
