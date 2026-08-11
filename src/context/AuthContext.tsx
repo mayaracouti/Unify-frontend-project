@@ -19,6 +19,7 @@ import {
 } from "../storage/tokenStorage";
 import type {
   EmailVerificationRequest,
+  MessageResponse,
   ResendEmailVerificationRequest,
   SignInRequest,
   SignInResult,
@@ -33,9 +34,7 @@ type AuthContextValue = {
   isAuthenticated: boolean;
   isReady: boolean;
   pendingVerificationEmail: string | null;
-  resendVerificationCode: (
-    email?: string
-  ) => Promise<VerificationCodeDispatchResponse>;
+  resendVerificationCode: (email?: string) => Promise<MessageResponse>;
   session: StoredAuthSnapshot["session"];
   signIn: (payload: SignInRequest) => Promise<SignInResult>;
   signOut: () => Promise<void>;
@@ -136,9 +135,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return response;
   };
 
-  const resendVerificationCode = async (
-    email?: string
-  ): Promise<VerificationCodeDispatchResponse> => {
+  const resendVerificationCode = async (email?: string): Promise<MessageResponse> => {
     const targetEmail = normalizeEmail(email ?? snapshot.pendingVerificationEmail ?? "");
 
     if (!targetEmail) {
@@ -149,7 +146,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
       email: targetEmail,
     } as ResendEmailVerificationRequest);
 
-    await setPendingVerificationEmail(response.email);
+    // The resend endpoint no longer echoes the email back (202 + { message }),
+    // so we persist the email we already validated locally.
+    await setPendingVerificationEmail(targetEmail);
 
     return response;
   };

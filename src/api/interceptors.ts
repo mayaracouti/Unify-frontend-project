@@ -108,7 +108,9 @@ export function initializeApiInterceptors() {
       }
     }
 
-    if ((error.status === 401 || error.status === 403) && request.requiresAuth) {
+    // Apenas 401 significa "sessao invalida". 403 e negacao de permissao de
+    // negocio (ex.: moderador tentando alterar um admin) e NAO deve deslogar.
+    if (error.status === 401 && request.requiresAuth) {
       await clearAuthSession();
     }
 

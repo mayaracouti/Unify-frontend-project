@@ -16,6 +16,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-nav";
 import { GlobalTopNav } from "../../src/components/navigation/global-top-nav";
 import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
+import { ScreenEmpty } from "../../src/components/ui/screen-empty";
+import { ScreenError } from "../../src/components/ui/screen-error";
+import { ScreenLoading } from "../../src/components/ui/screen-loading";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { matchService } from "../../src/services/matchService";
 import { profileService } from "../../src/services/profileService";
@@ -723,12 +726,7 @@ export default function Matches() {
 
         <View className="flex-1 overflow-hidden rounded-b-[44px] bg-[#111214]">
           {loadingProfiles ? (
-            <View className="flex-1 items-center justify-center px-8">
-              <ActivityIndicator color="#EAEA00" />
-              <Text className="mt-4 text-center text-[16px] font-semibold text-[#CAC3D8]">
-                Buscando perfis compatíveis...
-              </Text>
-            </View>
+            <ScreenLoading label="Buscando perfis compatíveis..." />
           ) : currentProfile ? (
             <>
               <ProfilePhoto authToken={authToken} photoUrl={currentPhotoUrl} />
@@ -860,22 +858,21 @@ export default function Matches() {
                 />
               ) : null}
             </>
+          ) : loadError ? (
+            <View className="flex-1 items-center justify-center px-8">
+              <ScreenError
+                title="Você chegou ao fim da lista"
+                message={loadError}
+                onRetry={restartProfiles}
+              />
+            </View>
           ) : (
             <View className="flex-1 items-center justify-center px-8">
-              <Text className="text-center text-[28px] font-black text-white">
-                Você chegou ao fim da lista
-              </Text>
-              <Text className="mt-4 text-center text-[16px] font-semibold leading-6 text-[#CAC3D8]">
-                {loadError || "Novos perfis aparecerão aqui quando estiverem disponíveis."}
-              </Text>
-              <Pressable
-                className="mt-8 rounded-full bg-[#EAEA00] px-8 py-4"
-                onPress={restartProfiles}
-              >
-                <Text className="text-[16px] font-black text-[#202020]">
-                  Ver novamente
-                </Text>
-              </Pressable>
+              <ScreenEmpty
+                title="Você chegou ao fim da lista"
+                description="Novos perfis aparecerão aqui quando estiverem disponíveis."
+                action={{ label: "Ver novamente", onPress: restartProfiles }}
+              />
             </View>
           )}
         </View>

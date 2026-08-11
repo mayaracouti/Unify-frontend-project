@@ -104,10 +104,14 @@ export const communityService = {
     );
   },
 
-  getFeed(communityId?: string | null) {
+  getFeed(communityId?: string | null, args?: { page?: number; size?: number }) {
     return customApiCall.get<CommunityFeedResponse>(
       COMMUNITY_FEED_ENDPOINT,
-      communityId ? { communityId } : undefined,
+      {
+        ...(communityId ? { communityId } : undefined),
+        page: args?.page ?? 0,
+        size: args?.size ?? 20,
+      },
       { requiresAuth: true }
     );
   },
@@ -127,10 +131,13 @@ export const communityService = {
     );
   },
 
-  getMembers(communityId: string) {
+  getMembers(communityId: string, args?: { page?: number; size?: number }) {
     return customApiCall.get<CommunityMembersResponse>(
       `${COMMUNITIES_ENDPOINT}/${encodePathSegment(communityId)}/members`,
-      undefined,
+      {
+        page: args?.page ?? 0,
+        size: args?.size ?? 20,
+      },
       { requiresAuth: true }
     );
   },
@@ -187,10 +194,13 @@ export const communityService = {
     );
   },
 
-  getComments(postId: string) {
+  getComments(postId: string, args?: { page?: number; size?: number }) {
     return customApiCall.get<CommunityCommentsResponse>(
       `${COMMUNITY_POSTS_ENDPOINT}/${encodePathSegment(postId)}/comments`,
-      undefined,
+      {
+        page: args?.page ?? 0,
+        size: args?.size ?? 20,
+      },
       { requiresAuth: true }
     );
   },

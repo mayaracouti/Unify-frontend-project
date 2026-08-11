@@ -19,7 +19,10 @@ import {
   AuthenticatedRemoteImage,
   preloadAuthenticatedRemoteImages,
 } from "../../src/components/profile/authenticated-remote-image";
+import { ScreenEmpty } from "../../src/components/ui/screen-empty";
+import { ScreenLoading } from "../../src/components/ui/screen-loading";
 import { useAuth } from "../../src/context/AuthContext";
+import { useAsyncState } from "../../src/hooks/useAsyncState";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { communityService } from "../../src/services/communityService";
 import type {
@@ -104,36 +107,35 @@ function DirectoryEmptyState({
   onRetry?: () => void;
 }) {
   return (
-    <View className="rounded-[28px] border border-[#353534] bg-[#111214] px-6 py-10">
-      <View className="h-16 w-16 items-center justify-center rounded-full bg-[#201F1F]">
-        <Ionicons name="people-outline" size={32} color="#7C4DFF" />
-      </View>
-      <Text className="mt-6 text-[22px] font-black text-[#E5E2E1]">
-        Nenhuma comunidade encontrada
-      </Text>
-      <Text className="mt-3 text-[15px] font-semibold leading-6 text-[#CAC3D8]">
-        {message}
-      </Text>
-      {onRetry ? (
-        <Pressable
-          className="mt-6 self-start rounded-full border border-[#494455] bg-[#201F1F] px-5 py-3"
-          onPress={onRetry}
-        >
-          <Text className="text-[14px] font-bold text-white">Tentar novamente</Text>
-        </Pressable>
-      ) : null}
-    </View>
+    <ScreenEmpty
+      className="rounded-[28px] border border-[#353534] bg-surface-alt px-6 py-10"
+      icon={
+        <View className="mb-6 h-16 w-16 items-center justify-center rounded-full bg-[#201F1F]">
+          <Ionicons name="people-outline" size={32} color="#7C4DFF" />
+        </View>
+      }
+      title="Nenhuma comunidade encontrada"
+      description={message}
+      action={
+        onRetry
+          ? {
+              label: "Tentar novamente",
+              onPress: onRetry,
+              accessibilityHint: "Atualiza a lista de comunidades",
+            }
+          : undefined
+      }
+    />
   );
 }
 
 function SearchEmptyState({ searchQuery }: { searchQuery: string }) {
   return (
-    <View className="rounded-[28px] border border-[#353534] bg-[#111214] px-6 py-8">
-      <Text className="text-[22px] font-black text-white">Sem resultados</Text>
-      <Text className="mt-3 text-[15px] font-semibold leading-6 text-[#CAC3D8]">
-        Nenhuma comunidade corresponde a "{searchQuery}" no backend.
-      </Text>
-    </View>
+    <ScreenEmpty
+      className="rounded-[28px] border border-[#353534] bg-surface-alt px-6 py-8"
+      title="Sem resultados"
+      description={`Nenhuma comunidade corresponde a "${searchQuery}" no backend.`}
+    />
   );
 }
 
@@ -209,7 +211,7 @@ function CommunityDirectoryCard({
 
   return (
     <Pressable
-      className="rounded-[28px] border border-[#353534] bg-[#111214] p-5"
+      className="rounded-[28px] border border-[#353534] bg-surface-alt p-5"
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`Abrir ${community.name}`}
@@ -244,7 +246,7 @@ function CommunityDirectoryCard({
           </View>
 
           {community.description ? (
-            <Text className="mt-3 text-[15px] font-semibold leading-6 text-[#CAC3D8]">
+            <Text className="mt-3 text-[15px] font-semibold leading-6 text-content-secondary">
               {community.description}
             </Text>
           ) : (
@@ -275,7 +277,7 @@ function CommunityDirectoryCard({
             </View>
 
             <View className="flex-1">
-              <Text className="text-[13px] font-semibold text-[#CAC3D8]">Criada por</Text>
+              <Text className="text-[13px] font-semibold text-content-secondary">Criada por</Text>
               <Text className="text-[15px] font-black text-white">
                 {community.owner?.name ?? "Comunidade sem criador informado"}
               </Text>
@@ -301,7 +303,7 @@ function CommunityDirectoryCard({
       <View className="mt-5 flex-row items-center justify-between rounded-2xl bg-[#17181C] px-4 py-4">
         <View>
           <Text className="text-[15px] font-bold text-white">Abrir comunidade</Text>
-          <Text className="mt-1 text-[13px] font-semibold text-[#CAC3D8]">
+          <Text className="mt-1 text-[13px] font-semibold text-content-secondary">
             Veja publicações, comentários e ações de participação.
           </Text>
         </View>
@@ -325,13 +327,15 @@ export default function CommunityDirectoryScreen() {
   const initialLoadRef = useRef(false);
   const requestIdRef = useRef(0);
 
-  const [directory, setDirectory] = useState<CommunityDirectoryResponse>(
-    EMPTY_DIRECTORY_RESPONSE
-  );
+  const {
+    data: directory,
+    setData: setDirectory,
+    error: loadError,
+    setError: setLoadError,
+  } = useAsyncState<CommunityDirectoryResponse>(EMPTY_DIRECTORY_RESPONSE);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isFocused || !canAccessCompletedOnboardingContent) {
@@ -348,7 +352,7 @@ export default function CommunityDirectoryScreen() {
 
     const loadDirectory = async () => {
       try {
-        setLoadError(null);
+        setLoadError("");
 
         const response = deferredSearchQuery
           ? await communityService.searchCommunities(deferredSearchQuery, {
@@ -401,7 +405,7 @@ export default function CommunityDirectoryScreen() {
     const requestId = ++requestIdRef.current;
 
     try {
-      setLoadError(null);
+      setLoadError("");
 
       const response = deferredSearchQuery
         ? await communityService.searchCommunities(deferredSearchQuery, {
@@ -499,7 +503,7 @@ export default function CommunityDirectoryScreen() {
         <View className="flex-1">
           {loading && directory.communities.length === 0 ? (
             <View className="flex-1 items-center justify-center bg-[#131313]">
-              <ActivityIndicator color="#7C4DFF" size="large" />
+              <ScreenLoading label="Carregando comunidades..." />
             </View>
           ) : (
             <ScrollView
@@ -517,13 +521,13 @@ export default function CommunityDirectoryScreen() {
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              <View className="rounded-[32px] bg-[#111214] p-6">
+              <View className="rounded-[32px] bg-surface-alt p-6">
                 <View className="flex-row items-start justify-between gap-4">
                   <View className="flex-1">
                     <Text className="text-[34px] font-black leading-10 text-white">
                       Comunidades
                     </Text>
-                    <Text className="mt-3 text-[15px] font-semibold leading-6 text-[#CAC3D8] text-justify">
+                    <Text className="mt-3 text-[15px] font-semibold leading-6 text-content-secondary text-justify">
                       Explore comunidades criadas por usuários, pesquise pelo nome ou descrição e abra o feed da que fizer sentido para você.
                     </Text>
                   </View>
@@ -566,7 +570,7 @@ export default function CommunityDirectoryScreen() {
                   <Text className="text-[13px] font-bold uppercase tracking-[1.1px] text-[#7C4DFF]">
                     Resultado atual
                   </Text>
-                  <Text className="mt-2 text-[14px] font-semibold leading-6 text-[#CAC3D8]">
+                  <Text className="mt-2 text-[14px] font-semibold leading-6 text-content-secondary">
                     {directorySummaryLabel}
                   </Text>
                 </View> */}
@@ -588,7 +592,7 @@ export default function CommunityDirectoryScreen() {
                   ) : (
                     <DirectoryEmptyState
                       message={
-                        loadError ??
+                        loadError ||
                         "As comunidades aparecerão aqui assim que existirem comunidades públicas disponíveis para o usuário autenticado."
                       }
                       onRetry={() => {

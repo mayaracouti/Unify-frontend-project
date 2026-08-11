@@ -21,6 +21,9 @@ import {
   AuthenticatedRemoteImage,
   preloadAuthenticatedRemoteImages,
 } from "../../src/components/profile/authenticated-remote-image";
+import { ScreenEmpty } from "../../src/components/ui/screen-empty";
+import { ScreenError } from "../../src/components/ui/screen-error";
+import { ScreenLoading } from "../../src/components/ui/screen-loading";
 import { useAppShell } from "../../src/context/AppShellContext";
 import { useAuth } from "../../src/context/AuthContext";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
@@ -80,14 +83,23 @@ function canParticipateInCommunity(community?: CommunitySummaryResponse | null) 
   return Boolean(community.isMember || community.isOwner || community.currentUserRole);
 }
 
-function normalizeFeedResponse(response: CommunityFeedResponse): CommunityFeedResponse {
+type NormalizedCommunityFeed = {
+  community: CommunitySummaryResponse | null;
+  posts: CommunityPostResponse[];
+  // TODO: paginação incremental — expor `postsHasNext`/`postsPage` quando o feed
+  // ganhar scroll infinito; hoje carregamos apenas a primeira página (size padrão).
+  postsHasNext: boolean;
+};
+
+function normalizeFeedResponse(response: CommunityFeedResponse): NormalizedCommunityFeed {
   return {
     community: response.community ?? null,
-    posts: Array.isArray(response.posts) ? response.posts : [],
+    posts: Array.isArray(response.posts?.content) ? response.posts.content : [],
+    postsHasNext: response.posts?.hasNext ?? false,
   };
 }
 
-function collectCommunityAssetUrls(feed: CommunityFeedResponse) {
+function collectCommunityAssetUrls(feed: NormalizedCommunityFeed) {
   const communityIconUrl = communityService.resolveAssetUrl(feed.community?.iconData);
   const ownerAvatarUrl = communityService.resolveAssetUrl(feed.community?.owner?.avatarData);
   const postAssetUrls = feed.posts.flatMap((post) => {
@@ -137,7 +149,7 @@ function isCommunityMemberOwner(
 }
 
 function applyMembershipUpdate(
-  currentFeed: CommunityFeedResponse | null,
+  currentFeed: NormalizedCommunityFeed | null,
   membership: CommunityMembershipResponse
 ) {
   if (!currentFeed?.community) {
@@ -156,7 +168,7 @@ function applyMembershipUpdate(
   };
 }
 
-function applyLikeUpdate(currentFeed: CommunityFeedResponse | null, like: CommunityLikeResponse) {
+function applyLikeUpdate(currentFeed: NormalizedCommunityFeed | null, like: CommunityLikeResponse) {
   if (!currentFeed) {
     return currentFeed;
   }
@@ -175,7 +187,7 @@ function applyLikeUpdate(currentFeed: CommunityFeedResponse | null, like: Commun
   };
 }
 
-function removePost(currentFeed: CommunityFeedResponse | null, postId: string) {
+function removePost(currentFeed: NormalizedCommunityFeed | null, postId: string) {
   if (!currentFeed) {
     return currentFeed;
   }
@@ -466,7 +478,7 @@ function CommunityOwnerCard({
         </View>
 
         <View className="flex-1">
-          <Text className="text-[13px] font-semibold text-[#CAC3D8]">Criador</Text>
+          <Text className="text-[13px] font-semibold text-content-secondary">Criador</Text>
           <Text className="text-[16px] font-black text-white">
             {community.owner?.name ?? "Criador não informado"}
           </Text>
@@ -537,7 +549,7 @@ function CommunityHeader({
       ) : null}
 
       {/* <View className="mt-6 rounded-2xl border border-[#3A3246] bg-[#17181C] px-4 py-4"> */}
-        {/* <Text className="text-[12px] font-black uppercase tracking-[1.2px] text-[#CAC3D8]">
+        {/* <Text className="text-[12px] font-black uppercase tracking-[1.2px] text-content-secondary">
           Navegacao da comunidade
         </Text>
         <Text className="mt-2 text-[14px] font-semibold leading-6 text-[#E5E2E1]">
@@ -559,7 +571,7 @@ function CommunityHeader({
 
       {/* <CommunityOwnerCard authToken={authToken} community={community} /> */}
 
-      <Text className="mt-5 text-[14px] font-semibold leading-6 text-[#CAC3D8]">
+      <Text className="mt-5 text-[14px] font-semibold leading-6 text-content-secondary">
         {community.isOwner
           ? "Você é a pessoa proprietária desta comunidade e pode gerenciar conteúdo e membros elevados."
           : community.currentUserRole
@@ -693,37 +705,22 @@ function EmptyCommunityState({
 }) {
   return (
     <View className="flex-1 items-center justify-center px-8 py-16">
-      <View className="h-16 w-16 items-center justify-center rounded-full bg-[#201F1F]">
-        <Ionicons name="people-outline" size={32} color="#7C4DFF" />
-      </View>
-      <Text className="mt-6 text-center text-[22px] font-black text-[#E5E2E1]">
-        Comunidade indisponível
-      </Text>
-      <Text className="mt-3 text-center text-[15px] font-semibold leading-6 text-[#CAC3D8]">
-        {message}
-      </Text>
-      {onRetry ? (
-        <Pressable
-          className="mt-6 rounded-full border border-[#494455] bg-[#201F1F] px-5 py-3"
-          onPress={onRetry}
-        >
-          <Text className="text-[14px] font-bold text-white">Tentar novamente</Text>
-        </Pressable>
-      ) : null}
+      <ScreenError title="Comunidade indisponível" message={message} onRetry={onRetry} />
     </View>
   );
 }
 
 function EmptyPostState({ canParticipate }: { canParticipate: boolean }) {
   return (
-    <View className="mx-6 mt-7 rounded-2xl border border-[#3A3246] bg-[#1A1C1F] px-6 py-8">
-      <Text className="text-[22px] font-black text-white">Ainda sem publicações</Text>
-      <Text className="mt-3 text-[15px] font-semibold leading-6 text-[#CAC3D8]">
-        {canParticipate
+    <ScreenEmpty
+      className="mx-6 mt-7 rounded-2xl border border-[#3A3246] bg-[#1A1C1F] px-6 py-8"
+      title="Ainda sem publicações"
+      description={
+        canParticipate
           ? "Seja a primeira pessoa a compartilhar algo com a comunidade."
-          : "Entre na comunidade para começar a publicar e interagir com os posts."}
-      </Text>
-    </View>
+          : "Entre na comunidade para começar a publicar e interagir com os posts."
+      }
+    />
   );
 }
 
@@ -766,7 +763,7 @@ function CommunityContentTabs({
               />
               <Text
                 className={`text-[13px] font-black ${
-                  isActive ? "text-[#FCF6FF]" : "text-[#CAC3D8]"
+                  isActive ? "text-[#FCF6FF]" : "text-content-secondary"
                 }`}
               >
                 {tab.label}
@@ -830,12 +827,11 @@ function CommunityMemberCard({
 
 function EmptyMembersState() {
   return (
-    <View className="mx-6 mt-7 rounded-2xl border border-[#3A3246] bg-[#1A1C1F] px-6 py-8">
-      <Text className="text-[22px] font-black text-white">Nenhum membro listado</Text>
-      <Text className="mt-3 text-[15px] font-semibold leading-6 text-[#CAC3D8]">
-        Não foi possível encontrar participantes para esta comunidade no momento.
-      </Text>
-    </View>
+    <ScreenEmpty
+      className="mx-6 mt-7 rounded-2xl border border-[#3A3246] bg-[#1A1C1F] px-6 py-8"
+      title="Nenhum membro listado"
+      description="Não foi possível encontrar participantes para esta comunidade no momento."
+    />
   );
 }
 
@@ -858,7 +854,7 @@ export default function CommunityDetailScreen() {
   const membersInitialLoadRef = useRef(false);
   const scrollViewRef = useRef<ScrollView | null>(null);
   const contentStartOffsetRef = useRef(0);
-  const [feed, setFeed] = useState<CommunityFeedResponse | null>(null);
+  const [feed, setFeed] = useState<NormalizedCommunityFeed | null>(null);
   const [members, setMembers] = useState<CommunityMemberResponse[]>([]);
   const [activeTab, setActiveTab] = useState<CommunityViewTab>(requestedTab);
   const [loading, setLoading] = useState(true);
@@ -894,6 +890,8 @@ export default function CommunityDetailScreen() {
     try {
       setLoadError(null);
 
+      // TODO: paginação incremental — hoje sempre carregamos a primeira página
+      // (size padrão do backend) das publicações da comunidade.
       const feedResponse = await communityService.getFeed(requestedCommunityId);
       const normalizedFeed = normalizeFeedResponse(feedResponse);
       setFeed(normalizedFeed);
@@ -907,7 +905,7 @@ export default function CommunityDetailScreen() {
       setLoadError(
         formatApiErrorMessage(error, "Não foi possível carregar os dados da comunidade.")
       );
-      setFeed((currentFeed) => currentFeed ?? { community: null, posts: [] });
+      setFeed((currentFeed) => currentFeed ?? { community: null, posts: [], postsHasNext: false });
     } finally {
       setLoading(false);
     }
@@ -931,8 +929,10 @@ export default function CommunityDetailScreen() {
       try {
         setMembersLoadError(null);
 
+        // TODO: paginação incremental — hoje sempre carregamos a primeira página
+        // (size padrão do backend) da lista de membros.
         const response = await communityService.getMembers(communityId);
-        const nextMembers = Array.isArray(response.members) ? response.members : [];
+        const nextMembers = Array.isArray(response.content) ? response.content : [];
         setMembers(nextMembers);
 
         const avatarUrls = collectMemberAssetUrls(nextMembers);
@@ -1307,7 +1307,7 @@ export default function CommunityDetailScreen() {
         <View className="flex-1">
           {loading && !feed ? (
             <View className="flex-1 items-center justify-center bg-[#131313]">
-              <ActivityIndicator color="#7C4DFF" size="large" />
+              <ScreenLoading label="Carregando comunidade..." />
             </View>
           ) : (
             <ScrollView
@@ -1389,7 +1389,7 @@ export default function CommunityDetailScreen() {
                     <>
                       {/* <View className="mx-6 mt-7 rounded-2xl border border-[#3A3246] bg-[#1A1C1F] px-5 py-5">
                         <Text className="text-[18px] font-black text-white">Membros da comunidade</Text>
-                        <Text className="mt-3 text-[14px] font-semibold leading-6 text-[#CAC3D8]">
+                        <Text className="mt-3 text-[14px] font-semibold leading-6 text-content-secondary">
                           {canManageRoles
                             ? "Somente moderadores e admins podem alterar cargos. Use esta aba para gerir elevações em vez dos posts ou comentários."
                             : "Somente moderadores e admins podem alterar cargos. Nesta aba você pode acompanhar quem participa da comunidade."}
@@ -1406,9 +1406,10 @@ export default function CommunityDetailScreen() {
                       ) : null}
 
                       {membersLoading && members.length === 0 ? (
-                        <View className="items-center px-6 py-12">
-                          <ActivityIndicator color="#7C4DFF" size="large" />
-                        </View>
+                        <ScreenLoading
+                          label="Carregando membros..."
+                          className="items-center px-6 py-12"
+                        />
                       ) : members.length > 0 ? (
                         <View className="gap-4 px-6 pt-7">
                           {members.map((member, index) => (

@@ -42,12 +42,12 @@ export const authService = {
   },
 
   resendEmailVerification(payload: ResendEmailVerificationRequest) {
-    return customApiCall.post<
-      VerificationCodeDispatchResponse,
-      ResendEmailVerificationRequest
-    >("/auth/resend-email-verification", {
-      email: normalizeEmail(payload.email),
-    });
+    return customApiCall.post<MessageResponse, ResendEmailVerificationRequest>(
+      "/auth/resend-email-verification",
+      {
+        email: normalizeEmail(payload.email),
+      }
+    );
   },
 
   forgotPassword(payload: ForgotPasswordRequest) {
