@@ -4,8 +4,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
+import { useTTS } from "../../src/accessibility/tts";
+
 export default function UnderageScreen() {
   const router = useRouter();
+  const { speak } = useTTS();
 
   return (
     <LinearGradient
@@ -43,7 +46,10 @@ export default function UnderageScreen() {
 
           <Pressable
             className="w-full max-w-[320px] items-center justify-center rounded-md bg-[#F2F500] px-6 py-4"
-            onPress={() => router.replace("/auth/login")}
+            onPress={() => {
+              speak("Voltar para o login");
+              router.replace("/auth/login");
+            }}
             accessibilityRole="button"
             accessibilityLabel="Voltar para o login"
             accessibilityHint="Retorna para a tela de login"

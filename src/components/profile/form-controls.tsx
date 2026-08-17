@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
+import { buildOptionToggleSpeech, useTTS } from "../../accessibility/tts";
 import type {
   LookupOptionResponse,
   SimilarityOptionResponse,
@@ -71,6 +72,8 @@ export function SingleChoice({
   onChange: (id: number) => void;
   onClear?: () => void;
 }) {
+  const { speak } = useTTS();
+
   return (
     <View className="mb-8">
       <Text className="mb-3 text-[22px] font-bold text-white">{title}</Text>
@@ -83,10 +86,12 @@ export function SingleChoice({
             role="radio"
             onPress={() => {
               if (value === option.id && onClear) {
+                speak(buildOptionToggleSpeech(option, false));
                 onClear();
                 return;
               }
 
+              speak(buildOptionToggleSpeech(option, true));
               onChange(option.id);
             }}
           />
@@ -111,6 +116,8 @@ export function MultiChoice({
   toggleId: (currentIds: number[], id: number) => number[];
   showOptionIcons?: boolean;
 }) {
+  const { speak } = useTTS();
+
   return (
     <View className="mb-8">
       <Text className="mb-3 text-[22px] font-bold text-white">{title}</Text>
@@ -126,7 +133,12 @@ export function MultiChoice({
                 ? option.ionicIcon
                 : undefined
             }
-            onPress={() => onChange(toggleId(values, option.id))}
+            onPress={() => {
+              speak(
+                buildOptionToggleSpeech(option, !values.includes(option.id))
+              );
+              onChange(toggleId(values, option.id));
+            }}
           />
         ))}
       </View>
@@ -143,6 +155,8 @@ export function ChoiceCard({
   selected: boolean;
   onPress: () => void;
 }) {
+  const { speak } = useTTS();
+
   return (
     <Pressable
       className={`min-h-[56px] flex-1 basis-[46%] flex-row items-center justify-between rounded-lg border-2 px-5 py-3 ${
@@ -150,7 +164,10 @@ export function ChoiceCard({
           ? "border-[#EAEA00] bg-[#EAEA00]/10"
           : "border-[#262626] bg-[#201F1F]"
       }`}
-      onPress={onPress}
+      onPress={() => {
+        speak(buildOptionToggleSpeech(label, true));
+        onPress();
+      }}
       accessibilityRole="radio"
       accessibilityLabel={label}
       accessibilityState={{ selected }}
@@ -196,6 +213,8 @@ export function SimilaritySelector({
   onChange: (value: SimilarityPreference) => void;
   onClear?: () => void;
 }) {
+  const { speak } = useTTS();
+
   return (
     <View className="mb-6">
       <Text className="mb-3 text-[15px] font-bold text-[#CAC3D8]">{title}</Text>
@@ -213,10 +232,12 @@ export function SimilaritySelector({
               }`}
               onPress={() => {
                 if (selected && onClear) {
+                  speak(buildOptionToggleSpeech(option.description, false));
                   onClear();
                   return;
                 }
 
+                speak(buildOptionToggleSpeech(option.description, true));
                 onChange(option.value);
               }}
               accessibilityRole="radio"

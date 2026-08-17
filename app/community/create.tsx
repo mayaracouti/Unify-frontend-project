@@ -15,6 +15,7 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useTTS } from "../../src/accessibility/tts";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { communityService } from "../../src/services/communityService";
 import { showGlobalToast } from "../../src/utils/globalToast";
@@ -64,6 +65,7 @@ function createCommunityPostFormData(
 
 export default function CommunityCreatePostScreen() {
   const router = useRouter();
+  const { speak } = useTTS();
   const params = useLocalSearchParams<{ communityId?: string | string[] }>();
 
   useRequireCompletedOnboarding();
@@ -177,7 +179,12 @@ export default function CommunityCreatePostScreen() {
             <View className="flex-row items-center">
               <Pressable
                 className="mr-3 h-10 w-10 items-center justify-center rounded-full"
-                onPress={() => router.back()}
+                onPress={() => {
+                  speak("Voltar");
+                  router.back();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Voltar"
               >
                 <Ionicons name="arrow-back" size={24} color="#E5E2E1" />
               </Pressable>
@@ -190,8 +197,17 @@ export default function CommunityCreatePostScreen() {
                   ? "bg-[#EAEA00]"
                   : "bg-[#3B3841]"
               }`}
-              onPress={handleSubmit}
+              onPress={() => {
+                speak("Publicar na comunidade");
+                void handleSubmit();
+              }}
               disabled={trimmedBody.length === 0 || submitting}
+              accessibilityRole="button"
+              accessibilityLabel="Publicar na comunidade"
+              accessibilityState={{
+                disabled: trimmedBody.length === 0 || submitting,
+                busy: submitting,
+              }}
             >
               {submitting ? (
                 <ActivityIndicator color="#1D1D00" size="small" />
@@ -227,6 +243,8 @@ export default function CommunityCreatePostScreen() {
                 textAlignVertical="top"
                 value={body}
                 onChangeText={setBody}
+                onFocus={() => speak("Texto da publicação")}
+                accessibilityLabel="Texto da publicação"
               />
               <Text className="mt-2 text-right text-[12px] font-semibold text-[#948EA1]">
                 {body.length} / 600
@@ -241,8 +259,15 @@ export default function CommunityCreatePostScreen() {
 
                 <Pressable
                   className="rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-3"
-                  onPress={handlePickImage}
+                  onPress={() => {
+                    speak(selectedImage ? "Trocar imagem" : "Selecionar imagem");
+                    void handlePickImage();
+                  }}
                   disabled={pickingImage}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    selectedImage ? "Trocar imagem" : "Selecionar imagem"
+                  }
                 >
                   {pickingImage ? (
                     <ActivityIndicator color="#EAEA00" size="small" />
@@ -268,7 +293,14 @@ export default function CommunityCreatePostScreen() {
                     <Text className="flex-1 text-[13px] font-semibold text-[#CAC3D8]">
                       {selectedImage.fileName ?? "Imagem selecionada"}
                     </Text>
-                    <Pressable onPress={() => setSelectedImage(null)}>
+                    <Pressable
+                      onPress={() => {
+                        speak("Imagem removida");
+                        setSelectedImage(null);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Remover imagem"
+                    >
                       <Text className="text-[14px] font-bold text-[#FF8A8A]">Remover</Text>
                     </Pressable>
                   </View>

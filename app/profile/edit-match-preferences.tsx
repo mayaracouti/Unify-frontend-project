@@ -13,6 +13,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { buildOptionToggleSpeech, useTTS } from "../../src/accessibility/tts";
 import {
   ChoiceCard,
   SectionTitle,
@@ -40,6 +41,7 @@ function toggleId(currentIds: number[], id: number): number[] {
 
 export default function EditMatchPreferences() {
   const router = useRouter();
+  const { speak } = useTTS();
   const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
 
   const [options, setOptions] = useState<ProfileOptionsResponse | null>(null);
@@ -66,6 +68,15 @@ export default function EditMatchPreferences() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // Erros da tela precisam ser audiveis assim que aparecem (o toast global ja
+  // fala os seus; este cobre os erros locais sem toast, e a supressao de
+  // duplicata evita fala dupla quando os dois existem).
+  useEffect(() => {
+    if (error) {
+      speak(error);
+    }
+  }, [error, speak]);
 
   const similarityOptions = options?.similarityPreferences.length
     ? options.similarityPreferences
@@ -287,7 +298,10 @@ export default function EditMatchPreferences() {
           <View className="flex-row items-center">
             <Pressable
               className="mr-3 h-10 w-10 items-center justify-center rounded-full"
-              onPress={() => router.replace("/profile")}
+              onPress={() => {
+                speak("Voltar para o seu perfil");
+                router.replace("/profile");
+              }}
               accessibilityRole="button"
               accessibilityLabel="Voltar"
               accessibilityHint="Retorna para o seu perfil"
@@ -350,7 +364,15 @@ export default function EditMatchPreferences() {
                             ? "border-[#7C4DFF] bg-[#7C4DFF]"
                             : "border-[#262626] bg-[#201F1F]"
                         }`}
-                        onPress={() => setDesiredGenderIds(toggleId(desiredGenderIds, option.id))}
+                        onPress={() => {
+                          speak(
+                            buildOptionToggleSpeech(
+                              option,
+                              !desiredGenderIds.includes(option.id)
+                            )
+                          );
+                          setDesiredGenderIds(toggleId(desiredGenderIds, option.id));
+                        }}
                         accessibilityRole="checkbox"
                         accessibilityLabel={option.description}
                         accessibilityHint="Marca ou desmarca este gênero como interesse"
@@ -382,6 +404,7 @@ export default function EditMatchPreferences() {
                       placeholderTextColor="#948EA1"
                       value={minAge}
                       onChangeText={setMinAge}
+                      onFocus={() => speak("Idade mínima")}
                       accessibilityLabel="Idade mínima"
                       accessibilityHint="Idade mínima das pessoas que você deseja encontrar"
                     />
@@ -392,6 +415,7 @@ export default function EditMatchPreferences() {
                       placeholderTextColor="#948EA1"
                       value={maxAge}
                       onChangeText={setMaxAge}
+                      onFocus={() => speak("Idade máxima")}
                       accessibilityLabel="Idade máxima"
                       accessibilityHint="Idade máxima das pessoas que você deseja encontrar"
                     />
@@ -408,6 +432,7 @@ export default function EditMatchPreferences() {
                       placeholderTextColor="#948EA1"
                       value={maxMatchDistanceKm}
                       onChangeText={setMaxMatchDistanceKm}
+                      onFocus={() => speak("Distância máxima em quilômetros")}
                       accessibilityLabel="Distância máxima em quilômetros"
                       accessibilityHint="Distância máxima até a conexão sugerida"
                     />
@@ -434,7 +459,10 @@ export default function EditMatchPreferences() {
                       <Pressable
                         className={`mt-4 h-12 items-center justify-center rounded-xl ${locationStatus === "requesting" ? "bg-[#CFCF62]" : "bg-[#EAEA00]"}`}
                         disabled={locationStatus === "requesting"}
-                        onPress={() => void handleGrantLocationAccess()}
+                        onPress={() => {
+                          speak("Conceder acesso à localização");
+                          void handleGrantLocationAccess();
+                        }}
                         accessibilityRole="button"
                         accessibilityLabel="Habilitar localização"
                         accessibilityHint="Solicita a permissão de localização do aparelho"
@@ -456,7 +484,10 @@ export default function EditMatchPreferences() {
                     {showLocationSettingsButton ? (
                       <Pressable
                         className="mt-4 h-12 items-center justify-center rounded-xl border border-[#5DDB85] bg-[#132519]"
-                        onPress={() => void handleOpenLocationSettings()}
+                        onPress={() => {
+                          speak("Ir para os ajustes do celular");
+                          void handleOpenLocationSettings();
+                        }}
                         accessibilityRole="button"
                         accessibilityLabel="Abrir configurações do celular"
                         accessibilityHint="Isso vai abrir as configurações do sistema, fora do aplicativo"
@@ -528,7 +559,10 @@ export default function EditMatchPreferences() {
             <Pressable
               className={`mt-6 h-14 items-center justify-center rounded-2xl ${saving ? "bg-[#CDCD00]" : "bg-[#EAEA00]"}`}
               disabled={saving}
-              onPress={handleSave}
+              onPress={() => {
+                speak("Salvar preferências de match");
+                void handleSave();
+              }}
               accessibilityRole="button"
               accessibilityLabel={saving ? "Salvando…" : "Salvar preferências"}
               accessibilityHint="Salva suas preferências de match"

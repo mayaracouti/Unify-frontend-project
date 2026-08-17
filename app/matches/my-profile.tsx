@@ -13,6 +13,12 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import {
+  buildOptionToggleSpeech,
+  buildSwitchSpeech,
+  joinSpeechParts,
+  useTTS,
+} from "../../src/accessibility/tts";
 import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { profileService } from "../../src/services/profileService";
@@ -151,6 +157,8 @@ function DiscoveryToggle({
     <Pressable
       className="h-8 w-16 flex-row items-center justify-end rounded-full border-2 pr-0.5"
       onPress={() => onValueChange(!value)}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
       style={{
         alignItems: "center",
         borderColor: DISCOVERY_ACCENT,
@@ -195,6 +203,7 @@ function MultiOptionModal({
   title: string;
   visible: boolean;
 }) {
+  const { speak } = useTTS();
   const [nextOptions, setNextOptions] = useState<string[]>(selectedOptions);
 
   useEffect(() => {
@@ -204,6 +213,7 @@ function MultiOptionModal({
   }, [selectedOptions, visible]);
 
   function toggleOption(option: string) {
+    speak(buildOptionToggleSpeech(option, !nextOptions.includes(option)));
     setNextOptions((currentOptions) =>
       currentOptions.includes(option)
         ? currentOptions.filter((item) => item !== option)
@@ -227,6 +237,9 @@ function MultiOptionModal({
                   key={option}
                   className="mb-3 h-14 flex-row items-center justify-between rounded-[18px] bg-[#1D1F24] px-4"
                   onPress={() => toggleOption(option)}
+                  accessibilityRole="checkbox"
+                  accessibilityLabel={option}
+                  accessibilityState={{ checked: selected }}
                 >
                   <Text className="text-[16px] font-bold text-white">{option}</Text>
                   {selected ? (
@@ -241,9 +254,18 @@ function MultiOptionModal({
             className="mt-2 h-14 items-center justify-center rounded-[18px]"
             style={{ backgroundColor: DISCOVERY_ACCENT }}
             onPress={() => {
+              // Confirma com o conteudo real da selecao (dados de runtime).
+              speak(
+                joinSpeechParts([
+                  "Seleção salva",
+                  nextOptions.length > 0 ? nextOptions.join(", ") : "nenhuma opção",
+                ])
+              );
               onSave(nextOptions);
               onClose();
             }}
+            accessibilityRole="button"
+            accessibilityLabel="Salvar seleção"
           >
             <Text className="text-[16px] font-black text-white">Salvar seleção</Text>
           </Pressable>
@@ -264,6 +286,7 @@ function LocationModal({
   value: string;
   visible: boolean;
 }) {
+  const { speak } = useTTS();
   const [nextValue, setNextValue] = useState(value);
 
   useEffect(() => {
@@ -295,11 +318,14 @@ function LocationModal({
               const trimmedValue = nextValue.trim();
 
               if (trimmedValue) {
+                speak(`Local salvo: ${trimmedValue}`);
                 onSave(trimmedValue);
               }
 
               onClose();
             }}
+            accessibilityRole="button"
+            accessibilityLabel="Salvar local"
           >
             <Text className="text-[16px] font-black text-white">Salvar local</Text>
           </Pressable>
@@ -313,6 +339,7 @@ export default function MatchMyProfile() {
   const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
 
   const router = useRouter();
+  const { speak } = useTTS();
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -372,6 +399,38 @@ export default function MatchMyProfile() {
     };
   }, [canAccessCompletedOnboardingContent]);
 
+  // Sliders: fala o valor final quando o usuario para de arrastar (700 ms sem
+  // mudanca), nunca durante o gesto — evita metralhadora de fala.
+  const sliderSpeechInitializedRef = useRef(false);
+
+  useEffect(() => {
+    if (!sliderSpeechInitializedRef.current) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      speak(`Distância máxima, ${maxDistanceKm} quilômetros`);
+    }, 700);
+
+    return () => clearTimeout(timer);
+  }, [maxDistanceKm, speak]);
+
+  useEffect(() => {
+    if (!sliderSpeechInitializedRef.current) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      speak(`Faixa etária, de ${ageRange[0]} a ${ageRange[1]} anos`);
+    }, 700);
+
+    return () => clearTimeout(timer);
+  }, [ageRange, speak]);
+
+  useEffect(() => {
+    sliderSpeechInitializedRef.current = true;
+  }, []);
+
   const displayName = buildDisplayName(profile);
   const photoUrl = getPrimaryProfilePhotoUrl(profile);
   const interestedInOptions = [
@@ -417,14 +476,24 @@ export default function MatchMyProfile() {
           <View className="flex-row items-center justify-between">
             <Pressable
               className="h-10 w-10 items-center justify-center rounded-full bg-[#17181C]"
-              onPress={() => router.replace("/matches")}
+              onPress={() => {
+                speak("Voltar para Encontros");
+                router.replace("/matches");
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Voltar para encontros"
             >
               <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
             </Pressable>
 
             <Pressable
               className="h-10 w-10 items-center justify-center rounded-full bg-[#17181C]"
-              onPress={() => router.push("/profile/edit-match-preferences")}
+              onPress={() => {
+                speak("Editar preferências de match");
+                router.push("/profile/edit-match-preferences");
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Editar preferências de match"
             >
               <Ionicons name="settings" size={24} color="#E5E2E1" />
             </Pressable>
@@ -455,7 +524,12 @@ export default function MatchMyProfile() {
 
                 <Pressable
                   className="absolute bottom-0 right-0 h-8 w-8 items-center justify-center rounded-full border-[3px] border-black bg-[#2F80ED]"
-                  onPress={() => router.push("/profile")}
+                  onPress={() => {
+                    speak("Alterar foto de perfil");
+                    router.push("/profile");
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Alterar foto de perfil"
                 >
                   <Ionicons name="camera" size={16} color="#FFFFFF" />
                 </Pressable>
@@ -473,7 +547,13 @@ export default function MatchMyProfile() {
 
                 <Pressable
                   className="mt-4 h-12 max-w-[188px] flex-row items-center justify-center rounded-full bg-white px-5"
-                  onPress={() => router.push("/profile/edit")}
+                  onPress={() => {
+                    // Acao sobre o proprio perfil: inclui o nome de runtime.
+                    speak(joinSpeechParts(["Editar perfil", displayName], ", "));
+                    router.push("/profile/edit");
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Editar perfil de ${displayName}`}
                 >
                   <Ionicons name="pencil" size={18} color="#25262A" />
                   <Text
@@ -505,7 +585,18 @@ export default function MatchMyProfile() {
 
               <Pressable
                 className="mt-5 flex-row items-center"
-                onPress={() => setLocationModalOpen(true)}
+                onPress={() => {
+                  // Fala o local atual (dado dinamico) ao abrir a edicao.
+                  speak(
+                    joinSpeechParts(
+                      ["Editar localização", discoveryLocation || null],
+                      ", "
+                    )
+                  );
+                  setLocationModalOpen(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Editar localização, ${discoveryLocationLabel}`}
               >
                 <Ionicons name="location" size={34} color={DISCOVERY_ACCENT} />
                 <Text className="ml-4 text-[22px] font-semibold text-white">
@@ -515,7 +606,12 @@ export default function MatchMyProfile() {
 
               <Pressable
                 className="mt-5"
-                onPress={() => setLocationModalOpen(true)}
+                onPress={() => {
+                  speak("Adicionar novo local");
+                  setLocationModalOpen(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Adicionar novo local"
               >
                 <Text
                   className="text-[18px] font-black"
@@ -557,12 +653,31 @@ export default function MatchMyProfile() {
                 </Text>
                 <DiscoveryToggle
                   value={expandDistance}
-                  onValueChange={setExpandDistance}
+                  onValueChange={(value) => {
+                    speak(buildSwitchSpeech("Mostrar pessoas mais longe", value));
+                    setExpandDistance(value);
+                  }}
                 />
               </View>
             </DiscoveryCard>
 
-            <Pressable onPress={() => setInterestModalOpen(true)}>
+            <Pressable
+              onPress={() => {
+                // Fala a preferencia atual (dados de runtime) antes de abrir.
+                speak(
+                  joinSpeechParts(
+                    [
+                      "Tem interesse em",
+                      interestedIn.length > 0 ? interestedIn.join(", ") : null,
+                    ],
+                    ": "
+                  )
+                );
+                setInterestModalOpen(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Tem interesse em: ${interestedInLabel}`}
+            >
               <DiscoveryCard>
               <Text className="text-[16px] font-black text-white">
                 Tem interesse em
@@ -603,7 +718,15 @@ export default function MatchMyProfile() {
                 </Text>
                 <DiscoveryToggle
                   value={expandAgeRange}
-                  onValueChange={setExpandAgeRange}
+                  onValueChange={(value) => {
+                    speak(
+                      buildSwitchSpeech(
+                        "Mostrar pessoas fora da faixa de idade",
+                        value
+                      )
+                    );
+                    setExpandAgeRange(value);
+                  }}
                 />
               </View>
             </DiscoveryCard>
@@ -611,7 +734,12 @@ export default function MatchMyProfile() {
             <Pressable
               className="h-14 items-center justify-center rounded-[18px]"
               style={{ backgroundColor: DISCOVERY_ACCENT }}
-              onPress={() => setAppliedMessage("Ajustes aplicados nesta sessão.")}
+              onPress={() => {
+                speak("Ajustes aplicados nesta sessão.");
+                setAppliedMessage("Ajustes aplicados nesta sessão.");
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Aplicar ajustes"
             >
               <Text className="text-[16px] font-black text-white">
                 Aplicar ajustes
@@ -625,13 +753,23 @@ export default function MatchMyProfile() {
             ) : null}
 
             <View className="mt-7 gap-3">
-              <Pressable className="h-14 items-center justify-center rounded-[18px] border border-[#7C4DFF] bg-transparent">
+              <Pressable
+                className="h-14 items-center justify-center rounded-[18px] border border-[#7C4DFF] bg-transparent"
+                onPress={() => speak("Desativar perfil")}
+                accessibilityRole="button"
+                accessibilityLabel="Desativar perfil"
+              >
                 <Text className="text-[16px] font-black text-[#CDBDFF]">
                   Desativar perfil
                 </Text>
               </Pressable>
 
-              <Pressable className="h-14 items-center justify-center rounded-[18px] border border-[#FF6B6B] bg-transparent">
+              <Pressable
+                className="h-14 items-center justify-center rounded-[18px] border border-[#FF6B6B] bg-transparent"
+                onPress={() => speak("Apagar perfil")}
+                accessibilityRole="button"
+                accessibilityLabel="Apagar perfil"
+              >
                 <Text className="text-[16px] font-black text-[#FFB4AB]">
                   Apagar perfil
                 </Text>

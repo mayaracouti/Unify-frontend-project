@@ -18,7 +18,7 @@ import { FormField, type FormFieldHandle } from "../../../src/components/ui/form
 import { useAuth } from "../../../src/context/AuthContext";
 import { profileService } from "../../../src/services/profileService";
 import { formatApiErrorMessage } from "../../../src/utils/auth";
-import { speak } from "../../../src/accessibility/screen-reader";
+import { speak } from "../../../src/accessibility/tts";
 
 function validateEmailField(value: string): string | null {
   if (!value.trim()) {
@@ -295,7 +295,10 @@ export default function Login() {
               rightElement={
                 <Pressable
                   className="ml-3 rounded px-2 py-1"
-                  onPress={() => setShowPassword((value) => !value)}
+                  onPress={() => {
+                    speak(showPassword ? "Senha oculta" : "Senha visível");
+                    setShowPassword((value) => !value);
+                  }}
                   accessibilityRole="button"
                   accessibilityLabel={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 >
@@ -318,7 +321,10 @@ export default function Login() {
 
             <Pressable
               className="mb-6 self-end"
-              onPress={() => router.push("/auth/forgot-password")}
+              onPress={() => {
+                speak("Recuperar senha");
+                router.push("/auth/forgot-password");
+              }}
               accessibilityRole="button"
               accessibilityLabel="Esqueci minha senha"
               accessibilityHint="Abre a tela de recuperacao de senha"
@@ -330,7 +336,10 @@ export default function Login() {
 
             <Pressable
               className="mt-1 items-center justify-center rounded-md bg-[#2B1257] py-3.5"
-              onPress={handleLogin}
+              onPress={() => {
+                speak("Entrar");
+                void handleLogin();
+              }}
               disabled={loading}
               accessibilityRole="button"
               accessibilityLabel={loading ? "Entrando…" : "Entrar"}
@@ -361,7 +370,10 @@ export default function Login() {
 
             <Pressable
               className="items-center justify-center rounded-md border border-white/70 py-3.5"
-              onPress={() => router.push("/auth/cadastro")}
+              onPress={() => {
+                speak("Criar uma conta");
+                router.push("/auth/cadastro");
+              }}
               accessibilityRole="button"
               accessibilityLabel="Criar uma conta"
               accessibilityHint="Abre a tela de cadastro"

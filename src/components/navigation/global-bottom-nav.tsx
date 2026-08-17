@@ -2,12 +2,14 @@ import { Pressable, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePathname, useRouter } from "expo-router";
 
+import { joinSpeechParts, useTTS } from "../../accessibility/tts";
 import { useAppShell } from "../../context/AppShellContext";
 import { navigationTabs } from "./navigation-tabs";
 
 export function GlobalBottomNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const { speak } = useTTS();
   const { unseenProfilesCount } = useAppShell();
 
   return (
@@ -25,10 +27,22 @@ export function GlobalBottomNav() {
               key={tab.route}
               className="min-h-[72px] flex-1 items-center justify-center"
               onPress={() => {
+                // O badge e dado dinamico: entra na fala junto com o nome da
+                // aba ("Encontros. 3 novos perfis").
+                speak(
+                  joinSpeechParts([
+                    tab.label,
+                    badgeValue ? `${badgeValue} novos perfis` : null,
+                  ])
+                );
+
                 if (!active) {
                   router.replace(tab.route);
                 }
               }}
+              accessibilityRole="tab"
+              accessibilityLabel={tab.label}
+              accessibilityState={{ selected: active }}
             >
               {active ? (
                 <View className="absolute top-0 h-1 w-full max-w-[90px] bg-[#7C4DFF]" />

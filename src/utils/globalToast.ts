@@ -1,4 +1,4 @@
-import { speak } from "../accessibility/screen-reader";
+import { speak } from "../accessibility/tts";
 
 export type GlobalToastVariant = "error" | "info" | "success" | "warning";
 

@@ -15,6 +15,8 @@ import {
   type TextInputProps,
 } from "react-native";
 
+import { joinSpeechParts, speak } from "../../accessibility/tts";
+
 export type FormFieldValidator = (value: string) => string | null | undefined;
 
 export type FormFieldHandle = {
@@ -127,9 +129,25 @@ export const FormField = forwardRef<FormFieldHandle, FormFieldProps>(
         const message = validator(value) ?? null;
         setLocalError(message);
         onValidate?.(message);
+
+        // Erro de validacao detectado no blur precisa ser audivel na hora.
+        if (message) {
+          speak(message);
+        }
       }
 
       onBlur?.(event);
+    }
+
+    const { onFocus, ...restTextInputProps } = textInputProps;
+
+    function handleFocus(
+      event: Parameters<NonNullable<TextInputProps["onFocus"]>>[0]
+    ) {
+      // Ao focar o campo, fala o rotulo (e a instrucao, se houver) para o
+      // usuario saber o que digitar.
+      speak(joinSpeechParts([label, hint]));
+      onFocus?.(event);
     }
 
     return (
@@ -143,11 +161,12 @@ export const FormField = forwardRef<FormFieldHandle, FormFieldProps>(
             value={value}
             onChangeText={onChangeText}
             onBlur={handleBlur}
+            onFocus={handleFocus}
             accessibilityLabel={label}
             accessibilityHint={hint}
             accessibilityState={{ disabled: Boolean(disabled) }}
             editable={!disabled}
-            {...textInputProps}
+            {...restTextInputProps}
           />
           {rightElement}
         </View>

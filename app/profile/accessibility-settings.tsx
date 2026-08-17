@@ -10,7 +10,12 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { speak } from "../../src/accessibility/screen-reader";
+import {
+  buildOptionToggleSpeech,
+  buildSwitchSpeech,
+  speak,
+  useTTS,
+} from "../../src/accessibility/tts";
 import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-nav";
 import { GlobalTopNav } from "../../src/components/navigation/global-top-nav";
 import { useAccessibility } from "../../src/context/AccessibilityContext";
@@ -30,6 +35,7 @@ const FONT_SCALE_OPTIONS: { value: FontScaleOption; label: string }[] = [
 
 export default function AccessibilitySettings() {
   const { settings, isLoading, updateSettings } = useAccessibility();
+  const { enabled: ttsEnabled, setEnabled: setTtsEnabled } = useTTS();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [savedAt, setSavedAt] = useState(0);
@@ -154,6 +160,33 @@ export default function AccessibilitySettings() {
             </Text>
           ) : null}
 
+          <View className={`${cardClassName} flex-row items-center justify-between`}>
+            <View className="flex-1 pr-4">
+              <Text className={`mb-1 ${titleClassName}`}>Leitura por voz</Text>
+              <Text className={captionClassName}>
+                Ler em voz alta conteúdos e ações ao tocar
+              </Text>
+            </View>
+            <Switch
+              value={ttsEnabled}
+              onValueChange={(value) => {
+                // A preferencia e local (vale antes do login e sem rede) e o
+                // efeito e imediato. `force`: a confirmacao precisa ser audivel
+                // inclusive no instante em que o recurso e desligado.
+                setTtsEnabled(value);
+                speak(buildSwitchSpeech("Leitura por voz", value), {
+                  force: true,
+                });
+              }}
+              trackColor={{ false: "#5F6068", true: "#F2F500" }}
+              thumbColor="#FFFFFF"
+              accessibilityRole="switch"
+              accessibilityLabel="Leitura por voz"
+              accessibilityHint="Lê em voz alta conteúdos e ações conforme você navega"
+              accessibilityState={{ checked: ttsEnabled }}
+            />
+          </View>
+
           <View className={cardClassName}>
             <View className="mb-4 flex-row items-center justify-between">
               <Text className={titleClassName} accessibilityRole="header">
@@ -190,7 +223,15 @@ export default function AccessibilitySettings() {
                           : "border-[#494455] bg-transparent"
                     }`}
                     disabled={saving}
-                    onPress={() => void persist({ fontScale: option.value })}
+                    onPress={() => {
+                      speak(
+                        buildOptionToggleSpeech(
+                          `Tamanho de fonte ${option.label}`,
+                          true
+                        )
+                      );
+                      void persist({ fontScale: option.value });
+                    }}
                     accessibilityRole="radio"
                     accessibilityLabel={`Tamanho de fonte ${option.label}`}
                     accessibilityHint="Ajusta o tamanho do texto em todo o aplicativo"
@@ -233,7 +274,10 @@ export default function AccessibilitySettings() {
             <Switch
               value={settings.highContrast}
               disabled={saving}
-              onValueChange={(value) => void persist({ highContrast: value })}
+              onValueChange={(value) => {
+                speak(buildSwitchSpeech("Alto contraste", value));
+                void persist({ highContrast: value });
+              }}
               trackColor={{ false: "#5F6068", true: "#F2F500" }}
               thumbColor="#FFFFFF"
               accessibilityRole="switch"
@@ -257,13 +301,10 @@ export default function AccessibilitySettings() {
               value={settings.screenReaderOptimized}
               disabled={saving}
               onValueChange={(value) => {
-                // `force`: o singleton global so recebe o novo valor no proximo
-                // efeito do provider, mas o usuario precisa ouvir a confirmacao
-                // no instante em que liga (ou desliga) o recurso.
-                speak(
-                  value ? "Leitor de tela ativado." : "Leitor de tela desativado.",
-                  { force: true }
-                );
+                // A fala do app agora e governada pela "Leitura por voz" acima;
+                // esta preferencia mantem apenas a otimizacao de telas para
+                // leitores de tela (TalkBack/VoiceOver).
+                speak(buildSwitchSpeech("Otimização para leitor de tela", value));
                 void persist({ screenReaderOptimized: value });
               }}
               trackColor={{ false: "#5F6068", true: "#F2F500" }}
@@ -288,7 +329,10 @@ export default function AccessibilitySettings() {
             <Switch
               value={settings.reduceMotion}
               disabled={saving}
-              onValueChange={(value) => void persist({ reduceMotion: value })}
+              onValueChange={(value) => {
+                speak(buildSwitchSpeech("Reduzir movimento", value));
+                void persist({ reduceMotion: value });
+              }}
               trackColor={{ false: "#5F6068", true: "#F2F500" }}
               thumbColor="#FFFFFF"
               accessibilityRole="switch"

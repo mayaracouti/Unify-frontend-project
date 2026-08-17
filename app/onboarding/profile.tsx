@@ -14,6 +14,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useTTS } from "../../src/accessibility/tts";
 import {
   MultiChoice,
   SingleChoice,
@@ -112,6 +113,7 @@ async function requestForegroundLocationPermissionState(): Promise<LocationPermi
 
 export default function ProfileOnboarding() {
   const router = useRouter();
+  const { speak } = useTTS();
   const [options, setOptions] = useState<ProfileOptionsResponse | null>(null);
   const [bio, setBio] = useState("");
   const [genderId, setGenderId] = useState<number | undefined>();
@@ -159,6 +161,13 @@ export default function ProfileOnboarding() {
   );
   const showLocationSettingsButton =
     Platform.OS !== "web" && !hasLocationPermission && !canAskLocationPermissionAgain;
+
+  // Erros da tela precisam ser audiveis assim que aparecem.
+  useEffect(() => {
+    if (error) {
+      speak(error);
+    }
+  }, [error, speak]);
 
   useEffect(() => {
     let active = true;
@@ -352,7 +361,10 @@ export default function ProfileOnboarding() {
           <View className="flex-row items-center">
             <Pressable
               className="mr-3 h-10 w-10 items-center justify-center rounded-full"
-              onPress={() => router.back()}
+              onPress={() => {
+                speak("Voltar");
+                router.back();
+              }}
               accessibilityRole="button"
               accessibilityLabel="Voltar"
               accessibilityHint="Retorna para a tela anterior"
@@ -398,6 +410,7 @@ export default function ProfileOnboarding() {
                 textAlignVertical="top"
                 value={bio}
                 onChangeText={setBio}
+                onFocus={() => speak("Sobre você")}
                 accessibilityLabel="Sobre você"
                 accessibilityHint="Descreva um pouco sobre você, até 500 caracteres"
               />
@@ -481,7 +494,10 @@ export default function ProfileOnboarding() {
                       <Pressable
                         className={`mt-4 h-12 items-center justify-center rounded-xl ${locationStatus === "requesting" ? "bg-[#CFCF62]" : "bg-[#EAEA00]"}`}
                         disabled={locationStatus === "requesting"}
-                        onPress={() => void handleGrantLocationAccess()}
+                        onPress={() => {
+                          speak("Habilitar GPS");
+                          void handleGrantLocationAccess();
+                        }}
                         accessibilityRole="button"
                         accessibilityLabel="Habilitar localização"
                         accessibilityHint="Solicita a permissão de localização do aparelho"
@@ -503,7 +519,10 @@ export default function ProfileOnboarding() {
                     {showLocationSettingsButton ? (
                       <Pressable
                         className="mt-4 h-12 items-center justify-center rounded-xl border border-[#5DDB85] bg-[#132519]"
-                        onPress={() => void handleOpenLocationSettings()}
+                        onPress={() => {
+                          speak("Ir para os ajustes do celular");
+                          void handleOpenLocationSettings();
+                        }}
                         accessibilityRole="button"
                         accessibilityLabel="Abrir configurações do celular"
                         accessibilityHint="Isso vai abrir as configurações do sistema, fora do aplicativo"
@@ -540,7 +559,10 @@ export default function ProfileOnboarding() {
             <Pressable
               className={`h-14 items-center justify-center rounded-lg ${saving ? "bg-[#CDCD00]" : "bg-[#EAEA00]"}`}
               disabled={saving}
-              onPress={handleSave}
+              onPress={() => {
+                speak("Continuar para preferências de match");
+                void handleSave();
+              }}
               accessibilityRole="button"
               accessibilityLabel="Continuar"
               accessibilityHint="Salva seu perfil e segue para as preferências de match"

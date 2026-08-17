@@ -13,6 +13,11 @@ import { useRouter } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import {
+  buildActionSpeech,
+  buildPublicProfileSpeech,
+  useTTS,
+} from "../../src/accessibility/tts";
 import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-nav";
 import { GlobalTopNav } from "../../src/components/navigation/global-top-nav";
 import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
@@ -226,13 +231,16 @@ function ProfileDetailsPanel({
       >
         <View className="absolute bottom-8 left-0 right-0 flex-row items-center justify-center gap-11">
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Recusar ${profile.name}`}
             className="h-[68px] w-[68px] items-center justify-center rounded-full bg-[#26282B]"
             onPress={onReject}
           >
             <Ionicons name="close" size={36} color="#FF2D73" />
           </Pressable>
           <Pressable
-            accessibilityLabel="Dar match"
+            accessibilityRole="button"
+            accessibilityLabel={`Curtir ${profile.name}`}
             className="h-[68px] w-[68px] items-center justify-center rounded-full bg-[#26282B]"
             onPress={onAccept}
           >
@@ -373,6 +381,7 @@ export default function Matches() {
 
   const isFocused = useIsFocused();
   const router = useRouter();
+  const { speak } = useTTS();
   const [queuedProfileIds, setQueuedProfileIds] = useState<string[]>([]);
   const [seenProfileIds, setSeenProfileIds] = useState<string[]>([]);
   const [currentProfile, setCurrentProfile] = useState<MatchProfile | null>(null);
@@ -395,10 +404,12 @@ export default function Matches() {
       return;
     }
 
-    setCurrentPhotoIndex((currentIndex) =>
-      currentIndex === 0 ? totalPhotos - 1 : currentIndex - 1
-    );
-  }, [currentProfile?.photoUrls.length]);
+    setCurrentPhotoIndex((currentIndex) => {
+      const nextIndex = currentIndex === 0 ? totalPhotos - 1 : currentIndex - 1;
+      speak(`Foto ${nextIndex + 1} de ${totalPhotos}`);
+      return nextIndex;
+    });
+  }, [currentProfile?.photoUrls.length, speak]);
 
   const showNextPhotoImage = useCallback(() => {
     const totalPhotos = currentProfile?.photoUrls.length ?? 0;
@@ -407,14 +418,34 @@ export default function Matches() {
       return;
     }
 
-    setCurrentPhotoIndex((currentIndex) =>
-      currentIndex === totalPhotos - 1 ? 0 : currentIndex + 1
-    );
-  }, [currentProfile?.photoUrls.length]);
+    setCurrentPhotoIndex((currentIndex) => {
+      const nextIndex = currentIndex === totalPhotos - 1 ? 0 : currentIndex + 1;
+      speak(`Foto ${nextIndex + 1} de ${totalPhotos}`);
+      return nextIndex;
+    });
+  }, [currentProfile?.photoUrls.length, speak]);
 
   useEffect(() => {
     setCurrentPhotoIndex(0);
   }, [currentProfile?.id]);
+
+  // O perfil visivel muda como resultado direto da interacao (curtir/recusar/
+  // recarregar): fala o conteudo semantico do perfil em exibicao — dado de
+  // runtime vindo do backend, nunca string fixa.
+  const spokenProfileIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isFocused || !currentProfile) {
+      return;
+    }
+
+    if (spokenProfileIdRef.current === currentProfile.id) {
+      return;
+    }
+
+    spokenProfileIdRef.current = currentProfile.id;
+    speak(buildPublicProfileSpeech(currentProfile));
+  }, [currentProfile, isFocused, speak]);
 
   useEffect(() => {
     if (!currentProfile || currentProfile.photoUrls.length === 0) {
@@ -674,11 +705,22 @@ export default function Matches() {
     setDetailsOpen(false);
   }
 
+  function rejectCurrentProfile() {
+    if (!currentProfile || submitting) {
+      return;
+    }
+
+    // Acao sobre entidade dinamica: "Recusar" + nome vindo do backend.
+    speak(buildActionSpeech("Recusar", currentProfile.name));
+    void showNextProfile();
+  }
+
   async function acceptCurrentProfile() {
     if (!currentProfile || submitting) {
       return;
     }
 
+    speak(buildActionSpeech("Curtir", currentProfile.name));
     setSubmitting(true);
 
     try {
@@ -806,16 +848,17 @@ export default function Matches() {
 
               <View className="absolute bottom-8 left-0 right-0 flex-row items-center justify-center gap-11">
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Recusar ${currentProfile.name}`}
                   className="h-[68px] w-[68px] items-center justify-center rounded-full bg-[#26282B]"
                   disabled={submitting}
-                  onPress={() => {
-                    void showNextProfile();
-                  }}
+                  onPress={rejectCurrentProfile}
                 >
                   <Ionicons name="close" size={36} color="#FF2D73" />
                 </Pressable>
                 <Pressable
-                  accessibilityLabel="Dar match"
+                  accessibilityRole="button"
+                  accessibilityLabel={`Curtir ${currentProfile.name}`}
                   className="h-[68px] w-[68px] items-center justify-center rounded-full bg-[#26282B]"
                   disabled={submitting}
                   onPress={acceptCurrentProfile}
@@ -830,9 +873,20 @@ export default function Matches() {
               
               <View className="absolute top-4 left-4 right-4 items-end justify-end">
                   <Pressable
+                    accessibilityRole="button"
                     accessibilityLabel="Ver gostos e preferências"
                     className="h-12 w-36 items-center justify-center rounded-full border border-white/35 bg-black/25"
-                    onPress={() => setDetailsOpen((isOpen) => !isOpen)}
+                    onPress={() => {
+                      speak(
+                        detailsOpen
+                          ? "Fechar detalhes"
+                          : buildActionSpeech(
+                              "Mais detalhes de",
+                              currentProfile.name
+                            )
+                      );
+                      setDetailsOpen((isOpen) => !isOpen);
+                    }}
                   >
                     <View className="flex-row items-center">
                       <Text className="text-[14px] font-semibold text-white">
@@ -851,10 +905,11 @@ export default function Matches() {
                 <ProfileDetailsPanel
                   profile={currentProfile}
                   onAccept={acceptCurrentProfile}
-                  onClose={() => setDetailsOpen(false)}
-                  onReject={() => {
-                    void showNextProfile();
+                  onClose={() => {
+                    speak("Fechar detalhes");
+                    setDetailsOpen(false);
                   }}
+                  onReject={rejectCurrentProfile}
                 />
               ) : null}
             </>

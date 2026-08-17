@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { buildMutualMatchSpeech, useTTS } from "../../src/accessibility/tts";
 import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-nav";
 import { GlobalTopNav } from "../../src/components/navigation/global-top-nav";
 import {
@@ -123,11 +124,18 @@ function MutualMatchCard({
   authToken: string | null;
   match: MutualMatchSummaryResponse;
 }) {
+  const { speak } = useTTS();
   const imageUrl = profileService.resolveProfileImageUrl(match.profilePicture?.url);
   const displayName = match.fullName?.trim() || "Pessoa sem nome";
 
   return (
-    <View className="rounded-[28px] border border-[#353534] bg-[#111214] p-5">
+    <Pressable
+      className="rounded-[28px] border border-[#353534] bg-[#111214] p-5"
+      accessibilityRole="button"
+      accessibilityLabel={displayName}
+      // Toque no card fala o match (nome e idade vindos do backend).
+      onPress={() => speak(buildMutualMatchSpeech(match) ?? displayName)}
+    >
       <View className="flex-row items-center gap-4">
         <View className="h-20 w-20 overflow-hidden rounded-[24px] border border-[#CDBDFF] bg-[#2D2A33]">
           {imageUrl ? (
@@ -181,13 +189,14 @@ function MutualMatchCard({
         <View className="absolute top-14 right-6">
             <Ionicons name="chatbubble-ellipses" size={24} color="#E5E2E1" />
         </View>
-    </View>
+    </Pressable>
   );
 }
 
 export default function MutualMatchesScreen() {
   const router = useRouter();
   const isFocused = useIsFocused();
+  const { speak } = useTTS();
   const { session } = useAuth();
   const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
   const {
@@ -339,7 +348,11 @@ export default function MutualMatchesScreen() {
         <View className="flex-1 px-6 pt-6">
             <Pressable
               className="h-12 items-center flex flex-row justify-start"
-              onPress={() => router.replace("/matches")}
+              onPress={() => {
+                speak("Voltar para Encontros");
+                router.replace("/matches");
+              }}
+              accessibilityRole="button"
               accessibilityLabel="Voltar para encontros">
               <Ionicons name="arrow-back" size={22} color="#E5E2E1" />
               <Text className="color-slate-100 ml-2">Voltar para Encontros</Text>
@@ -419,9 +432,13 @@ export default function MutualMatchesScreen() {
                 <Pressable
                   className="mt-6 items-center justify-center rounded-[24px] border border-[#3A3246] bg-[#17181C] px-5 py-4"
                   onPress={() => {
+                    speak("Carregar mais matches");
                     void handleLoadMore();
                   }}
                   disabled={loadingMore}
+                  accessibilityRole="button"
+                  accessibilityLabel="Carregar mais matches"
+                  accessibilityState={{ disabled: loadingMore, busy: loadingMore }}
                 >
                   {loadingMore ? (
                     <ActivityIndicator color="#EAEA00" size="small" />

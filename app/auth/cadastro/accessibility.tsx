@@ -14,7 +14,12 @@ import { useRouter } from "expo-router";
 import { useAccessibility } from "../../../src/context/AccessibilityContext";
 import type { FontScaleOption } from "../../../src/types/accessibility";
 import { formatApiErrorMessage } from "../../../src/utils/auth";
-import { speak } from "../../../src/accessibility/screen-reader";
+import {
+  buildOptionToggleSpeech,
+  buildSwitchSpeech,
+  speak,
+  useTTS,
+} from "../../../src/accessibility/tts";
 
 const FONT_SCALE_OPTIONS: Array<{
   value: FontScaleOption;
@@ -30,6 +35,7 @@ const FONT_SCALE_OPTIONS: Array<{
 export default function CadastroAccessibility() {
   const router = useRouter();
   const { settings, updateSettings } = useAccessibility();
+  const { enabled: ttsEnabled, setEnabled: setTtsEnabled } = useTTS();
 
   const [fontScale, setFontScale] = useState<FontScaleOption>(settings.fontScale);
   const [highContrast, setHighContrast] = useState(settings.highContrast);
@@ -55,6 +61,7 @@ export default function CadastroAccessibility() {
 
   async function handleSavePreferences() {
     try {
+      speak("Salvar e continuar");
       setLoading(true);
       setError("");
 
@@ -91,7 +98,10 @@ export default function CadastroAccessibility() {
           <View className="flex-row items-center">
             <Pressable
               className="mr-5 h-12 w-12 items-center justify-center rounded-full bg-white/8"
-              onPress={() => router.back()}
+              onPress={() => {
+                speak("Voltar");
+                router.back();
+              }}
               accessibilityRole="button"
               accessibilityLabel="Voltar"
               accessibilityHint="Retorna para a tela anterior"
@@ -209,7 +219,15 @@ export default function CadastroAccessibility() {
                       <Pressable
                         key={option.value}
                         className="h-8 w-8 items-center justify-center"
-                        onPress={() => setFontScale(option.value)}
+                        onPress={() => {
+                          speak(
+                            buildOptionToggleSpeech(
+                              `Tamanho de fonte ${option.label}`,
+                              true
+                            )
+                          );
+                          setFontScale(option.value);
+                        }}
                         accessibilityRole="radio"
                         accessibilityLabel={`Tamanho de fonte ${option.label}`}
                         accessibilityHint="Ajusta o tamanho do texto em todo o aplicativo"
@@ -246,7 +264,15 @@ export default function CadastroAccessibility() {
                 return (
                   <Pressable
                     key={option.value}
-                    onPress={() => setFontScale(option.value)}
+                    onPress={() => {
+                          speak(
+                            buildOptionToggleSpeech(
+                              `Tamanho de fonte ${option.label}`,
+                              true
+                            )
+                          );
+                          setFontScale(option.value);
+                        }}
                     accessibilityRole="radio"
                     accessibilityLabel={`Tamanho de fonte ${option.label}`}
                     accessibilityHint="Ajusta o tamanho do texto em todo o aplicativo"
@@ -294,6 +320,48 @@ export default function CadastroAccessibility() {
                   highContrast ? "text-hc-text" : "text-white"
                 }`}
               >
+                Leitura por Voz
+              </Text>
+              <Text
+                className={`text-[12px] font-semibold ${
+                  highContrast ? "text-hc-text" : "text-[#A9A9B2]"
+                }`}
+              >
+                Ler em voz alta conteúdos e ações ao tocar
+              </Text>
+            </View>
+            <Switch
+              value={ttsEnabled}
+              onValueChange={(value) => {
+                // Efeito imediato e persistido localmente (nao depende do
+                // submit deste formulario nem de estar autenticado).
+                setTtsEnabled(value);
+                speak(buildSwitchSpeech("Leitura por voz", value), {
+                  force: true,
+                });
+              }}
+              trackColor={{ false: "#5F6068", true: "#F2F500" }}
+              thumbColor="#FFFFFF"
+              accessibilityRole="switch"
+              accessibilityLabel="Leitura por voz"
+              accessibilityHint="Lê em voz alta conteúdos e ações conforme você navega"
+              accessibilityState={{ checked: ttsEnabled }}
+            />
+          </View>
+
+          <View
+            className={`mb-4 flex-row items-center justify-between rounded-md border p-4 ${
+              highContrast
+                ? "border-hc-border bg-hc-surface"
+                : "border-[#5A5A61] bg-[#19191C]"
+            }`}
+          >
+            <View className="flex-1 pr-4">
+              <Text
+                className={`mb-1 text-[17px] font-extrabold ${
+                  highContrast ? "text-hc-text" : "text-white"
+                }`}
+              >
                 Alto Contraste
               </Text>
               <Text
@@ -306,7 +374,10 @@ export default function CadastroAccessibility() {
             </View>
             <Switch
               value={highContrast}
-              onValueChange={setHighContrast}
+              onValueChange={(value) => {
+                speak(buildSwitchSpeech("Alto contraste", value));
+                setHighContrast(value);
+              }}
               trackColor={{ false: "#5F6068", true: "#F2F500" }}
               thumbColor="#FFFFFF"
               accessibilityRole="switch"
@@ -341,7 +412,10 @@ export default function CadastroAccessibility() {
             </View>
             <Switch
               value={screenReaderOptimized}
-              onValueChange={setScreenReaderOptimized}
+              onValueChange={(value) => {
+                speak(buildSwitchSpeech("Otimização para leitor de tela", value));
+                setScreenReaderOptimized(value);
+              }}
               trackColor={{ false: "#5F6068", true: "#F2F500" }}
               thumbColor="#FFFFFF"
               accessibilityRole="switch"
@@ -376,7 +450,10 @@ export default function CadastroAccessibility() {
             </View>
             <Switch
               value={reduceMotion}
-              onValueChange={setReduceMotion}
+              onValueChange={(value) => {
+                speak(buildSwitchSpeech("Reduzir movimento", value));
+                setReduceMotion(value);
+              }}
               trackColor={{ false: "#5F6068", true: "#F2F500" }}
               thumbColor="#FFFFFF"
               accessibilityRole="switch"

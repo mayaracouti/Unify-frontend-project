@@ -12,6 +12,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useTTS } from "../../src/accessibility/tts";
 import {
   MultiChoice,
   SingleChoice,
@@ -40,6 +41,7 @@ function toggleId(currentIds: number[], id: number): number[] {
 
 export default function EditProfile() {
   const router = useRouter();
+  const { speak } = useTTS();
   const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
 
   const [options, setOptions] = useState<ProfileOptionsResponse | null>(null);
@@ -65,6 +67,13 @@ export default function EditProfile() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const bioFieldRef = useRef<FormFieldHandle>(null);
+
+  // Erros da tela precisam ser audiveis assim que aparecem.
+  useEffect(() => {
+    if (error) {
+      speak(error);
+    }
+  }, [error, speak]);
 
   const hasPronounOptions = (options?.pronouns.length ?? 0) > 0;
   const hasLoveLanguageOptions = (options?.loveLanguages.length ?? 0) > 0;
@@ -287,7 +296,10 @@ export default function EditProfile() {
           <View className="flex-row items-center">
             <Pressable
               className="mr-3 h-10 w-10 items-center justify-center rounded-full"
-              onPress={() => router.replace("/profile")}
+              onPress={() => {
+                speak("Voltar para o seu perfil");
+                router.replace("/profile");
+              }}
               accessibilityRole="button"
               accessibilityLabel="Voltar"
               accessibilityHint="Retorna para o seu perfil"
@@ -412,7 +424,10 @@ export default function EditProfile() {
                         <Pressable
                           className={`mt-4 h-12 items-center justify-center rounded-xl ${locationStatus === "requesting" ? "bg-[#CFCF62]" : "bg-[#EAEA00]"}`}
                           disabled={locationStatus === "requesting"}
-                          onPress={() => void handleGrantLocationAccess()}
+                          onPress={() => {
+                            speak("Habilitar GPS");
+                            void handleGrantLocationAccess();
+                          }}
                           accessibilityRole="button"
                           accessibilityLabel="Habilitar localização"
                           accessibilityHint="Solicita a permissão de localização do aparelho"
@@ -434,7 +449,10 @@ export default function EditProfile() {
                       {showLocationSettingsButton ? (
                         <Pressable
                           className="mt-4 h-12 items-center justify-center rounded-xl border border-[#5DDB85] bg-[#132519]"
-                          onPress={() => void handleOpenLocationSettings()}
+                          onPress={() => {
+                            speak("Ir para os ajustes do celular");
+                            void handleOpenLocationSettings();
+                          }}
                           accessibilityRole="button"
                           accessibilityLabel="Abrir configurações do celular"
                           accessibilityHint="Isso vai abrir as configurações do sistema, fora do aplicativo"
@@ -472,7 +490,10 @@ export default function EditProfile() {
             <Pressable
               className={`mt-6 h-14 items-center justify-center rounded-2xl ${saving ? "bg-[#CDCD00]" : "bg-[#EAEA00]"}`}
               disabled={saving}
-              onPress={handleSave}
+              onPress={() => {
+                speak("Salvar alterações do perfil");
+                void handleSave();
+              }}
               accessibilityRole="button"
               accessibilityLabel={saving ? "Salvando…" : "Salvar alterações"}
               accessibilityHint="Salva as alterações feitas no seu perfil"

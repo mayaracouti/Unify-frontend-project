@@ -16,6 +16,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
+  buildActionSpeech,
+  buildCommunityMemberSpeech,
+  buildCommunityPostSpeech,
+  buildCommunitySpeech,
+  useTTS,
+} from "../../src/accessibility/tts";
+import {
   CommunityRoleBadge,
   canModerateRole,
   formatMemberCount,
@@ -535,10 +542,18 @@ function CommunityPostCard({
   onToggleLike: () => void;
   post: CommunityPostResponse;
 }) {
+  const { speak } = useTTS();
   const mediaUrl = communityService.resolveAssetUrl(post.mediaData);
 
   return (
-    <View className="rounded-xl bg-[#2A2A2A] p-4">
+    <Pressable
+      className="rounded-xl bg-[#2A2A2A] p-4"
+      // O card e o dono da fala da publicacao: toque le autor, corpo e
+      // contadores reais vindos do backend.
+      onPress={() => speak(buildCommunityPostSpeech(post))}
+      accessibilityRole="button"
+      accessibilityLabel={`Publicação de ${post.author.name}`}
+    >
       <View className="flex-row items-start gap-3">
         <AuthorAvatar
           authToken={authToken}
@@ -616,7 +631,7 @@ function CommunityPostCard({
           onPress={onOpenComments}
         />
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -657,6 +672,7 @@ function CommunityContentTabs({
   memberCount?: number | null;
   onChange: (tab: CommunityViewTab) => void;
 }) {
+  const { speak } = useTTS();
   const membersLabel =
     typeof memberCount === "number"
       ? `Membros (${memberCount.toLocaleString("pt-BR")})`
@@ -677,8 +693,14 @@ function CommunityContentTabs({
               className={`flex-1 flex-row items-center justify-center gap-2 rounded-xl px-4 py-3 ${
                 isActive ? "bg-[#7C4DFF]" : "bg-transparent"
               }`}
-              accessibilityRole="button"
-              onPress={() => onChange(tab.key as CommunityViewTab)}
+              accessibilityRole="tab"
+              accessibilityLabel={tab.label}
+              accessibilityState={{ selected: isActive }}
+              onPress={() => {
+                // O rotulo inclui a contagem real de membros do backend.
+                speak(tab.label);
+                onChange(tab.key as CommunityViewTab);
+              }}
             >
               <Ionicons
                 name={tab.icon as ComponentProps<typeof Ionicons>["name"]}
@@ -713,8 +735,16 @@ function CommunityMemberCard({
   member: CommunityMemberResponse;
   onManageRole: () => void;
 }) {
+  const { speak } = useTTS();
+
   return (
-    <View className="rounded-2xl border border-[#353534] bg-[#17181C] p-4">
+    <Pressable
+      className="rounded-2xl border border-[#353534] bg-[#17181C] p-4"
+      // Toque no membro fala nome e papel reais vindos do backend.
+      onPress={() => speak(buildCommunityMemberSpeech(member))}
+      accessibilityRole="button"
+      accessibilityLabel={member.name}
+    >
       <View className="flex-row items-center gap-3">
         <AuthorAvatar
           authToken={authToken}
@@ -741,7 +771,11 @@ function CommunityMemberCard({
           <Pressable
             className="rounded-full border border-[#46708A] bg-[#16232C] px-4 py-3"
             accessibilityRole="button"
-            onPress={onManageRole}
+            accessibilityLabel={`Gerenciar cargo de ${member.name}`}
+            onPress={() => {
+              speak(buildActionSpeech("Gerenciar cargo de", member.name));
+              onManageRole();
+            }}
           >
             <View className="flex-row items-center gap-2">
               <Ionicons name="shield-checkmark-outline" size={16} color="#9FD9FF" />
@@ -750,7 +784,7 @@ function CommunityMemberCard({
           </Pressable>
         ) : null}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -768,6 +802,7 @@ export default function CommunityDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ communityId?: string | string[]; tab?: string | string[] }>();
   const isFocused = useIsFocused();
+  const { speak } = useTTS();
   const { session } = useAuth();
   const { currentUserId, currentUserProfileId } = useAppShell();
 
@@ -794,10 +829,28 @@ export default function CommunityDetailScreen() {
   const [pendingLikePostId, setPendingLikePostId] = useState<string | null>(null);
   const [pendingDeletePostId, setPendingDeletePostId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const spokenCommunityIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setActiveTab(requestedTab);
   }, [requestedTab]);
+
+  // Abrir a comunidade (inclusive por deep link) anuncia o conteudo semantico
+  // real dela uma unica vez por comunidade carregada.
+  useEffect(() => {
+    const loadedCommunity = feed?.community;
+
+    if (!isFocused || !loadedCommunity) {
+      return;
+    }
+
+    if (spokenCommunityIdRef.current === loadedCommunity.id) {
+      return;
+    }
+
+    spokenCommunityIdRef.current = loadedCommunity.id;
+    speak(buildCommunitySpeech(loadedCommunity));
+  }, [feed?.community, isFocused, speak]);
 
   useEffect(() => {
     initialLoadRef.current = false;
@@ -938,6 +991,13 @@ export default function CommunityDetailScreen() {
       return;
     }
 
+    // Acao sobre entidade dinamica: inclui o nome real da comunidade.
+    speak(
+      buildActionSpeech(
+        feed.community.isMember ? "Sair da comunidade" : "Participar da comunidade",
+        feed.community.name
+      )
+    );
     setMembershipBusy(true);
 
     try {
@@ -963,7 +1023,7 @@ export default function CommunityDetailScreen() {
     } finally {
       setMembershipBusy(false);
     }
-  }, [activeTab, feed?.community, loadMembers, membershipBusy, requestedCommunityId]);
+  }, [activeTab, feed?.community, loadMembers, membershipBusy, requestedCommunityId, speak]);
 
   const handleToggleLike = useCallback(
     async (post: CommunityPostResponse) => {
@@ -980,6 +1040,14 @@ export default function CommunityDetailScreen() {
         return;
       }
 
+      speak(
+        buildActionSpeech(
+          post.likedByCurrentUser
+            ? "Remover curtida da publicação de"
+            : "Curtir publicação de",
+          post.author.name
+        )
+      );
       setPendingLikePostId(post.id);
 
       try {
@@ -994,7 +1062,7 @@ export default function CommunityDetailScreen() {
         setPendingLikePostId(null);
       }
     },
-    [feed?.community, pendingLikePostId]
+    [feed?.community, pendingLikePostId, speak]
   );
 
   const canDeletePost = useCallback(
@@ -1084,6 +1152,7 @@ export default function CommunityDetailScreen() {
 
   const handleDeletePost = useCallback(
     (post: CommunityPostResponse) => {
+      speak(buildActionSpeech("Excluir publicação de", post.author.name));
       Alert.alert(
         "Excluir publicação",
         "Essa ação remove a publicação da comunidade. Deseja continuar?",
@@ -1099,7 +1168,7 @@ export default function CommunityDetailScreen() {
         ]
       );
     },
-    [confirmDeletePost]
+    [confirmDeletePost, speak]
   );
 
   // Excluir/sair da comunidade migrou para `app/community/settings.tsx`
@@ -1112,11 +1181,17 @@ export default function CommunityDetailScreen() {
       return;
     }
 
+    speak(
+      buildActionSpeech(
+        "Configurações da comunidade",
+        feed?.community?.name ?? null
+      )
+    );
     router.push({
       pathname: "/community/settings",
       params: { communityId },
     });
-  }, [feed?.community?.id, requestedCommunityId, router]);
+  }, [feed?.community?.id, feed?.community?.name, requestedCommunityId, router, speak]);
 
   const handleOpenComments = useCallback(
     (post: CommunityPostResponse) => {
@@ -1124,6 +1199,7 @@ export default function CommunityDetailScreen() {
         return;
       }
 
+      speak(buildActionSpeech("Abrir comentários da publicação de", post.author.name));
       router.push({
         pathname: "/community/comments",
         params: {
@@ -1138,7 +1214,7 @@ export default function CommunityDetailScreen() {
         },
       });
     },
-    [feed?.community, router]
+    [feed?.community, router, speak]
   );
 
   const handleOpenCreatePost = useCallback(() => {
@@ -1155,13 +1231,14 @@ export default function CommunityDetailScreen() {
       return;
     }
 
+    speak(buildActionSpeech("Criar publicação em", feed.community.name));
     router.push({
       pathname: "/community/create",
       params: {
         communityId: feed.community.id,
       },
     });
-  }, [feed?.community, router]);
+  }, [feed?.community, router, speak]);
 
   const handleManageMember = useCallback(
     (member: CommunityMemberResponse) => {
@@ -1229,7 +1306,12 @@ export default function CommunityDetailScreen() {
               <View>
                 <Pressable
                   className="self-start w-full border-[#494455] bg-[#1A1C1F] px-4 py-3"
-                  onPress={() => router.replace("/community")}
+                  onPress={() => {
+                    speak("Voltar para comunidades");
+                    router.replace("/community");
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Voltar para comunidades"
                 >
                   <View className="flex-row items-center gap-2">
                     <Ionicons name="arrow-back" size={16} color="#E5E2E1" />

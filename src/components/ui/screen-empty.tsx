@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 
+import { useTTS } from "../../accessibility/tts";
+
 export type ScreenEmptyAction = {
   label: string;
   onPress: () => void;
@@ -30,6 +32,8 @@ export function ScreenEmpty({
   icon,
   className,
 }: ScreenEmptyProps) {
+  const { speak } = useTTS();
+
   return (
     <View
       className={
@@ -54,7 +58,10 @@ export function ScreenEmpty({
       {action ? (
         <Pressable
           className="mt-6 rounded-full bg-accent px-6 py-3"
-          onPress={action.onPress}
+          onPress={() => {
+            speak(action.label);
+            action.onPress();
+          }}
           accessibilityRole="button"
           accessibilityLabel={action.label}
           accessibilityHint={action.accessibilityHint}

@@ -6,6 +6,7 @@ import { Platform, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { applyGlobalTextAdjustmentsPatch } from "../src/accessibility/global-text-adjustments";
+import { TtsProvider, useTTS } from "../src/accessibility/tts";
 import { AuthLoadingScreen } from "../src/components/ui/auth-loading-screen";
 import { GlobalToastViewport } from "../src/components/ui/global-toast-viewport";
 import {
@@ -24,13 +25,30 @@ function NavigationGuard() {
   const segments = useSegments();
   const navigationState = useRootNavigationState();
   const { isAuthenticated, isReady, pendingVerificationEmail } = useAuth();
+  const { isReady: isTtsReady, onboardingCompleted } = useTTS();
 
   useEffect(() => {
-    if (!navigationState?.key || !isReady) {
+    if (!navigationState?.key || !isReady || !isTtsReady) {
       return;
     }
 
     const routePath = segments.join("/");
+    const isAccessibilityOnboardingRoute = routePath === "accessibility-onboarding";
+
+    // Primeiro launch: o onboarding de acessibilidade (TTS ligado por padrao)
+    // precisa acontecer ANTES de qualquer outra tela, autenticado ou nao.
+    if (!onboardingCompleted) {
+      if (!isAccessibilityOnboardingRoute) {
+        router.replace("/accessibility-onboarding");
+      }
+      return;
+    }
+
+    if (isAccessibilityOnboardingRoute) {
+      router.replace("/");
+      return;
+    }
+
     const isIndexRoute = routePath.length === 0 || routePath === "index";
     const isAuthRoute = routePath.startsWith("auth");
     const isVerificationRoute = routePath === "auth/email-code";
@@ -66,7 +84,9 @@ function NavigationGuard() {
   }, [
     isAuthenticated,
     isReady,
+    isTtsReady,
     navigationState?.key,
+    onboardingCompleted,
     pendingVerificationEmail,
     router,
     segments,
@@ -78,6 +98,7 @@ function NavigationGuard() {
 function RootNavigator() {
   const navigationState = useRootNavigationState();
   const { isReady } = useAuth();
+  const { isReady: isTtsReady } = useTTS();
   const { settings } = useAccessibility();
 
   // Em alto contraste o fundo raiz vira preto puro: combinado com o mapeamento
@@ -86,7 +107,7 @@ function RootNavigator() {
   const backgroundColor = settings.highContrast ? "#000000" : "#201233";
   const reduceMotion = settings.reduceMotion;
 
-  if (!navigationState?.key || !isReady) {
+  if (!navigationState?.key || !isReady || !isTtsReady) {
     return <AuthLoadingScreen />;
   }
 
@@ -110,14 +131,16 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <AccessibilityProvider>
-          <AppShellProvider>
-            <RootNavigator />
-          </AppShellProvider>
-        </AccessibilityProvider>
-        <GlobalToastViewport />
-      </AuthProvider>
+      <TtsProvider>
+        <AuthProvider>
+          <AccessibilityProvider>
+            <AppShellProvider>
+              <RootNavigator />
+            </AppShellProvider>
+          </AccessibilityProvider>
+          <GlobalToastViewport />
+        </AuthProvider>
+      </TtsProvider>
     </SafeAreaProvider>
   );
 }

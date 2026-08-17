@@ -20,7 +20,7 @@ import { FormField, type FormFieldHandle } from "../../../src/components/ui/form
 import { useAuth } from "../../../src/context/AuthContext";
 import { formatApiErrorMessage } from "../../../src/utils/auth";
 import { isApiError } from "../../../src/types/auth";
-import { speak } from "../../../src/accessibility/screen-reader";
+import { speak } from "../../../src/accessibility/tts";
 
 const UNDERAGE_SIGNUP_ERROR_CODE = 3008;
 
@@ -339,7 +339,15 @@ export default function Cadastro() {
 
           <Pressable
             className="mb-4 flex-row items-center border-b border-white/35 bg-black/24 px-4 py-4"
-            onPress={() => setShowBirthdatePicker((currentValue) => !currentValue)}
+            onPress={() => {
+              // Fala a data ja escolhida (dado dinamico) ao abrir o seletor.
+              speak(
+                birthdate
+                  ? `Data de nascimento: ${formatBirthdateForDisplay(birthdate)}`
+                  : "Selecionar data de nascimento"
+              );
+              setShowBirthdatePicker((currentValue) => !currentValue);
+            }}
             accessibilityRole="button"
             accessibilityLabel={
               birthdate
@@ -395,7 +403,10 @@ export default function Cadastro() {
             disabled={loading}
             rightElement={
               <Pressable
-                onPress={() => setShowPassword((value) => !value)}
+                onPress={() => {
+                  speak(showPassword ? "Senha oculta" : "Senha visível");
+                  setShowPassword((value) => !value);
+                }}
                 accessibilityRole="button"
                 accessibilityLabel={showPassword ? "Ocultar senha" : "Mostrar senha"}
               >
@@ -448,7 +459,10 @@ export default function Cadastro() {
               loading ? "bg-[#BFC200]" : "bg-[#F2F500]"
             }`}
             disabled={loading}
-            onPress={handleCreateAccount}
+            onPress={() => {
+              speak("Cadastrar");
+              void handleCreateAccount();
+            }}
             accessibilityRole="button"
             accessibilityLabel={loading ? "Cadastrando…" : "Cadastrar"}
             accessibilityState={{ disabled: loading, busy: loading }}
@@ -464,7 +478,10 @@ export default function Cadastro() {
 
           <Pressable
             className="items-center justify-center rounded-md border border-white/35 py-3"
-            onPress={() => router.replace("/auth/login")}
+            onPress={() => {
+              speak("Voltar para o login");
+              router.replace("/auth/login");
+            }}
             accessibilityRole="button"
             accessibilityLabel="Voltar para o login"
             accessibilityHint="Retorna para a tela de login"

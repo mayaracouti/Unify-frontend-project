@@ -12,6 +12,7 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useTTS } from "../../src/accessibility/tts";
 import { CommunityDirectoryCard } from "../../src/components/community/community-card";
 import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-nav";
 import { GlobalTopNav } from "../../src/components/navigation/global-top-nav";
@@ -76,6 +77,7 @@ function collectDirectoryAssetUrls(directory: CommunityDirectoryResponse) {
 export default function MyCommunitiesScreen() {
   const router = useRouter();
   const isFocused = useIsFocused();
+  const { speak } = useTTS();
   const { session } = useAuth();
 
   const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
@@ -261,7 +263,10 @@ export default function MyCommunitiesScreen() {
 
                   <Pressable
                     className="rounded-full border border-[#3A3246] bg-[#17181C] px-4 py-3"
-                    onPress={() => router.push("/community")}
+                    onPress={() => {
+                      speak("Explorar comunidades");
+                      router.push("/community");
+                    }}
                     accessibilityRole="button"
                     accessibilityLabel="Explorar comunidades"
                     accessibilityHint="Abre a lista com todas as comunidades disponíveis"
@@ -323,6 +328,7 @@ export default function MyCommunitiesScreen() {
                 <Pressable
                   className="mt-2 items-center justify-center rounded-[24px] border border-[#3A3246] bg-[#17181C] px-5 py-2"
                   onPress={() => {
+                    speak("Carregar mais comunidades");
                     void handleLoadMore();
                   }}
                   disabled={loadingMore}

@@ -1,8 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import { useTTS } from "../../src/accessibility/tts";
 
 import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
 import { useAppShell } from "../../src/context/AppShellContext";
@@ -77,6 +80,15 @@ export default function MatchSuccess() {
   const matchedInitial = matchedName.charAt(0).toUpperCase();
   const matchedPhoto = typeof photo === "string" && photo.trim() ? photo.trim() : null;
   const authToken = session?.accessToken ?? null;
+  const { speak } = useTTS();
+
+  // Evento deliberado de acessibilidade: o resultado do match (com o nome
+  // vindo do fluxo de descoberta) e anunciado assim que a tela abre.
+  useEffect(() => {
+    speak(
+      `Deu match! Você e ${matchedName} demonstraram interesse mútuo.`
+    );
+  }, [matchedName, speak]);
 
   return (
     <LinearGradient
@@ -127,7 +139,14 @@ export default function MatchSuccess() {
           </Text>
 
           <View className="mb-4 mt-10 w-full max-w-[320px] gap-4">
-            <Pressable className="h-[58px] w-full flex-row items-center justify-center rounded-[14px] border-b-[5px] border-[#494900] bg-[#EAEA00]">
+            <Pressable
+              className="h-[58px] w-full flex-row items-center justify-center rounded-[14px] border-b-[5px] border-[#494900] bg-[#EAEA00]"
+              onPress={() =>
+                speak(`Iniciar conversa com ${matchedName}. Em breve.`)
+              }
+              accessibilityRole="button"
+              accessibilityLabel={`Iniciar conversa com ${matchedName}`}
+            >
               <Ionicons name="chatbox" size={24} color="#686800" />
               <Text className="ml-3 text-[20px] font-black text-[#686800]">
                 Iniciar Conversa
@@ -136,7 +155,12 @@ export default function MatchSuccess() {
 
             <Pressable
               className="h-[58px] w-full items-center justify-center rounded-[14px] border-[2px] border-[#948EA1] bg-transparent"
-              onPress={() => router.replace("/matches")}
+              onPress={() => {
+                speak("Continuar navegando");
+                router.replace("/matches");
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Continuar navegando"
             >
               <Text className="text-[20px] font-black text-[#E5E2E1]">
                 Continuar Navegando

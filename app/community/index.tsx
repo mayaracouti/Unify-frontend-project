@@ -13,6 +13,7 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useTTS } from "../../src/accessibility/tts";
 import { CommunityCategoryChips } from "../../src/components/community/category-chips";
 import { CommunityDirectoryCard } from "../../src/components/community/community-card";
 import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-nav";
@@ -119,6 +120,7 @@ function SearchEmptyState({ searchQuery }: { searchQuery: string }) {
 export default function CommunityDirectoryScreen() {
   const router = useRouter();
   const isFocused = useIsFocused();
+  const { speak } = useTTS();
   const { session } = useAuth();
 
   const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
@@ -199,6 +201,16 @@ export default function CommunityDirectoryScreen() {
 
         setDirectory(response);
 
+        // Resultado de busca e conteudo dinamico: anuncia a contagem real
+        // retornada pelo backend quando o usuario pesquisou algo.
+        if (deferredSearchQuery) {
+          speak(
+            response.totalElements > 0
+              ? `${response.totalElements} comunidades encontradas para ${deferredSearchQuery}`
+              : `Nenhuma comunidade encontrada para ${deferredSearchQuery}`
+          );
+        }
+
         const assetUrls = collectDirectoryAssetUrls(response);
 
         if (assetUrls.length > 0) {
@@ -229,6 +241,7 @@ export default function CommunityDirectoryScreen() {
     deferredSearchQuery,
     isFocused,
     selectedCategoryId,
+    speak,
   ]);
 
   const handleRefresh = async () => {
@@ -373,7 +386,10 @@ export default function CommunityDirectoryScreen() {
 
                   <Pressable
                     className="rounded-full border border-[#3A3246] bg-[#17181C] px-4 py-3"
-                    onPress={() => router.push("/community/mine")}
+                    onPress={() => {
+                      speak("Minhas comunidades");
+                      router.push("/community/mine");
+                    }}
                     accessibilityRole="button"
                     accessibilityLabel="Minhas comunidades"
                     accessibilityHint="Abre a lista das comunidades das quais você participa"
@@ -398,7 +414,12 @@ export default function CommunityDirectoryScreen() {
                     {searchQuery.trim().length > 0 ? (
                       <Pressable
                         className="h-8 w-8 items-center justify-center rounded-full bg-[#2A2A2A]"
-                        onPress={() => setSearchQuery("")}
+                        onPress={() => {
+                          speak("Busca limpa");
+                          setSearchQuery("");
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Limpar busca"
                       >
                         <Ionicons name="close" size={16} color="#E5E2E1" />
                       </Pressable>
@@ -469,9 +490,13 @@ export default function CommunityDirectoryScreen() {
                 <Pressable
                   className="mt-2 items-center justify-center rounded-[24px] border border-[#3A3246] bg-[#17181C] px-5 py-2"
                   onPress={() => {
+                    speak("Carregar mais comunidades");
                     void handleLoadMore();
                   }}
                   disabled={loadingMore}
+                  accessibilityRole="button"
+                  accessibilityLabel="Carregar mais comunidades"
+                  accessibilityState={{ disabled: loadingMore, busy: loadingMore }}
                 >
                   {loadingMore ? (
                     <ActivityIndicator color="#EAEA00" size="small" />
@@ -487,7 +512,10 @@ export default function CommunityDirectoryScreen() {
             className="absolute bottom-6 right-6 h-16 w-16 items-center justify-center rounded-full border-2 border-[#CDBDFF] bg-[#7C4DFF]"
             accessibilityRole="button"
             accessibilityLabel="Criar comunidade"
-            onPress={() => router.push("/community/new")}
+            onPress={() => {
+              speak("Criar comunidade");
+              router.push("/community/new");
+            }}
           >
             <Ionicons name="add" size={38} color="#FCF6FF" />
           </Pressable>

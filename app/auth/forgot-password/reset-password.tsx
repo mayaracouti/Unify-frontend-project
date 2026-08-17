@@ -13,7 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { authService } from "../../../src/services/authService";
 import { formatApiErrorMessage } from "../../../src/utils/auth";
-import { speak } from "../../../src/accessibility/screen-reader";
+import { speak } from "../../../src/accessibility/tts";
 
 function readTokenParam(tokenParam: string | string[] | undefined): string {
   if (Array.isArray(tokenParam)) {
@@ -152,6 +152,7 @@ export default function ResetPassword() {
                 placeholderTextColor="#8C8F99"
                 secureTextEntry
                 value={password}
+                onFocus={() => speak("Nova senha")}
                 accessibilityLabel="Nova senha"
                 accessibilityHint="A senha deve ter pelo menos 8 caracteres"
                 onChangeText={(value) => {
@@ -173,6 +174,7 @@ export default function ResetPassword() {
                 placeholderTextColor="#8C8F99"
                 secureTextEntry
                 value={confirmPassword}
+                onFocus={() => speak("Confirmar nova senha")}
                 accessibilityLabel="Confirmar nova senha"
                 accessibilityHint="Repita exatamente a nova senha digitada acima"
                 onChangeText={(value) => {
@@ -189,7 +191,10 @@ export default function ResetPassword() {
                   loading ? "bg-[#BFC200]" : "bg-[#EFFF00]"
                 }`}
                 disabled={loading}
-                onPress={handleResetPassword}
+                onPress={() => {
+                  speak("Redefinir senha");
+                  void handleResetPassword();
+                }}
                 accessibilityRole="button"
                 accessibilityLabel="Redefinir senha"
                 accessibilityHint="Salva a nova senha e conclui a recuperação da conta"
@@ -208,7 +213,14 @@ export default function ResetPassword() {
 
           <Pressable
             className="mt-6 items-center justify-center rounded-md border border-white/35 py-3"
-            onPress={() => router.replace("/auth/forgot-password")}
+            onPress={() => {
+              speak(
+                successMessage || isTokenMissing
+                  ? "Solicitar novo link"
+                  : "Voltar para recuperar senha"
+              );
+              router.replace("/auth/forgot-password");
+            }}
             accessibilityRole="button"
             accessibilityLabel={
               successMessage || isTokenMissing
@@ -226,7 +238,10 @@ export default function ResetPassword() {
 
           <Pressable
             className="mt-4 items-center justify-center rounded-md border border-white/20 py-3"
-            onPress={() => router.replace("/auth/login")}
+            onPress={() => {
+              speak("Ir para o login");
+              router.replace("/auth/login");
+            }}
             accessibilityRole="button"
             accessibilityLabel="Ir para o login"
             accessibilityHint="Abre a tela de login"

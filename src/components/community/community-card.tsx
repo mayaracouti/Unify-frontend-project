@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
+import { buildCommunitySpeech, useTTS } from "../../accessibility/tts";
 import { AuthenticatedRemoteImage } from "../profile/authenticated-remote-image";
 import { communityService } from "../../services/communityService";
 import type { CommunityRole, CommunitySummaryResponse } from "../../types/community";
@@ -104,6 +105,7 @@ export function CommunityDirectoryCard({
   community: CommunitySummaryResponse;
   onPress: () => void;
 }) {
+  const { speak } = useTTS();
   const iconUrl = communityService.resolveAssetUrl(community.iconData);
   const ownerAvatarUrl = communityService.resolveAssetUrl(community.owner?.avatarData);
   const memberCountLabel = formatMemberCount(community.memberCount);
@@ -111,7 +113,12 @@ export function CommunityDirectoryCard({
   return (
     <Pressable
       className="rounded-[28px] border border-[#353534] bg-surface-alt p-5"
-      onPress={onPress}
+      onPress={() => {
+        // O card e o dono da fala deste toque: fala o conteudo semantico da
+        // comunidade (dados de runtime), e a tela apenas navega.
+        speak(buildCommunitySpeech(community));
+        onPress();
+      }}
       accessibilityRole="button"
       accessibilityLabel={`Abrir ${community.name}`}
     >

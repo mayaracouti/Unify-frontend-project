@@ -3,6 +3,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePathname, useRouter } from "expo-router";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 
+import { joinSpeechParts, useTTS } from "../../accessibility/tts";
 import { useAppShell } from "../../context/AppShellContext";
 import { useAuth } from "../../context/AuthContext";
 import { AuthenticatedRemoteImage } from "../profile/authenticated-remote-image";
@@ -27,12 +28,14 @@ export function GlobalTopNav({ settingsRoute = null }: GlobalTopNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { session, signOut } = useAuth();
+  const { speak } = useTTS();
   const { currentUserName, currentUserPhotoUrl, unseenProfilesCount } = useAppShell();
   const [menuOpen, setMenuOpen] = useState(false);
   const initials = useMemo(() => getInitials(currentUserName || "Perfil"), [currentUserName]);
   const shouldShowMutualMatchesShortcut = pathname === "/matches";
 
   async function handleSignOut() {
+    speak("Sair da conta");
     setMenuOpen(false);
     await signOut();
     router.replace("/auth/login");
@@ -43,7 +46,14 @@ export function GlobalTopNav({ settingsRoute = null }: GlobalTopNavProps) {
       <View className="h-16 flex-row items-center justify-between border-b border-[#262037] bg-[#090B18] px-6">
         <Pressable
           className="h-10 w-10 items-center justify-center rounded-full"
-          onPress={() => setMenuOpen(true)}
+          onPress={() => {
+            // O nome do usuario e dado de runtime: falar junto situa o menu.
+            speak(
+              joinSpeechParts(["Menu aberto", currentUserName || null])
+            );
+            setMenuOpen(true);
+          }}
+          accessibilityRole="button"
           accessibilityLabel="Abrir menu"
         >
           <Ionicons name="menu-outline" size={24} color="#A270FF" />
@@ -54,7 +64,11 @@ export function GlobalTopNav({ settingsRoute = null }: GlobalTopNavProps) {
         {shouldShowMutualMatchesShortcut ? (
           <Pressable
             className="h-10 w-10 items-center justify-center rounded-full"
-            onPress={() => router.push("/matches/mutual")}
+            onPress={() => {
+              speak("Abrir lista de matches");
+              router.push("/matches/mutual");
+            }}
+            accessibilityRole="button"
             accessibilityLabel="Abrir lista de matches"
           >
             <Ionicons name="heart-circle-outline" size={30} color="#A270FF" />
@@ -62,7 +76,11 @@ export function GlobalTopNav({ settingsRoute = null }: GlobalTopNavProps) {
         ) : settingsRoute ? (
           <Pressable
             className="h-10 w-10 items-center justify-center rounded-full"
-            onPress={() => router.push(settingsRoute)}
+            onPress={() => {
+              speak("Abrir configurações");
+              router.push(settingsRoute);
+            }}
+            accessibilityRole="button"
             accessibilityLabel="Abrir configurações"
           >
             <Ionicons name="settings-outline" size={24} color="#A270FF" />
@@ -84,7 +102,11 @@ export function GlobalTopNav({ settingsRoute = null }: GlobalTopNavProps) {
               <Text className="text-[20px] font-black tracking-[1.5px] text-[#7C4DFF]">UNIFY</Text>
               <Pressable
                 className="h-10 w-10 items-center justify-center rounded-full bg-[#181A24]"
-                onPress={() => setMenuOpen(false)}
+                onPress={() => {
+                  speak("Menu fechado");
+                  setMenuOpen(false);
+                }}
+                accessibilityRole="button"
                 accessibilityLabel="Fechar menu"
               >
                 <Ionicons name="close" size={22} color="#E5E2E1" />
@@ -135,12 +157,21 @@ export function GlobalTopNav({ settingsRoute = null }: GlobalTopNavProps) {
                     key={tab.route}
                     className="mb-3 flex-row items-center rounded-[20px] border border-[#1E2230] bg-[#131521] px-4 py-4"
                     onPress={() => {
+                      speak(
+                        joinSpeechParts([
+                          tab.label,
+                          badgeValue ? `${badgeValue} novos perfis` : null,
+                        ])
+                      );
                       setMenuOpen(false);
 
                       if (!active) {
                         router.replace(tab.route);
                       }
                     }}
+                    accessibilityRole="button"
+                    accessibilityLabel={tab.label}
+                    accessibilityState={{ selected: active }}
                   >
                     <View className="relative h-11 w-11 items-center justify-center rounded-full bg-[#1B1E2A]">
                       <Ionicons
@@ -175,6 +206,8 @@ export function GlobalTopNav({ settingsRoute = null }: GlobalTopNavProps) {
               onPress={() => {
                 void handleSignOut();
               }}
+              accessibilityRole="button"
+              accessibilityLabel="Sair da conta"
             >
               <Ionicons name="log-out-outline" size={22} color="#FF8FAB" />
               <Text className="ml-3 text-[16px] font-black text-[#FFCCD8]">Sair</Text>

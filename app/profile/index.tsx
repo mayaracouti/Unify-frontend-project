@@ -13,6 +13,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { joinSpeechParts, useTTS } from "../../src/accessibility/tts";
 import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-nav";
 import { GlobalTopNav } from "../../src/components/navigation/global-top-nav";
 import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
@@ -149,6 +150,9 @@ function GalleryImageCard({
         className="mt-3 h-10 flex-row items-center justify-center rounded-full border border-[#494455] bg-[#1A1C1F]"
         onPress={onRemove}
         disabled={removing}
+        accessibilityRole="button"
+        accessibilityLabel="Remover foto da galeria"
+        accessibilityState={{ disabled: removing, busy: removing }}
       >
         {removing ? (
           <ActivityIndicator color="#EAEA00" size="small" />
@@ -174,6 +178,7 @@ function SectionLoadingState({ message }: { message: string }) {
 
 export default function Profile() {
   const router = useRouter();
+  const { speak } = useTTS();
   const { syncProfileSummary } = useAppShell();
   const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
 
@@ -280,6 +285,11 @@ export default function Profile() {
   }
 
   function openImageSourcePicker(target: UploadTarget) {
+    speak(
+      target === "profilePicture"
+        ? "Atualizar foto de perfil"
+        : "Adicionar foto ao carrossel"
+    );
     setActionError("");
     setSourcePickerTarget(target);
   }
@@ -381,12 +391,15 @@ export default function Profile() {
 
               <Pressable
                 className="mt-6 h-14 flex-row items-center justify-center rounded-[18px] bg-[#F1EF00]"
-                onPress={() =>
-                  sourcePickerTarget
-                    ? void pickAndUploadImage(sourcePickerTarget, "camera")
-                    : undefined
-                }
+                onPress={() => {
+                  if (sourcePickerTarget) {
+                    speak("Tirar foto");
+                    void pickAndUploadImage(sourcePickerTarget, "camera");
+                  }
+                }}
                 disabled={uploadingTarget !== null}
+                accessibilityRole="button"
+                accessibilityLabel="Tirar foto"
               >
                 <Ionicons name="camera-outline" size={18} color="#212000" />
                 <Text className="ml-2 text-[16px] font-black text-[#212000]">
@@ -396,12 +409,15 @@ export default function Profile() {
 
               <Pressable
                 className="mt-3 h-14 flex-row items-center justify-center rounded-[18px] border border-[#494455] bg-[#1A1C1F]"
-                onPress={() =>
-                  sourcePickerTarget
-                    ? void pickAndUploadImage(sourcePickerTarget, "gallery")
-                    : undefined
-                }
+                onPress={() => {
+                  if (sourcePickerTarget) {
+                    speak("Escolher da galeria");
+                    void pickAndUploadImage(sourcePickerTarget, "gallery");
+                  }
+                }}
                 disabled={uploadingTarget !== null}
+                accessibilityRole="button"
+                accessibilityLabel="Escolher da galeria"
               >
                 <Ionicons name="images-outline" size={18} color="#FFFFFF" />
                 <Text className="ml-2 text-[16px] font-black text-white">
@@ -411,8 +427,13 @@ export default function Profile() {
 
               <Pressable
                 className="mt-3 h-12 items-center justify-center rounded-[18px]"
-                onPress={closeImageSourcePicker}
+                onPress={() => {
+                  speak("Cancelar");
+                  closeImageSourcePicker();
+                }}
                 disabled={uploadingTarget !== null}
+                accessibilityRole="button"
+                accessibilityLabel="Cancelar"
               >
                 <Text className="text-[14px] font-bold text-content-secondary">Cancelar</Text>
               </Pressable>
@@ -456,6 +477,8 @@ export default function Profile() {
                   className="absolute bottom-1 right-0 h-12 w-12 items-center justify-center rounded-full border-4 border-[#151515] bg-[#EAEA00]"
                   onPress={() => openImageSourcePicker("profilePicture")}
                   disabled={uploadingTarget !== null}
+                  accessibilityRole="button"
+                  accessibilityLabel="Atualizar foto de perfil"
                 >
                   {uploadingTarget === "profilePicture" ? (
                     <ActivityIndicator color="#323200" size="small" />
@@ -465,9 +488,26 @@ export default function Profile() {
                 </Pressable>
               </View>
 
-              <Text className="mt-6 text-center text-[31px] font-extrabold text-white">
-                {loading ? "Carregando perfil..." : `${displayName}${displayAge ? `, ${displayAge}` : ""}`}
-              </Text>
+              <Pressable
+                // Toque no nome rele o resumo do perfil (dados de runtime).
+                onPress={() =>
+                  speak(
+                    joinSpeechParts([
+                      joinSpeechParts(
+                        [displayName, displayAge ? `${displayAge} anos` : null],
+                        ", "
+                      ),
+                      profile?.bio?.trim() || null,
+                    ])
+                  )
+                }
+                accessibilityRole="button"
+                accessibilityLabel={displayName}
+              >
+                <Text className="mt-6 text-center text-[31px] font-extrabold text-white">
+                  {loading ? "Carregando perfil..." : `${displayName}${displayAge ? `, ${displayAge}` : ""}`}
+                </Text>
+              </Pressable>
 
               {loading ? (
                 <View className="mt-4 w-full max-w-[320px] rounded-[22px] border border-[#3A3246] bg-[#17181C] px-5 py-4">
@@ -503,7 +543,10 @@ export default function Profile() {
                       image={image}
                       authToken={imageAuthToken}
                       removing={removingImageId === image.id}
-                      onRemove={() => handleDeleteImage(image.id)}
+                      onRemove={() => {
+                        speak("Remover foto da galeria");
+                        void handleDeleteImage(image.id);
+                      }}
                     />
                   ))}
 
@@ -512,6 +555,8 @@ export default function Profile() {
                       className="mr-4 h-[172px] w-[132px] items-center justify-center rounded-[24px] border border-dashed border-[#7C4DFF] bg-[#1A1C1F] px-4"
                       onPress={() => openImageSourcePicker("gallery")}
                       disabled={uploadingTarget !== null}
+                      accessibilityRole="button"
+                      accessibilityLabel="Adicionar foto para match"
                     >
                       {uploadingTarget === "gallery" ? (
                         <ActivityIndicator color="#EAEA00" />
@@ -546,7 +591,10 @@ export default function Profile() {
 
             <Pressable
               className="mt-6 h-14 flex-row items-center justify-center rounded-[18px] bg-[#F1EF00]"
-              onPress={() => router.push("/profile/edit")}
+              onPress={() => {
+                speak("Editar perfil");
+                router.push("/profile/edit");
+              }}
               accessibilityRole="button"
               accessibilityLabel="Editar perfil"
               accessibilityHint="Abre a tela de edição do seu perfil"
@@ -559,7 +607,10 @@ export default function Profile() {
 
             <Pressable
               className="mt-3 h-14 flex-row items-center justify-center rounded-[18px] border border-[#494455] bg-[#1A1C1F]"
-              onPress={() => router.push("/profile/edit-match-preferences")}
+              onPress={() => {
+                speak("Editar preferências de match");
+                router.push("/profile/edit-match-preferences");
+              }}
               accessibilityRole="button"
               accessibilityLabel="Editar preferências de match"
               accessibilityHint="Abre a tela de preferências de match"
@@ -572,7 +623,10 @@ export default function Profile() {
 
             <Pressable
               className="mt-3 h-14 flex-row items-center justify-center rounded-[18px] border border-[#494455] bg-[#1A1C1F]"
-              onPress={() => router.push("/profile/accessibility-settings")}
+              onPress={() => {
+                speak("Configurações de acessibilidade");
+                router.push("/profile/accessibility-settings");
+              }}
               accessibilityRole="button"
               accessibilityLabel="Configurações de acessibilidade"
               accessibilityHint="Abre os ajustes de fonte, contraste, leitor de tela e movimento"
@@ -608,7 +662,14 @@ export default function Profile() {
                 <SectionLoadingState message="Carregando os detalhes de acessibilidade do seu perfil..." />
               ) : (
                 accessibilityCards.map((card) => (
-                  <View key={card.key} className="mb-3 rounded-[22px] border border-[#8D74C8] bg-[#2A272D] p-4">
+                  <Pressable
+                    key={card.key}
+                    className="mb-3 rounded-[22px] border border-[#8D74C8] bg-[#2A272D] p-4"
+                    // Fala o conteudo real do card (deficiencias do perfil).
+                    onPress={() => speak(joinSpeechParts([card.title, card.subtitle]))}
+                    accessibilityRole="button"
+                    accessibilityLabel={card.title}
+                  >
                     <View className="flex-row items-center justify-between">
                       <View className="flex-row flex-1 items-center">
                         <View className="h-12 w-12 items-center justify-center rounded-2xl bg-[#7C4DFF]">
@@ -625,12 +686,43 @@ export default function Profile() {
 
                       <Ionicons name="checkmark-circle" size={22} color="#D9C9FF" />
                     </View>
-                  </View>
+                  </Pressable>
                 ))
               )}
             </View>
 
-            <View className="mt-8 rounded-[28px] bg-surface-alt p-6">
+            <Pressable
+              className="mt-8 rounded-[28px] bg-surface-alt p-6"
+              // Fala formas de comunicacao e interesses reais do perfil.
+              onPress={() =>
+                speak(
+                  joinSpeechParts([
+                    joinSpeechParts(
+                      [
+                        "Comunicação",
+                        joinDescriptions(
+                          profile?.communicationForms ?? [],
+                          "nenhuma forma cadastrada"
+                        ).replaceAll(" • ", ", "),
+                      ],
+                      ": "
+                    ),
+                    joinSpeechParts(
+                      [
+                        "Interesses",
+                        joinDescriptions(
+                          profile?.interestTypes ?? [],
+                          "nenhum interesse cadastrado"
+                        ).replaceAll(" • ", ", "),
+                      ],
+                      ": "
+                    ),
+                  ])
+                )
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Comunicação e interesses"
+            >
               <Text className="text-[18px] font-black text-white">Comunicação</Text>
               <Text className="mt-3 text-[15px] font-semibold leading-6 text-content-secondary">
                 {loading
@@ -650,7 +742,7 @@ export default function Profile() {
                       "Adicione interesses e hobbies para enriquecer sua apresentação."
                     )}
               </Text>
-            </View>
+            </Pressable>
           </ScrollView>
 
           <GlobalBottomNav />

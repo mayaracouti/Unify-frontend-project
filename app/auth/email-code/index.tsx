@@ -15,7 +15,7 @@ import { formatApiErrorMessage, normalizeVerificationCode } from "../../../src/u
 import { clearPendingVerificationEmail } from "../../../src/storage/tokenStorage";
 import { showGlobalToast } from "../../../src/utils/globalToast";
 import Ionicicons from '@expo/vector-icons/Ionicons';
-import { speak } from "../../../src/accessibility/screen-reader";
+import { speak } from "../../../src/accessibility/tts";
 
 export default function EmailCode() {
   const router = useRouter();
@@ -116,7 +116,10 @@ export default function EmailCode() {
         <View className="flex-1 px-8 pt-8">
           <Pressable
             className="mb-14 h-14 w-14 items-center justify-center rounded-full bg-white/8"
-            onPress={goBackLoginScreen}
+            onPress={() => {
+              speak("Voltar para o login");
+              void goBackLoginScreen();
+            }}
             accessibilityRole="button"
             accessibilityLabel="Voltar"
             accessibilityHint="Retorna para a tela de login"
@@ -147,6 +150,7 @@ export default function EmailCode() {
             value={code}
             accessibilityLabel="Código de verificação de 6 dígitos"
             accessibilityHint="Digite o código enviado para seu e-mail"
+            onFocus={() => speak("Código de verificação de 6 dígitos")}
             onChangeText={(value) => {
               setCode(normalizeVerificationCode(value));
 
@@ -186,7 +190,10 @@ export default function EmailCode() {
 
           <Pressable
             className="mb-10 self-start"
-            onPress={handleResendCode}
+            onPress={() => {
+              speak("Reenviar código");
+              void handleResendCode();
+            }}
             disabled={isResending}
             accessibilityRole="button"
             accessibilityLabel="Reenviar código"
@@ -203,7 +210,10 @@ export default function EmailCode() {
               isComplete && !loading ? "bg-white" : "bg-[#3B3D45]"
             }`}
             disabled={!isComplete || loading}
-            onPress={handleVerifyEmail}
+            onPress={() => {
+              speak("Confirmar código");
+              void handleVerifyEmail();
+            }}
             accessibilityRole="button"
             accessibilityLabel="Confirmar código"
             accessibilityHint="Valida o código digitado e conclui a verificação do e-mail"

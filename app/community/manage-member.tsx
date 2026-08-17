@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-nati
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { buildActionSpeech, useTTS } from "../../src/accessibility/tts";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { communityService } from "../../src/services/communityService";
 import type { CommunityRole } from "../../src/types/community";
@@ -41,6 +42,7 @@ function normalizeRole(value?: string | string[]): CommunityRole | null {
 
 export default function CommunityManageMemberScreen() {
   const router = useRouter();
+  const { speak } = useTTS();
   const params = useLocalSearchParams<{
     communityId?: string | string[];
     communityName?: string | string[];
@@ -108,6 +110,8 @@ export default function CommunityManageMemberScreen() {
         return;
       }
 
+      // Acao sobre pessoa dinamica: "Tornar Maria Moderador".
+      speak(buildActionSpeech(`Tornar ${userName}`, ROLE_LABELS[role]));
       setPendingRole(role);
 
       try {
@@ -125,7 +129,7 @@ export default function CommunityManageMemberScreen() {
         setPendingRole(null);
       }
     },
-    [canManage, communityId, handleBack, pendingRole, userProfileId]
+    [canManage, communityId, handleBack, pendingRole, speak, userName, userProfileId]
   );
 
   return (
@@ -135,7 +139,12 @@ export default function CommunityManageMemberScreen() {
           <View className="flex-row items-center">
             <Pressable
               className="mr-3 h-10 w-10 items-center justify-center rounded-full"
-              onPress={handleBack}
+              onPress={() => {
+                speak("Voltar para a comunidade");
+                handleBack();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Voltar para a comunidade"
             >
               <Ionicons name="arrow-back" size={24} color="#E5E2E1" />
             </Pressable>
@@ -187,6 +196,9 @@ export default function CommunityManageMemberScreen() {
                       void handleSelectRole(role);
                     }}
                     disabled={Boolean(pendingRole)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Tornar ${userName} ${ROLE_LABELS[role]}`}
+                    accessibilityState={{ disabled: Boolean(pendingRole), busy: isPending }}
                   >
                     <View className="flex-row items-start gap-4">
                       <View

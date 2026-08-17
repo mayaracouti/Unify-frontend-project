@@ -12,7 +12,7 @@ import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { authService } from "../../../src/services/authService";
 import { formatApiErrorMessage } from "../../../src/utils/auth";
-import { speak } from "../../../src/accessibility/screen-reader";
+import { speak } from "../../../src/accessibility/tts";
 
 export default function ForgotPassword() {
   const router = useRouter();
@@ -101,6 +101,7 @@ export default function ForgotPassword() {
             value={email}
             accessibilityLabel="Endereço de e-mail cadastrado"
             accessibilityHint="Digite o e-mail usado no cadastro para receber o link de redefinição"
+            onFocus={() => speak("Endereço de e-mail cadastrado")}
             onChangeText={(value) => {
               setEmail(value);
 
@@ -143,7 +144,10 @@ export default function ForgotPassword() {
               loading ? "bg-[#BFC200]" : "bg-[#EFFF00]"
             }`}
             disabled={loading}
-            onPress={handleSendResetLink}
+            onPress={() => {
+              speak(successMessage ? "Enviar link novamente" : "Enviar link de redefinição");
+              void handleSendResetLink();
+            }}
             accessibilityRole="button"
             accessibilityLabel={
               successMessage
@@ -164,7 +168,10 @@ export default function ForgotPassword() {
 
           <Pressable
             className="mt-6 items-center justify-center rounded-md border border-white/35 py-3"
-            onPress={() => router.replace("/auth/login")}
+            onPress={() => {
+              speak("Voltar para o login");
+              router.replace("/auth/login");
+            }}
             accessibilityRole="button"
             accessibilityLabel="Voltar para o login"
             accessibilityHint="Retorna para a tela de login"

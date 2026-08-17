@@ -17,6 +17,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
+  buildActionSpeech,
+  buildCommunityCommentSpeech,
+  useTTS,
+} from "../../src/accessibility/tts";
+import {
   AuthenticatedRemoteImage,
   preloadAuthenticatedRemoteImages,
 } from "../../src/components/profile/authenticated-remote-image";
@@ -104,8 +109,16 @@ function CommentCard({
   deleting: boolean;
   onDelete: () => void;
 }) {
+  const { speak } = useTTS();
+
   return (
-    <View className="rounded-2xl border border-[#353534] bg-[#17181C] p-4">
+    <Pressable
+      className="rounded-2xl border border-[#353534] bg-[#17181C] p-4"
+      // Toque no comentario le autor e corpo reais vindos do backend.
+      onPress={() => speak(buildCommunityCommentSpeech(comment))}
+      accessibilityRole="button"
+      accessibilityLabel={`Comentário de ${comment.author.name}`}
+    >
       <View className="flex-row items-start gap-3">
         <CommentAvatar
           authToken={authToken}
@@ -129,6 +142,8 @@ function CommentCard({
                   className="h-9 w-9 items-center justify-center rounded-full bg-[#221820]"
                   onPress={onDelete}
                   disabled={deleting}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Excluir comentário de ${comment.author.name}`}
                 >
                   {deleting ? (
                     <ActivityIndicator color="#FFD3DD" size="small" />
@@ -145,7 +160,7 @@ function CommentCard({
           </Text>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -162,6 +177,7 @@ export default function CommunityCommentsScreen() {
     canModerate?: string | string[];
   }>();
   const { session } = useAuth();
+  const { speak } = useTTS();
 
   const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
 
@@ -342,6 +358,7 @@ export default function CommunityCommentsScreen() {
 
   const handleDeleteComment = useCallback(
     (comment: CommunityCommentResponse) => {
+      speak(buildActionSpeech("Excluir comentário de", comment.author.name));
       Alert.alert(
         "Excluir comentário",
         "Essa ação remove o comentário da conversa. Deseja continuar?",
@@ -357,7 +374,7 @@ export default function CommunityCommentsScreen() {
         ]
       );
     },
-    [confirmDeleteComment]
+    [confirmDeleteComment, speak]
   );
 
   return (
@@ -371,7 +388,11 @@ export default function CommunityCommentsScreen() {
             <View className="flex-row items-center">
               <Pressable
                 className="mr-3 h-10 w-10 items-center justify-center rounded-full"
+                accessibilityRole="button"
+                accessibilityLabel="Voltar para a comunidade"
                 onPress={() => {
+                  speak("Voltar para a comunidade");
+
                   if (communityId) {
                     router.replace({
                       pathname: "/community/[communityId]",
@@ -410,7 +431,17 @@ export default function CommunityCommentsScreen() {
                 }
                 showsVerticalScrollIndicator={false}
               >
-                <View className="rounded-[28px] bg-[#111214] p-6">
+                <Pressable
+                  className="rounded-[28px] bg-[#111214] p-6"
+                  // Toque relê a publicacao original (dados de runtime).
+                  onPress={() =>
+                    speak(
+                      buildActionSpeech(`Publicação de ${authorName}.`, postBody)
+                    )
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={`Publicação de ${authorName}`}
+                >
                   <Text className="text-[14px] font-bold uppercase tracking-[1.4px] text-[#7C4DFF]">
                     Publicação original
                   </Text>
@@ -430,7 +461,7 @@ export default function CommunityCommentsScreen() {
                       {postBody}
                     </Text>
                   ) : null}
-                </View>
+                </Pressable>
 
                 {loadError ? (
                   <View className="mt-6 rounded-2xl border border-[#6A4456] bg-[#2A1C24] px-4 py-4">
@@ -480,6 +511,8 @@ export default function CommunityCommentsScreen() {
                       textAlignVertical="top"
                       value={draft}
                       onChangeText={setDraft}
+                      onFocus={() => speak("Escreva um comentário")}
+                      accessibilityLabel="Escreva um comentário"
                     />
                     <View className="mt-4 flex-row items-center justify-between">
                       <Text className="text-[12px] font-semibold text-[#948EA1]">
@@ -491,8 +524,17 @@ export default function CommunityCommentsScreen() {
                             ? "bg-[#EAEA00]"
                             : "bg-[#3B3841]"
                         }`}
-                        onPress={handleSubmitComment}
+                        onPress={() => {
+                          speak("Enviar comentário");
+                          void handleSubmitComment();
+                        }}
                         disabled={draft.trim().length === 0 || submitting}
+                        accessibilityRole="button"
+                        accessibilityLabel="Enviar comentário"
+                        accessibilityState={{
+                          disabled: draft.trim().length === 0 || submitting,
+                          busy: submitting,
+                        }}
                       >
                         {submitting ? (
                           <ActivityIndicator color="#1D1D00" size="small" />

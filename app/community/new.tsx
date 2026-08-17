@@ -15,6 +15,7 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { buildActionSpeech, useTTS } from "../../src/accessibility/tts";
 import { CommunityCategoryChips } from "../../src/components/community/category-chips";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { communityService } from "../../src/services/communityService";
@@ -68,6 +69,7 @@ function createCommunityFormData(
 
 export default function CommunityCreateScreen() {
   const router = useRouter();
+  const { speak } = useTTS();
 
   useRequireCompletedOnboarding();
 
@@ -197,7 +199,12 @@ export default function CommunityCreateScreen() {
             <View className="flex-row items-center">
               <Pressable
                 className="mr-3 h-10 w-10 items-center justify-center rounded-full"
-                onPress={() => router.back()}
+                onPress={() => {
+                  speak("Voltar");
+                  router.back();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Voltar"
               >
                 <Ionicons name="arrow-back" size={24} color="#E5E2E1" />
               </Pressable>
@@ -208,8 +215,20 @@ export default function CommunityCreateScreen() {
               className={`rounded-full px-4 py-2 ${
                 trimmedName.length > 0 && !submitting ? "bg-[#EAEA00]" : "bg-[#3B3841]"
               }`}
-              onPress={handleSubmit}
+              onPress={() => {
+                // Fala a acao com o nome digitado (conteudo de runtime).
+                speak(buildActionSpeech("Criar comunidade", trimmedName));
+                void handleSubmit();
+              }}
               disabled={trimmedName.length === 0 || submitting}
+              accessibilityRole="button"
+              accessibilityLabel={
+                trimmedName ? `Criar comunidade ${trimmedName}` : "Criar comunidade"
+              }
+              accessibilityState={{
+                disabled: trimmedName.length === 0 || submitting,
+                busy: submitting,
+              }}
             >
               {submitting ? (
                 <ActivityIndicator color="#1D1D00" size="small" />
@@ -243,6 +262,8 @@ export default function CommunityCreateScreen() {
                 placeholderTextColor="#948EA1"
                 value={name}
                 onChangeText={setName}
+                onFocus={() => speak("Nome da comunidade")}
+                accessibilityLabel="Nome da comunidade"
               />
               <Text className="mt-2 text-right text-[12px] font-semibold text-[#948EA1]">
                 {name.length} / 80
@@ -260,6 +281,8 @@ export default function CommunityCreateScreen() {
                 textAlignVertical="top"
                 value={description}
                 onChangeText={setDescription}
+                onFocus={() => speak("Descrição da comunidade")}
+                accessibilityLabel="Descrição da comunidade"
               />
               <Text className="mt-2 text-right text-[12px] font-semibold text-[#948EA1]">
                 {description.length} / 400
@@ -293,8 +316,15 @@ export default function CommunityCreateScreen() {
 
                 <Pressable
                   className="rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-3"
-                  onPress={handlePickImage}
+                  onPress={() => {
+                    speak(selectedImage ? "Trocar ícone" : "Selecionar ícone");
+                    void handlePickImage();
+                  }}
                   disabled={pickingImage}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    selectedImage ? "Trocar ícone" : "Selecionar ícone"
+                  }
                 >
                   {pickingImage ? (
                     <ActivityIndicator color="#EAEA00" size="small" />
@@ -320,7 +350,14 @@ export default function CommunityCreateScreen() {
                     <Text className="flex-1 text-[13px] font-semibold text-[#CAC3D8]">
                       {selectedImage.fileName ?? "Ícone selecionado"}
                     </Text>
-                    <Pressable onPress={() => setSelectedImage(null)}>
+                    <Pressable
+                      onPress={() => {
+                        speak("Ícone removido");
+                        setSelectedImage(null);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Remover ícone"
+                    >
                       <Text className="text-[14px] font-bold text-[#FF8A8A]">Remover</Text>
                     </Pressable>
                   </View>

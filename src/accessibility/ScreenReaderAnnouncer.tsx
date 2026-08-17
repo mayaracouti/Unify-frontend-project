@@ -5,14 +5,17 @@
 import { usePathname } from "expo-router";
 import { useEffect, useRef } from "react";
 
-import { speak } from "./screen-reader";
+import { speak } from "./tts";
 
 /** Nome amigavel (pt-BR) de cada rota real do diretorio `app/`. */
 const ROUTE_LABELS: Record<string, string> = {
   "/": "Unify",
-  "/home": "Tela inicial",
+  "/accessibility-onboarding": "Leitura por voz",
+  // Mantidos iguais aos rotulos das abas: o toque na aba e o anuncio de rota
+  // produzem o mesmo texto e a supressao de duplicata evita fala dupla.
+  "/home": "Início",
   "/explore": "Explorar",
-  "/matches": "Matches",
+  "/matches": "Encontros",
   "/matches/mutual": "Matches mútuos",
   "/matches/my-profile": "Meu perfil de match",
   "/matches/success": "Deu match",
@@ -87,6 +90,13 @@ export function ScreenReaderAnnouncer() {
     }
 
     lastAnnouncedPathname.current = pathname;
+
+    // O onboarding de acessibilidade fala a propria introducao completa;
+    // anunciar o nome da rota por cima interromperia essa fala.
+    if (normalizePathname(pathname) === "/accessibility-onboarding") {
+      return;
+    }
+
     speak(getRouteAnnouncement(pathname));
   }, [pathname]);
 

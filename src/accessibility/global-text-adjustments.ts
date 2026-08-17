@@ -452,11 +452,16 @@ function patchReactNativeExport(
     // Sem NativeWind o ajuste continua valendo para estilos inline.
   }
 
-  Object.defineProperty(reactNativeModule, exportName, {
-    configurable: true,
-    enumerable: true,
-    get: () => adjusted,
-  });
+  try {
+    Object.defineProperty(reactNativeModule, exportName, {
+      configurable: true,
+      enumerable: true,
+      get: () => adjusted,
+    });
+  } catch {
+    // No web (react-native-web via ESM) o export pode ser nao-configuravel.
+    // O app segue funcionando sem o patch global de Text/TextInput.
+  }
 }
 
 const PATCH_FLAG = "__unifyGlobalTextAdjustmentsApplied__";

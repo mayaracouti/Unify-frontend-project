@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, Text } from "react-native";
 
+import { buildOptionToggleSpeech, useTTS } from "../../accessibility/tts";
 import type { CommunityCategoryResponse } from "../../types/community";
 
 export type CommunityCategoryChipsProps = {
@@ -27,6 +28,8 @@ export function CommunityCategoryChips({
   allOptionLabel,
   className,
 }: CommunityCategoryChipsProps) {
+  const { speak } = useTTS();
+
   if (categories.length === 0) {
     return null;
   }
@@ -47,7 +50,10 @@ export function CommunityCategoryChips({
               ? "border-[#EAEA00] bg-[#EAEA00]"
               : "border-[#3A3246] bg-[#17181C]"
           }`}
-          onPress={() => onSelect(null)}
+          onPress={() => {
+            speak(buildOptionToggleSpeech(allOptionLabel, true));
+            onSelect(null);
+          }}
           accessibilityRole="radio"
           accessibilityLabel="Todas as categorias"
           accessibilityState={{ selected: selectedCategoryId === null }}
@@ -73,7 +79,11 @@ export function CommunityCategoryChips({
             className={`rounded-full border px-4 py-2 ${
               selected ? "border-[#EAEA00] bg-[#EAEA00]" : "border-[#3A3246] bg-[#17181C]"
             }`}
-            onPress={() => onSelect(selected ? null : category.id)}
+            onPress={() => {
+              // O texto vem do dado de runtime (`category.description`).
+              speak(buildOptionToggleSpeech(category.description, !selected));
+              onSelect(selected ? null : category.id);
+            }}
             accessibilityRole="radio"
             accessibilityLabel={category.description}
             accessibilityState={{ selected }}

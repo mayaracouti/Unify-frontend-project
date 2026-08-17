@@ -15,6 +15,7 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { buildActionSpeech, useTTS } from "../../src/accessibility/tts";
 import { CommunityCategoryChips } from "../../src/components/community/category-chips";
 import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
 import { ScreenError } from "../../src/components/ui/screen-error";
@@ -95,6 +96,7 @@ function buildCommunityUpdateFormData(args: {
 
 export default function CommunitySettingsScreen() {
   const router = useRouter();
+  const { speak } = useTTS();
   const params = useLocalSearchParams<{ communityId?: string | string[] }>();
   const { session } = useAuth();
 
@@ -289,7 +291,10 @@ export default function CommunitySettingsScreen() {
             <View className="flex-row items-center">
               <Pressable
                 className="mr-3 h-10 w-10 items-center justify-center rounded-full"
-                onPress={handleBack}
+                onPress={() => {
+                  speak("Voltar para a comunidade");
+                  handleBack();
+                }}
                 accessibilityRole="button"
                 accessibilityLabel="Voltar para a comunidade"
               >
@@ -379,6 +384,7 @@ export default function CommunitySettingsScreen() {
                   placeholderTextColor="#948EA1"
                   value={name}
                   onChangeText={setName}
+                  onFocus={() => speak("Nome da comunidade")}
                   accessibilityLabel="Nome da comunidade"
                   accessibilityHint="Texto exibido como título da comunidade"
                 />
@@ -398,6 +404,7 @@ export default function CommunitySettingsScreen() {
                   textAlignVertical="top"
                   value={description}
                   onChangeText={setDescription}
+                  onFocus={() => speak("Descrição da comunidade")}
                   accessibilityLabel="Descrição da comunidade"
                   accessibilityHint="Texto exibido abaixo do nome da comunidade"
                 />
@@ -433,6 +440,11 @@ export default function CommunitySettingsScreen() {
                   <Pressable
                     className="rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-3"
                     onPress={() => {
+                      speak(
+                        selectedImage
+                          ? "Trocar ícone da comunidade"
+                          : "Selecionar ícone da comunidade"
+                      );
                       void handlePickImage();
                     }}
                     disabled={pickingImage}
@@ -469,7 +481,10 @@ export default function CommunitySettingsScreen() {
                         {selectedImage.fileName ?? "Novo ícone selecionado"}
                       </Text>
                       <Pressable
-                        onPress={() => setSelectedImage(null)}
+                        onPress={() => {
+                          speak("Ícone removido");
+                          setSelectedImage(null);
+                        }}
                         accessibilityRole="button"
                         accessibilityLabel="Remover o ícone selecionado"
                       >
@@ -506,6 +521,7 @@ export default function CommunitySettingsScreen() {
                   trimmedName.length > 0 && !saving ? "bg-[#EAEA00]" : "bg-[#3B3841]"
                 }`}
                 onPress={() => {
+                  speak(buildActionSpeech("Salvar alterações de", trimmedName));
                   void handleSave();
                 }}
                 disabled={trimmedName.length === 0 || saving}
@@ -539,7 +555,10 @@ export default function CommunitySettingsScreen() {
                 {!community?.isOwner ? (
                   <Pressable
                     className="mt-5 h-14 flex-row items-center justify-center gap-3 rounded-2xl border-2 border-[#494455] bg-[#2E2B33]"
-                    onPress={handleLeaveCommunity}
+                    onPress={() => {
+                      speak(buildActionSpeech("Sair da comunidade", community?.name));
+                      handleLeaveCommunity();
+                    }}
                     disabled={leaveBusy}
                     accessibilityRole="button"
                     accessibilityLabel="Sair da comunidade"
@@ -562,7 +581,10 @@ export default function CommunitySettingsScreen() {
                 {community?.isOwner ? (
                   <Pressable
                     className="mt-5 h-14 flex-row items-center justify-center gap-3 rounded-2xl border-2 border-[#6A4456] bg-[#2A1C24]"
-                    onPress={handleDeleteCommunity}
+                    onPress={() => {
+                      speak(buildActionSpeech("Excluir comunidade", community?.name));
+                      handleDeleteCommunity();
+                    }}
                     disabled={deleteBusy}
                     accessibilityRole="button"
                     accessibilityLabel="Excluir comunidade"

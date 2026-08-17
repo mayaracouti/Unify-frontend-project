@@ -1,4 +1,7 @@
+import { useEffect } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
+
+import { joinSpeechParts, useTTS } from "../../accessibility/tts";
 
 export type ScreenErrorProps = {
   /** Mensagem já formatada para o usuário final (ver `formatApiErrorMessage`). */
@@ -26,6 +29,14 @@ export function ScreenError({
   retrying,
   className,
 }: ScreenErrorProps) {
+  const { speak } = useTTS();
+
+  // Evento deliberado de acessibilidade: o erro precisa ser audivel assim que
+  // aparece (espelha o comportamento visual do alert assertivo).
+  useEffect(() => {
+    speak(joinSpeechParts([title, message]));
+  }, [message, speak, title]);
+
   return (
     <View
       className={
@@ -45,7 +56,10 @@ export function ScreenError({
       {onRetry ? (
         <Pressable
           className="mt-6 flex-row items-center justify-center rounded-full border border-content-muted/40 bg-surface-muted px-6 py-3"
-          onPress={onRetry}
+          onPress={() => {
+            speak("Tentar novamente");
+            onRetry();
+          }}
           disabled={retrying}
           accessibilityRole="button"
           accessibilityLabel="Tentar novamente"
