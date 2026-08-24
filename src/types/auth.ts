@@ -74,6 +74,11 @@ export interface NormalizedApiError extends Error {
   body?: unknown;
   rawText?: string;
   isNetworkError: boolean;
+  /**
+   * Marcado por um interceptor que ja exibiu uma mensagem propria para este
+   * erro. Impede o toast generico do cliente HTTP de duplicar o aviso.
+   */
+  toastHandled?: boolean;
 }
 
 export type SignInResult =

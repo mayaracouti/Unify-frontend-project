@@ -10,7 +10,16 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useIsFocused } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
@@ -139,115 +148,60 @@ function DetailCard({
   );
 }
 
-function ProfileDetailsPanel({
-  onAccept,
-  onClose,
-  onReject,
-  profile,
-}: {
-  onAccept: () => void;
-  onClose: () => void;
-  onReject: () => void;
-  profile: MatchProfile;
-}) {
+function ProfileDetailsContent({ profile }: { profile: MatchProfile }) {
   return (
-    <View className="absolute inset-0 bg-black">
-      <ScrollView
-        className="flex-1"
-        contentContainerClassName="px-4 pb-32 pt-10"
-        showsVerticalScrollIndicator={false}
-      >
-        <View className="mb-5 flex-row items-start justify-between px-1">
-          <Text className="text-[36px] font-semibold text-white">
-            {profile.name}, {profile.age}
-          </Text>
-          <Pressable
-            accessibilityLabel="Fechar detalhes"
-            className="h-12 w-12 items-center justify-center rounded-full bg-white"
-            onPress={onClose}
-          >
-            <Ionicons name="arrow-down" size={28} color="#111214" />
-          </Pressable>
-        </View>
+    <View className="bg-black px-4 pb-40 pt-8">
+      <Text className="mb-5 px-1 text-[36px] font-semibold text-white">
+        {profile.name}, {profile.age}
+      </Text>
 
-        <DetailCard title="Sobre mim" icon="chatbubble-ellipses-outline">
-          <Text className="mt-4 text-[20px] font-semibold leading-8 text-white">
-            {profile.bio}
-          </Text>
-        </DetailCard>
+      <DetailCard title="Sobre mim" icon="chatbubble-ellipses-outline">
+        <Text className="mt-4 text-[20px] font-semibold leading-8 text-white">
+          {profile.bio}
+        </Text>
+      </DetailCard>
 
-        <DetailCard title="Informações básicas" icon="id-card-outline">
-          <InfoRow
-            icon="location-outline"
-            label={
-              typeof profile.distanceKm === "number"
-                ? `${profile.distanceKm} km de distância`
-                : null
-            }
-          />
-          <InfoRow icon="briefcase-outline" label={profile.occupation} />
-          <InfoRow icon="home-outline" label={profile.location} />
-          <InfoRow icon="person-circle-outline" label={profile.pronouns} />
-          <InfoRow icon="male-female-outline" label={profile.gender} />
-          <InfoRow icon="accessibility-outline" label={profile.disabilities.join(", ")} />
-        </DetailCard>
+      <DetailCard title="Informações básicas" icon="id-card-outline">
+        <InfoRow
+          icon="location-outline"
+          label={
+            typeof profile.distanceKm === "number"
+              ? `${profile.distanceKm} km de distância`
+              : null
+          }
+        />
+        <InfoRow icon="briefcase-outline" label={profile.occupation} />
+        <InfoRow icon="home-outline" label={profile.location} />
+        <InfoRow icon="person-circle-outline" label={profile.pronouns} />
+        <InfoRow icon="male-female-outline" label={profile.gender} />
+        <InfoRow icon="accessibility-outline" label={profile.disabilities.join(", ")} />
+      </DetailCard>
 
-        <DetailCard title="Tô procurando" icon="search-outline">
-          <ChipList items={profile.connectionPreferences} />
-        </DetailCard>
+      <DetailCard title="Tô procurando" icon="search-outline">
+        <ChipList items={profile.connectionPreferences} />
+      </DetailCard>
 
-        <DetailCard title="Interesses" icon="sparkles-outline">
-          <ChipList items={profile.interests} />
-        </DetailCard>
+      <DetailCard title="Interesses" icon="sparkles-outline">
+        <ChipList items={profile.interests} />
+      </DetailCard>
 
-        <DetailCard title="Acessibilidade e autonomia" icon="body-outline">
-          <InfoRow icon="walk-outline" label={profile.autonomyLevel} />
-          <ChipList items={profile.accessibilityNeeds} />
-        </DetailCard>
+      <DetailCard title="Acessibilidade e autonomia" icon="body-outline">
+        <InfoRow icon="walk-outline" label={profile.autonomyLevel} />
+        <ChipList items={profile.accessibilityNeeds} />
+      </DetailCard>
 
-        <DetailCard title="Comunicação" icon="chatbubbles-outline">
-          <ChipList items={profile.communicationPreferences} />
-        </DetailCard>
+      <DetailCard title="Comunicação" icon="chatbubbles-outline">
+        <ChipList items={profile.communicationPreferences} />
+      </DetailCard>
 
-        <DetailCard title="Estilo de vida" icon="leaf-outline">
-          <InfoRow icon="flash-outline" label={profile.energyLevel} />
-          <ChipList items={profile.lifestyleTypes} />
-        </DetailCard>
+      <DetailCard title="Estilo de vida" icon="leaf-outline">
+        <InfoRow icon="flash-outline" label={profile.energyLevel} />
+        <ChipList items={profile.lifestyleTypes} />
+      </DetailCard>
 
-        <DetailCard title="Linguagem do amor" icon="heart-outline">
-          <ChipList items={profile.loveLanguages} />
-        </DetailCard>
-      </ScrollView>
-
-      <LinearGradient
-        colors={["transparent", "rgba(0,0,0,0.9)"]}
-        style={{
-          bottom: 0,
-          height: 132,
-          left: 0,
-          position: "absolute",
-          right: 0,
-        }}
-      >
-        <View className="absolute bottom-8 left-0 right-0 flex-row items-center justify-center gap-11">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Recusar ${profile.name}`}
-            className="h-[68px] w-[68px] items-center justify-center rounded-full bg-[#26282B]"
-            onPress={onReject}
-          >
-            <Ionicons name="close" size={36} color="#FF2D73" />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Curtir ${profile.name}`}
-            className="h-[68px] w-[68px] items-center justify-center rounded-full bg-[#26282B]"
-            onPress={onAccept}
-          >
-            <Ionicons name="heart" size={36} color="#65E568" />
-          </Pressable>
-        </View>
-      </LinearGradient>
+      <DetailCard title="Linguagem do amor" icon="heart-outline">
+        <ChipList items={profile.loveLanguages} />
+      </DetailCard>
     </View>
   );
 }
@@ -386,7 +340,7 @@ export default function Matches() {
   const [seenProfileIds, setSeenProfileIds] = useState<string[]>([]);
   const [currentProfile, setCurrentProfile] = useState<MatchProfile | null>(null);
   const [nextProfile, setNextProfile] = useState<MatchProfile | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [contentHeight, setContentHeight] = useState(0);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -395,7 +349,42 @@ export default function Matches() {
   const [currentUserScopeId, setCurrentUserScopeId] = useState<string | null>(null);
   const profileCacheRef = useRef<Map<string, MatchProfile>>(new Map());
   const visibleProfileLoadRef = useRef(0);
+  const contentScrollRef = useRef<ScrollView | null>(null);
+  const detailsSpokenProfileIdRef = useRef<string | null>(null);
   const currentPhotoUrl = getActiveProfilePhotoUrl(currentProfile, currentPhotoIndex);
+
+  const resetContentScroll = useCallback(() => {
+    detailsSpokenProfileIdRef.current = null;
+    contentScrollRef.current?.scrollTo({ animated: false, y: 0 });
+  }, []);
+
+  const handleContentLayout = useCallback((event: LayoutChangeEvent) => {
+    setContentHeight(event.nativeEvent.layout.height);
+  }, []);
+
+  const handleContentScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!currentProfile || contentHeight === 0) {
+        return;
+      }
+
+      const scrolledIntoDetails =
+        event.nativeEvent.contentOffset.y > contentHeight * 0.4;
+
+      if (!scrolledIntoDetails) {
+        return;
+      }
+
+      if (detailsSpokenProfileIdRef.current === currentProfile.id) {
+        return;
+      }
+
+      detailsSpokenProfileIdRef.current = currentProfile.id;
+      // Acao sobre entidade dinamica: nome vindo do backend.
+      speak(buildActionSpeech("Mais detalhes de", currentProfile.name));
+    },
+    [contentHeight, currentProfile, speak]
+  );
 
   const showPreviousPhoto = useCallback(() => {
     const totalPhotos = currentProfile?.photoUrls.length ?? 0;
@@ -537,7 +526,7 @@ export default function Matches() {
           setSeenProfileIds(resolvedSeenProfileIds);
           setCurrentProfile(visibleCurrentProfile);
           setNextProfile(visibleNextProfile);
-          setDetailsOpen(false);
+          resetContentScroll();
           setLoadError("");
           setLoadingProfiles(false);
 
@@ -572,7 +561,7 @@ export default function Matches() {
 
       await persistDiscoveryState(scopeId, [], resolvedSeenProfileIds);
     },
-    [loadProfileById, persistDiscoveryState]
+    [loadProfileById, persistDiscoveryState, resetContentScroll]
   );
 
   const loadDiscoveryProfiles = useCallback(async () => {
@@ -676,7 +665,7 @@ export default function Matches() {
     setSeenProfileIds(nextSeenProfileIds);
     setCurrentProfile(seedCurrentProfile);
     setNextProfile(null);
-    setDetailsOpen(false);
+    resetContentScroll();
 
     await persistDiscoveryState(
       currentUserScopeId,
@@ -696,13 +685,14 @@ export default function Matches() {
     nextProfile,
     persistDiscoveryState,
     queuedProfileIds,
+    resetContentScroll,
     resolveVisibleProfiles,
     seenProfileIds,
   ]);
 
   function restartProfiles() {
     void loadDiscoveryProfiles();
-    setDetailsOpen(false);
+    resetContentScroll();
   }
 
   function rejectCurrentProfile() {
@@ -741,12 +731,6 @@ export default function Matches() {
         });
         return;
       }
-
-      showGlobalToast({
-        title: "Interesse enviado",
-        message: "Se a outra pessoa também curtir você, o match aparece aqui.",
-        variant: "success",
-      });
     } catch (nextError) {
       showGlobalToast({
         title: "Não foi possível enviar",
@@ -766,152 +750,148 @@ export default function Matches() {
       <SafeAreaView className="flex-1 bg-black">
         <GlobalTopNav />
 
-        <View className="flex-1 overflow-hidden rounded-b-[44px] bg-[#111214]">
+        <View
+          className="flex-1 overflow-hidden rounded-b-[44px] bg-[#111214]"
+          onLayout={handleContentLayout}
+        >
           {loadingProfiles ? (
             <ScreenLoading label="Buscando perfis compatíveis..." />
           ) : currentProfile ? (
             <>
-              <ProfilePhoto authToken={authToken} photoUrl={currentPhotoUrl} />
+              <ScrollView
+                ref={contentScrollRef}
+                className="flex-1"
+                onScroll={handleContentScroll}
+                scrollEventThrottle={64}
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={{ height: contentHeight || undefined }}>
+                  <ProfilePhoto authToken={authToken} photoUrl={currentPhotoUrl} />
 
-                {currentProfile.photoUrls.length > 1 ? (
-                  <View className="absolute top-4 left-0 right-0 items-center justify-center">
-                    <Text className="text-[16px] font-bold text-white/75">
-                      {currentPhotoIndex + 1}/{currentProfile.photoUrls.length}
+                  {currentProfile.photoUrls.length > 1 ? (
+                    <View className="absolute top-4 left-0 right-0 items-center justify-center">
+                      <Text className="text-[16px] font-bold text-white/75">
+                        {currentPhotoIndex + 1}/{currentProfile.photoUrls.length}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  <LinearGradient
+                    colors={[
+                      "rgba(0,0,0,0.02)",
+                      "rgba(0,0,0,0.34)",
+                      "rgba(0,0,0,0.92)",
+                    ]}
+                    locations={[0, 0.46, 1]}
+                    style={{
+                      bottom: 0,
+                      left: 0,
+                      position: "absolute",
+                      right: 0,
+                      top: 0,
+                    }}
+                  />
+
+                  {currentProfile.photoUrls.length > 1 ? (
+                    <View
+                      pointerEvents="box-none"
+                      style={{
+                        bottom: 0,
+                        justifyContent: "center",
+                        left: 0,
+                        position: "absolute",
+                        right: 0,
+                        top: 0,
+                      }}
+                    >
+                      <View className="flex-row items-center justify-between px-5">
+                        <Pressable
+                          accessibilityLabel="Ver foto anterior"
+                          className="h-14 w-14 items-center justify-center rounded-full border border-white/20 bg-black/35"
+                          onPress={showPreviousPhoto}
+                        >
+                          <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+                        </Pressable>
+
+                        <Pressable
+                          accessibilityLabel="Ver próxima foto"
+                          className="h-14 w-14 items-center justify-center rounded-full border border-white/20 bg-black/35"
+                          onPress={showNextPhotoImage}
+                        >
+                          <Ionicons name="chevron-forward" size={28} color="#FFFFFF" />
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  <View className="absolute bottom-32 left-7 right-7">
+                    <Text className="text-[34px] font-semibold text-white">
+                      {currentProfile.name}{", "}
+                      <Text className="text-[34px] font-normal text-white/75">
+                        {currentProfile.age}
+                      </Text>
+                      <Text className="text-[18px] font-normal text-white/75">
+                        {currentProfile.pronouns && !currentProfile.pronouns.startsWith("Prefiro") ? ` (${currentProfile.pronouns})` : ""}
+                      </Text>
                     </Text>
+
+                    <Text className="mt-2 text-[16px] font-normal leading-2 text-white">
+                      {currentProfile.bio}
+                    </Text>
+
+                    <View
+                      accessible
+                      accessibilityRole="text"
+                      accessibilityLabel="Role a tela para baixo para ver mais detalhes do perfil"
+                      className="mt-4 flex-row items-center"
+                    >
+                      <Ionicons name="chevron-down" size={18} color="#FFFFFF" />
+                      <Text className="ml-2 text-[14px] font-semibold text-white/75">
+                        Role para ver mais detalhes
+                      </Text>
+                    </View>
                   </View>
-                ) : null}
+                </View>
+
+                <ProfileDetailsContent profile={currentProfile} />
+              </ScrollView>
 
               <LinearGradient
-                colors={[
-                  "rgba(0,0,0,0.02)",
-                  "rgba(0,0,0,0.34)",
-                  "rgba(0,0,0,0.92)",
-                ]}
-                locations={[0, 0.46, 1]}
+                colors={["transparent", "rgba(0,0,0,0.9)"]}
+                pointerEvents="box-none"
                 style={{
                   bottom: 0,
+                  height: 132,
                   left: 0,
                   position: "absolute",
                   right: 0,
-                  top: 0,
                 }}
-              />
-
-              {currentProfile.photoUrls.length > 1 ? (
-                <View
-                  pointerEvents="box-none"
-                  style={{
-                    bottom: 0,
-                    justifyContent: "center",
-                    left: 0,
-                    position: "absolute",
-                    right: 0,
-                    top: 0,
-                  }}
-                >
-                  <View className="flex-row items-center justify-between px-5">
-                    <Pressable
-                      accessibilityLabel="Ver foto anterior"
-                      className="h-14 w-14 items-center justify-center rounded-full border border-white/20 bg-black/35"
-                      onPress={showPreviousPhoto}
-                    >
-                      <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
-                    </Pressable>
-
-                    <Pressable
-                      accessibilityLabel="Ver próxima foto"
-                      className="h-14 w-14 items-center justify-center rounded-full border border-white/20 bg-black/35"
-                      onPress={showNextPhotoImage}
-                    >
-                      <Ionicons name="chevron-forward" size={28} color="#FFFFFF" />
-                    </Pressable>
-                  </View>
-                </View>
-              ) : null}
-
-              <View className="absolute bottom-32 left-7 right-7">
-                <Text className="text-[34px] font-semibold text-white">
-                  {currentProfile.name}{", "}
-                  <Text className="text-[34px] font-normal text-white/75">
-                    {currentProfile.age}
-                  </Text>
-                  <Text className="text-[18px] font-normal text-white/75">
-                    {currentProfile.pronouns && !currentProfile.pronouns.startsWith("Prefiro") ? ` (${currentProfile.pronouns})` : ""}
-                  </Text>
-                </Text>
-
-                <Text className="mt-2 text-[16px] font-normal leading-2 text-white">
-                  {currentProfile.bio}
-                </Text>
-
-              </View>
-
-              <View className="absolute bottom-8 left-0 right-0 flex-row items-center justify-center gap-11">
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Recusar ${currentProfile.name}`}
-                  className="h-[68px] w-[68px] items-center justify-center rounded-full bg-[#26282B]"
-                  disabled={submitting}
-                  onPress={rejectCurrentProfile}
-                >
-                  <Ionicons name="close" size={36} color="#FF2D73" />
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Curtir ${currentProfile.name}`}
-                  className="h-[68px] w-[68px] items-center justify-center rounded-full bg-[#26282B]"
-                  disabled={submitting}
-                  onPress={acceptCurrentProfile}
-                >
-                  {submitting ? (
-                    <ActivityIndicator color="#65E568" size="small" />
-                  ) : (
-                    <Ionicons name="heart" size={36} color="#65E568" />
-                  )}
-                </Pressable>
-              </View>
-              
-              <View className="absolute top-4 left-4 right-4 items-end justify-end">
+              >
+                <View className="absolute bottom-8 left-0 right-0 flex-row items-center justify-center gap-11">
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Ver gostos e preferências"
-                    className="h-12 w-36 items-center justify-center rounded-full border border-white/35 bg-black/25"
-                    onPress={() => {
-                      speak(
-                        detailsOpen
-                          ? "Fechar detalhes"
-                          : buildActionSpeech(
-                              "Mais detalhes de",
-                              currentProfile.name
-                            )
-                      );
-                      setDetailsOpen((isOpen) => !isOpen);
-                    }}
+                    accessibilityLabel={`Recusar ${currentProfile.name}`}
+                    className="h-[68px] w-[68px] items-center justify-center rounded-full bg-[#26282B]"
+                    disabled={submitting}
+                    onPress={rejectCurrentProfile}
                   >
-                    <View className="flex-row items-center">
-                      <Text className="text-[14px] font-semibold text-white">
-                        Mais Detalhes
-                      </Text>
-                      <Ionicons
-                        name={detailsOpen ? "arrow-down" : "arrow-up"}
-                        size={18}
-                        color="#ffffff"
-                      />
-                    </View>
-                </Pressable>
-              </View>
-
-              {detailsOpen ? (
-                <ProfileDetailsPanel
-                  profile={currentProfile}
-                  onAccept={acceptCurrentProfile}
-                  onClose={() => {
-                    speak("Fechar detalhes");
-                    setDetailsOpen(false);
-                  }}
-                  onReject={rejectCurrentProfile}
-                />
-              ) : null}
+                    <Ionicons name="close" size={36} color="#FF2D73" />
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Curtir ${currentProfile.name}`}
+                    className="h-[68px] w-[68px] items-center justify-center rounded-full bg-[#26282B]"
+                    disabled={submitting}
+                    onPress={acceptCurrentProfile}
+                  >
+                    {submitting ? (
+                      <ActivityIndicator color="#65E568" size="small" />
+                    ) : (
+                      <Ionicons name="heart" size={36} color="#65E568" />
+                    )}
+                  </Pressable>
+                </View>
+              </LinearGradient>
             </>
           ) : loadError ? (
             <View className="flex-1 items-center justify-center px-8">

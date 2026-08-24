@@ -2,6 +2,8 @@ import type { PageResponse } from "./pagination";
 
 export type CommunityRole = "ADMIN" | "MEMBER" | "MODERATOR";
 
+export type CommunityPrivacy = "PUBLIC" | "PRIVATE";
+
 export interface CommunityUserSummaryResponse {
   id?: string | null;
   userProfileId?: string | null;
@@ -26,14 +28,15 @@ export interface CommunitySummaryResponse {
   currentUserRole?: CommunityRole | null;
   isOwner?: boolean | null;
   category?: CommunityCategoryResponse | null;
+  privacy?: CommunityPrivacy | null;
+  hasPendingRequest?: boolean | null;
 }
 
-// TODO: campo `visibility` de comunidade permanece fora de escopo (ver plano,
-// seção 7 item 9) — nao criar enum/filtro de visibilidade por enquanto.
 export interface CommunityUpdateRequestFields {
   name: string;
   description?: string | null;
   categoryId?: number | null;
+  privacy?: CommunityPrivacy | null;
 }
 
 export interface CommunityDirectoryResponse {
@@ -51,6 +54,7 @@ export interface CommunityMembershipResponse {
   memberCount: number;
   role?: CommunityRole | null;
   isOwner?: boolean | null;
+  pendingRequest?: boolean | null;
 }
 
 export interface CommunityPostAuthorResponse extends CommunityUserSummaryResponse {}
@@ -115,3 +119,22 @@ export interface CommunityFeedResponse {
   community: CommunitySummaryResponse | null;
   posts: PageResponse<CommunityPostResponse>;
 }
+
+export interface CommunityJoinRequestResponse {
+  id: string;
+  userProfileId?: string | null;
+  name?: string | null;
+  avatarData?: string | null;
+  requestedAt?: string | null;
+}
+
+export type CommunityJoinRequestsResponse = PageResponse<CommunityJoinRequestResponse>;
+
+export interface CommunityForYouPostResponse {
+  communityId: string;
+  communityName: string;
+  communityIconData?: string | null;
+  post: CommunityPostResponse;
+}
+
+export type CommunityForYouFeedResponse = PageResponse<CommunityForYouPostResponse>;

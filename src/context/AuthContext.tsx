@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 
+import { setUserNotFoundHandler } from "../api/session-events";
 import { authService } from "../services/authService";
 import { clearEntireClientStorage } from "../storage/clientStorage";
 import {
@@ -83,6 +84,20 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return () => {
       isMounted = false;
       unsubscribe();
+    };
+  }, []);
+
+  // O interceptor de erro da API nao consegue importar `clearEntireClientStorage`
+  // (ciclo de imports), entao o provider registra a limpeza aqui. Usada quando o
+  // backend responde `USER_NOT_FOUND` para o usuario autenticado: e um logout
+  // apenas local, sem chamar `/auth/logout` (o usuario ja nao existe la).
+  useEffect(() => {
+    setUserNotFoundHandler(async () => {
+      await clearEntireClientStorage();
+    });
+
+    return () => {
+      setUserNotFoundHandler(null);
     };
   }, []);
 

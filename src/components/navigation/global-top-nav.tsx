@@ -20,11 +20,21 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
+const PROFILE_ROUTE = "/profile";
+
 type GlobalTopNavProps = {
   settingsRoute?: string | null;
+  backRoute?: string | null;
+  backLabel?: string;
+  showMenu?: boolean;
 };
 
-export function GlobalTopNav({ settingsRoute = null }: GlobalTopNavProps) {
+export function GlobalTopNav({
+  settingsRoute = null,
+  backRoute = null,
+  backLabel = "Voltar",
+  showMenu = true,
+}: GlobalTopNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { session, signOut } = useAuth();
@@ -33,6 +43,20 @@ export function GlobalTopNav({ settingsRoute = null }: GlobalTopNavProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const initials = useMemo(() => getInitials(currentUserName || "Perfil"), [currentUserName]);
   const shouldShowMutualMatchesShortcut = pathname === "/matches";
+  // O cartao do usuario ja leva ao perfil: manter o item "Perfil" duplicaria a rota no menu.
+  const menuTabs = useMemo(
+    () => navigationTabs.filter((tab) => tab.route !== PROFILE_ROUTE),
+    []
+  );
+
+  function handleOpenProfile() {
+    speak(joinSpeechParts(["Seu perfil", currentUserName || null]));
+    setMenuOpen(false);
+
+    if (pathname !== PROFILE_ROUTE && !pathname.startsWith(`${PROFILE_ROUTE}/`)) {
+      router.replace(PROFILE_ROUTE);
+    }
+  }
 
   async function handleSignOut() {
     speak("Sair da conta");
@@ -44,20 +68,44 @@ export function GlobalTopNav({ settingsRoute = null }: GlobalTopNavProps) {
   return (
     <>
       <View className="h-16 flex-row items-center justify-between border-b border-[#262037] bg-[#090B18] px-6">
-        <Pressable
-          className="h-10 w-10 items-center justify-center rounded-full"
-          onPress={() => {
-            // O nome do usuario e dado de runtime: falar junto situa o menu.
-            speak(
-              joinSpeechParts(["Menu aberto", currentUserName || null])
-            );
-            setMenuOpen(true);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Abrir menu"
-        >
-          <Ionicons name="menu-outline" size={24} color="#A270FF" />
-        </Pressable>
+        <View className="flex-row items-center">
+          {backRoute ? (
+            <Pressable
+              className="mr-1 h-10 w-10 items-center justify-center rounded-full"
+              onPress={() => {
+                speak(backLabel);
+                // `replace` (e nao `back`): a tela pode ser aberta por deep link,
+                // quando nao existe historico para voltar.
+                router.replace(backRoute);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={backLabel}
+            >
+              <Ionicons name="arrow-back" size={24} color="#A270FF" />
+            </Pressable>
+          ) : null}
+
+          {showMenu ? (
+            <Pressable
+              className="h-10 w-10 items-center justify-center rounded-full"
+              onPress={() => {
+                // O nome do usuario e dado de runtime: falar junto situa o menu.
+                speak(
+                  joinSpeechParts(["Menu aberto", currentUserName || null])
+                );
+                setMenuOpen(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Abrir menu"
+            >
+              <Ionicons name="menu-outline" size={24} color="#A270FF" />
+            </Pressable>
+          ) : backRoute ? null : (
+            // Sem menu e sem voltar o lado esquerdo ficaria vazio e o titulo
+            // "UNIFY" sairia do centro: o espacador ocupa o lugar do botao.
+            <View className="h-10 w-10" />
+          )}
+        </View>
 
         <Text className="text-[26px] font-black tracking-[2px] text-[#7C4DFF]">UNIFY</Text>
 
@@ -113,7 +161,13 @@ export function GlobalTopNav({ settingsRoute = null }: GlobalTopNavProps) {
               </Pressable>
             </View>
 
-            <View className="mt-8 flex-row items-center rounded-[28px] border border-[#2B2D39] bg-[#151722] p-4">
+            <Pressable
+              className="mt-8 flex-row items-center rounded-[28px] border border-[#2B2D39] bg-[#151722] p-4"
+              onPress={handleOpenProfile}
+              accessibilityRole="button"
+              accessibilityLabel="Abrir seu perfil"
+              accessibilityHint="Abre a tela do seu perfil"
+            >
               <View className="h-16 w-16 overflow-hidden rounded-full border-2 border-[#7C4DFF] bg-[#2D2A33]">
                 {currentUserPhotoUrl ? (
                   <AuthenticatedRemoteImage
@@ -142,10 +196,12 @@ export function GlobalTopNav({ settingsRoute = null }: GlobalTopNavProps) {
                   {currentUserName}
                 </Text>
               </View>
-            </View>
+
+              <Ionicons name="chevron-forward" size={20} color="#6F7181" />
+            </Pressable>
 
             <ScrollView className="mt-8 flex-1" showsVerticalScrollIndicator={false}>
-              {navigationTabs.map((tab) => {
+              {menuTabs.map((tab) => {
                 const active = pathname === tab.route || pathname.startsWith(`${tab.route}/`);
                 const badgeValue =
                   tab.badgeKey === "matches" && unseenProfilesCount > 0

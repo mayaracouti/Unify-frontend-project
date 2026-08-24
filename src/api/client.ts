@@ -186,7 +186,7 @@ function shouldShowErrorToast(
   error: NormalizedApiError,
   request: ApiRequestConfig
 ): boolean {
-  if (request.suppressErrorToast) {
+  if (request.suppressErrorToast || error.toastHandled) {
     return false;
   }
 

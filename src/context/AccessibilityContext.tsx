@@ -26,7 +26,6 @@ const DEFAULT_SETTINGS: UserAccessibilitySettingsResponse = {
   fontScale: "MEDIUM",
   fontScaleMultiplier: 1,
   highContrast: false,
-  screenReaderOptimized: false,
   reduceMotion: false,
 };
 
@@ -96,14 +95,13 @@ export function AccessibilityProvider({ children }: PropsWithChildren) {
     };
   }, [isAuthenticated, isReady]);
 
-  // Alimenta o singleton global consumido pelo patch de `Text`/`TextInput`,
-  // pelo leitor de tela e pelos componentes animados. Cobre tanto a hidratacao
-  // do cache local (cold start) quanto as alteracoes feitas pelo usuario.
+  // Alimenta o singleton global consumido pelo patch de `Text`/`TextInput` e
+  // pelos componentes animados. Cobre tanto a hidratacao do cache local
+  // (cold start) quanto as alteracoes feitas pelo usuario.
   useEffect(() => {
     setGlobalTextAdjustments({
       fontScaleMultiplier: settings.fontScaleMultiplier,
       highContrast: settings.highContrast,
-      screenReaderOptimized: settings.screenReaderOptimized,
       reduceMotion: settings.reduceMotion,
     });
   }, [settings]);
@@ -113,8 +111,6 @@ export function AccessibilityProvider({ children }: PropsWithChildren) {
       const nextRequest: UserAccessibilitySettingsUpsertRequest = {
         fontScale: patch.fontScale ?? settings.fontScale,
         highContrast: patch.highContrast ?? settings.highContrast,
-        screenReaderOptimized:
-          patch.screenReaderOptimized ?? settings.screenReaderOptimized,
         reduceMotion: patch.reduceMotion ?? settings.reduceMotion,
       };
 

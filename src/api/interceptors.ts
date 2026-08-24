@@ -1,10 +1,43 @@
-import { apiClient } from "./client";
-import type { AuthSession, TokenResponse } from "../types/auth";
+import { apiClient, type ApiRequestConfig } from "./client";
+import { notifyUserNotFound } from "./session-events";
+import { Platform } from "react-native";
+import type { AuthSession, NormalizedApiError, TokenResponse } from "../types/auth";
 import { createAuthSession } from "../types/auth";
-import { clearAuthSession, getAuthSnapshot, saveAuthSession } from "../storage/tokenStorage";
+import {
+  clearAllStoredAuthData,
+  clearAuthSession,
+  getAuthSnapshot,
+  saveAuthSession,
+} from "../storage/tokenStorage";
+import { showGlobalToast } from "../utils/globalToast";
 
 let initialized = false;
 let refreshPromise: Promise<AuthSession | null> | null = null;
+
+/** `ErrorCode.USER_NOT_FOUND` do backend (HTTP 404). */
+const USER_NOT_FOUND_ERROR = "USER_NOT_FOUND";
+const USER_NOT_FOUND_CODE = 4001;
+const USER_NOT_FOUND_MESSAGE = "Usuário não encontrado";
+
+/**
+ * `true` somente quando o backend diz, de forma explicita, que o usuario
+ * AUTENTICADO nao existe mais (o token e valido, mas o registro sumiu).
+ *
+ * A checagem e deliberadamente estreita: exige a requisicao autenticada, o
+ * status 404 e o identificador do erro no corpo. Um 404 generico
+ * (`RESOURCE_NOT_FOUND`, ex.: "Perfil de destino nao encontrado"), um 403 ou
+ * qualquer outra falha NAO desloga ninguem.
+ */
+function isAuthenticatedUserNotFound(
+  error: NormalizedApiError,
+  request: ApiRequestConfig
+): boolean {
+  return (
+    request.requiresAuth === true &&
+    error.status === 404 &&
+    (error.error === USER_NOT_FOUND_ERROR || error.code === USER_NOT_FOUND_CODE)
+  );
+}
 
 function isFormData(value: unknown): value is FormData {
   return typeof FormData !== "undefined" && value instanceof FormData;
@@ -112,6 +145,27 @@ export function initializeApiInterceptors() {
     // negocio (ex.: moderador tentando alterar um admin) e NAO deve deslogar.
     if (error.status === 401 && request.requiresAuth) {
       await clearAuthSession();
+    }
+
+    // Usuario autenticado que nao existe mais no backend: nao ha o que
+    // recuperar, entao a sessao e encerrada e o app avisa com uma mensagem
+    // unica. O `NavigationGuard` leva para o login assim que a sessao some.
+    if (isAuthenticatedUserNotFound(error, request)) {
+      const clearedByAuthProvider = await notifyUserNotFound();
+
+      if (!clearedByAuthProvider) {
+        await clearAllStoredAuthData({
+          clearEntireWebStorage: Platform.OS === "web",
+        });
+      }
+
+      // Evita o toast generico do cliente HTTP em cima deste.
+      error.toastHandled = true;
+
+      showGlobalToast({
+        message: USER_NOT_FOUND_MESSAGE,
+        variant: "error",
+      });
     }
 
     throw error;

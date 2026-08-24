@@ -23,9 +23,11 @@ import { ScreenLoading } from "../../src/components/ui/screen-loading";
 import { useAuth } from "../../src/context/AuthContext";
 import { useCommunityDangerActions } from "../../src/hooks/use-community-danger-actions";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
+import { CommunityPrivacySelector } from "../../src/components/community/privacy-selector";
 import { communityService } from "../../src/services/communityService";
 import type {
   CommunityCategoryResponse,
+  CommunityPrivacy,
   CommunitySummaryResponse,
 } from "../../src/types/community";
 import { formatApiErrorMessage } from "../../src/utils/auth";
@@ -58,12 +60,14 @@ function buildCommunityUpdateFormData(args: {
   name: string;
   description: string;
   categoryId: number | null;
+  privacy: CommunityPrivacy;
   asset: ImagePicker.ImagePickerAsset | null;
 }) {
   const formData = new FormData();
 
   formData.append("name", args.name);
   formData.append("description", args.description.trim());
+  formData.append("privacy", args.privacy);
 
   if (args.categoryId) {
     formData.append("categoryId", String(args.categoryId));
@@ -113,6 +117,7 @@ export default function CommunitySettingsScreen() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [privacy, setPrivacy] = useState<CommunityPrivacy>("PUBLIC");
   const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(
     null
   );
@@ -143,6 +148,7 @@ export default function CommunitySettingsScreen() {
       setName(loadedCommunity?.name ?? "");
       setDescription(loadedCommunity?.description ?? "");
       setCategoryId(loadedCommunity?.category?.id ?? null);
+      setPrivacy(loadedCommunity?.privacy ?? "PUBLIC");
 
       if (!loadedCommunity) {
         setLoadError("Não foi possível carregar os dados desta comunidade.");
@@ -246,6 +252,7 @@ export default function CommunitySettingsScreen() {
         name: trimmedName,
         description,
         categoryId,
+        privacy,
         asset: selectedImage,
       });
 
@@ -266,7 +273,7 @@ export default function CommunitySettingsScreen() {
     } finally {
       setSaving(false);
     }
-  }, [categoryId, communityId, description, router, saving, selectedImage, trimmedName]);
+  }, [categoryId, communityId, description, privacy, router, saving, selectedImage, trimmedName]);
 
   const handleBack = useCallback(() => {
     if (communityId) {
@@ -411,6 +418,15 @@ export default function CommunitySettingsScreen() {
                 <Text className="mt-2 text-right text-[12px] font-semibold text-[#948EA1]">
                   {description.length} / 400
                 </Text>
+              </View>
+
+              <View className="mt-6 rounded-[28px] bg-[#111214] p-6">
+                <Text className="mb-1 text-[22px] font-bold text-white">Privacidade</Text>
+                <Text className="mb-4 text-[14px] font-semibold leading-6 text-[#CAC3D8]">
+                  Em comunidades privadas, novas entradas ficam pendentes até aprovação da moderação.
+                </Text>
+
+                <CommunityPrivacySelector value={privacy} onChange={setPrivacy} />
               </View>
 
               {categories.length > 0 ? (

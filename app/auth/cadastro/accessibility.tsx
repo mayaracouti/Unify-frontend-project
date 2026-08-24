@@ -39,9 +39,6 @@ export default function CadastroAccessibility() {
 
   const [fontScale, setFontScale] = useState<FontScaleOption>(settings.fontScale);
   const [highContrast, setHighContrast] = useState(settings.highContrast);
-  const [screenReaderOptimized, setScreenReaderOptimized] = useState(
-    settings.screenReaderOptimized
-  );
   const [reduceMotion, setReduceMotion] = useState(settings.reduceMotion);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -68,7 +65,6 @@ export default function CadastroAccessibility() {
       await updateSettings({
         fontScale,
         highContrast,
-        screenReaderOptimized,
         reduceMotion,
       });
 
@@ -154,8 +150,7 @@ export default function CadastroAccessibility() {
             }`}
           >
             Estas preferências ajustam o tamanho do texto, o contraste das cores,
-            a otimização para leitores de tela e a redução de animações dentro do
-            aplicativo.
+            a leitura por voz e a redução de animações dentro do aplicativo.
           </Text>
 
           <Text
@@ -384,44 +379,6 @@ export default function CadastroAccessibility() {
               accessibilityLabel="Alto contraste"
               accessibilityHint="Aumenta o contraste entre texto, bordas e fundo"
               accessibilityState={{ checked: highContrast }}
-            />
-          </View>
-
-          <View
-            className={`mb-4 flex-row items-center justify-between rounded-md border p-4 ${
-              highContrast
-                ? "border-hc-border bg-hc-surface"
-                : "border-[#5A5A61] bg-[#19191C]"
-            }`}
-          >
-            <View className="flex-1 pr-4">
-              <Text
-                className={`mb-1 text-[17px] font-extrabold ${
-                  highContrast ? "text-hc-text" : "text-white"
-                }`}
-              >
-                Leitor de Tela
-              </Text>
-              <Text
-                className={`text-[12px] font-semibold ${
-                  highContrast ? "text-hc-text" : "text-[#A9A9B2]"
-                }`}
-              >
-                Otimizar telas para leitores de tela
-              </Text>
-            </View>
-            <Switch
-              value={screenReaderOptimized}
-              onValueChange={(value) => {
-                speak(buildSwitchSpeech("Otimização para leitor de tela", value));
-                setScreenReaderOptimized(value);
-              }}
-              trackColor={{ false: "#5F6068", true: "#F2F500" }}
-              thumbColor="#FFFFFF"
-              accessibilityRole="switch"
-              accessibilityLabel="Otimizar para leitor de tela"
-              accessibilityHint="Simplifica a leitura das telas por leitores de tela"
-              accessibilityState={{ checked: screenReaderOptimized }}
             />
           </View>
 

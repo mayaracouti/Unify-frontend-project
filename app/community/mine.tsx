@@ -250,33 +250,29 @@ export default function MyCommunitiesScreen() {
               showsVerticalScrollIndicator={false}
             >
               <View className="rounded-[32px] bg-surface-alt p-6">
-                <View className="flex-row items-start justify-between gap-4">
-                  <View className="flex-1">
-                    <Text className="text-[34px] font-black leading-10 text-white">
-                      Minhas comunidades
-                    </Text>
-                    <Text className="mt-3 text-justify text-[15px] font-semibold leading-6 text-content-secondary">
-                      Aqui ficam apenas as comunidades das quais você participa, incluindo as
-                      que você criou.
-                    </Text>
-                  </View>
-
-                  <Pressable
-                    className="rounded-full border border-[#3A3246] bg-[#17181C] px-4 py-3"
-                    onPress={() => {
-                      speak("Explorar comunidades");
-                      router.push("/community");
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Explorar comunidades"
-                    accessibilityHint="Abre a lista com todas as comunidades disponíveis"
-                  >
-                    <View className="flex-row items-center gap-2">
-                      <Ionicons name="compass-outline" size={18} color="#EAEA00" />
-                      <Text className="text-[13px] font-black text-white">Explorar</Text>
-                    </View>
-                  </Pressable>
+                <View>
+                  <Text className="text-[34px] font-black leading-10 text-white">
+                    Minhas comunidades
+                  </Text>
+                  <Text className="mt-3 text-justify text-[15px] font-semibold leading-6 text-content-secondary">
+                    Aqui ficam apenas as comunidades das quais você participa, incluindo as
+                    que você criou.
+                  </Text>
                 </View>
+
+                <Pressable
+                  className="mt-4 flex-row items-center justify-center gap-2 rounded-[24px] border border-[#3A3246] bg-[#17181C] px-4 py-3"
+                  onPress={() => {
+                    speak("Explorar comunidades");
+                    router.push("/community");
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Explorar comunidades"
+                  accessibilityHint="Abre a lista com todas as comunidades disponíveis"
+                >
+                  <Ionicons name="compass-outline" size={18} color="#EAEA00" />
+                  <Text className="text-[14px] font-black text-white">Explorar comunidades</Text>
+                </Pressable>
               </View>
 
               {loadError && directory.communities.length > 0 ? (

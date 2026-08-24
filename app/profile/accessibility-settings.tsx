@@ -102,7 +102,11 @@ export default function AccessibilitySettings() {
   return (
     <View className={highContrast ? "flex-1 bg-hc-bg" : "flex-1 bg-[#151515]"}>
       <SafeAreaView className="flex-1">
-        <GlobalTopNav />
+        <GlobalTopNav
+          backRoute="/profile"
+          backLabel="Voltar para o seu perfil"
+          showMenu={false}
+        />
 
         <ScrollView
           className="flex-1"
@@ -130,9 +134,8 @@ export default function AccessibilitySettings() {
               highContrast ? "text-hc-text" : "text-[#B9BAC4]"
             }`}
           >
-            Ajuste o tamanho do texto, o contraste das cores, a otimização para
-            leitores de tela e a redução de animações. As alterações são salvas
-            automaticamente.
+            Ajuste o tamanho do texto, o contraste das cores, a leitura por voz
+            e a redução de animações. As alterações são salvas automaticamente.
           </Text>
 
           {/* Estado de salvamento anunciado ao leitor de tela. */}
@@ -159,33 +162,6 @@ export default function AccessibilitySettings() {
               {error}
             </Text>
           ) : null}
-
-          <View className={`${cardClassName} flex-row items-center justify-between`}>
-            <View className="flex-1 pr-4">
-              <Text className={`mb-1 ${titleClassName}`}>Leitura por voz</Text>
-              <Text className={captionClassName}>
-                Ler em voz alta conteúdos e ações ao tocar
-              </Text>
-            </View>
-            <Switch
-              value={ttsEnabled}
-              onValueChange={(value) => {
-                // A preferencia e local (vale antes do login e sem rede) e o
-                // efeito e imediato. `force`: a confirmacao precisa ser audivel
-                // inclusive no instante em que o recurso e desligado.
-                setTtsEnabled(value);
-                speak(buildSwitchSpeech("Leitura por voz", value), {
-                  force: true,
-                });
-              }}
-              trackColor={{ false: "#5F6068", true: "#F2F500" }}
-              thumbColor="#FFFFFF"
-              accessibilityRole="switch"
-              accessibilityLabel="Leitura por voz"
-              accessibilityHint="Lê em voz alta conteúdos e ações conforme você navega"
-              accessibilityState={{ checked: ttsEnabled }}
-            />
-          </View>
 
           <View className={cardClassName}>
             <View className="mb-4 flex-row items-center justify-between">
@@ -292,30 +268,28 @@ export default function AccessibilitySettings() {
 
           <View className={`${cardClassName} flex-row items-center justify-between`}>
             <View className="flex-1 pr-4">
-              <Text className={`mb-1 ${titleClassName}`}>Leitor de tela</Text>
+              <Text className={`mb-1 ${titleClassName}`}>Leitura por voz</Text>
               <Text className={captionClassName}>
-                Otimizar telas para leitores de tela
+                Ler em voz alta conteúdos e ações ao tocar
               </Text>
             </View>
             <Switch
-              value={settings.screenReaderOptimized}
-              disabled={saving}
+              value={ttsEnabled}
               onValueChange={(value) => {
-                // A fala do app agora e governada pela "Leitura por voz" acima;
-                // esta preferencia mantem apenas a otimizacao de telas para
-                // leitores de tela (TalkBack/VoiceOver).
-                speak(buildSwitchSpeech("Otimização para leitor de tela", value));
-                void persist({ screenReaderOptimized: value });
+                // A preferencia e local (vale antes do login e sem rede) e o
+                // efeito e imediato. `force`: a confirmacao precisa ser audivel
+                // inclusive no instante em que o recurso e desligado.
+                setTtsEnabled(value);
+                speak(buildSwitchSpeech("Leitura por voz", value), {
+                  force: true,
+                });
               }}
               trackColor={{ false: "#5F6068", true: "#F2F500" }}
               thumbColor="#FFFFFF"
               accessibilityRole="switch"
-              accessibilityLabel="Otimizar para leitor de tela"
-              accessibilityHint="Simplifica a leitura das telas por leitores de tela"
-              accessibilityState={{
-                checked: settings.screenReaderOptimized,
-                disabled: saving,
-              }}
+              accessibilityLabel="Leitura por voz"
+              accessibilityHint="Lê em voz alta conteúdos e ações conforme você navega"
+              accessibilityState={{ checked: ttsEnabled }}
             />
           </View>
 

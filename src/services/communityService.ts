@@ -7,10 +7,13 @@ import type {
   CommunityCommentsResponse,
   CommunityCreateCommentRequest,
   CommunityFeedResponse,
+  CommunityForYouFeedResponse,
+  CommunityJoinRequestsResponse,
   CommunityLikeResponse,
   CommunityMembersResponse,
   CommunityMemberRoleResponse,
   CommunityMemberRoleUpdateRequest,
+  CommunityMemberResponse,
   CommunityMembershipResponse,
   CommunityPostResponse,
   CommunitySummaryResponse,
@@ -20,6 +23,8 @@ const COMMUNITIES_ENDPOINT = "/communities";
 const COMMUNITY_CATEGORIES_ENDPOINT = "/communities/categories";
 const MY_COMMUNITIES_ENDPOINT = "/communities/mine";
 const COMMUNITY_FEED_ENDPOINT = "/communities/feed";
+const COMMUNITY_FOR_YOU_FEED_ENDPOINT = "/communities/feed/me";
+const COMMUNITY_DISCOVER_ENDPOINT = "/communities/discover";
 const COMMUNITY_MEMBERSHIP_ENDPOINT = "/communities/membership";
 const COMMUNITY_POSTS_ENDPOINT = "/communities/posts";
 
@@ -105,6 +110,16 @@ export const communityService = {
     });
   },
 
+  discoverCommunities(args?: { page?: number; size?: number; categoryId?: number | null }) {
+    return customApiCall.get<CommunityDirectoryResponse>(COMMUNITY_DISCOVER_ENDPOINT, {
+      page: args?.page ?? 0,
+      size: args?.size ?? 20,
+      categoryId: args?.categoryId ?? undefined,
+    }, {
+      requiresAuth: true,
+    });
+  },
+
   getMyCommunities(args?: { page?: number; size?: number }) {
     return customApiCall.get<CommunityDirectoryResponse>(MY_COMMUNITIES_ENDPOINT, {
       page: args?.page ?? 0,
@@ -153,6 +168,17 @@ export const communityService = {
     );
   },
 
+  getForYouFeed(args?: { page?: number; size?: number }) {
+    return customApiCall.get<CommunityForYouFeedResponse>(
+      COMMUNITY_FOR_YOU_FEED_ENDPOINT,
+      {
+        page: args?.page ?? 0,
+        size: args?.size ?? 20,
+      },
+      { requiresAuth: true }
+    );
+  },
+
   joinCommunity(communityId: string) {
     return customApiCall.post<CommunityMembershipResponse>(
       appendQueryParams(COMMUNITY_MEMBERSHIP_ENDPOINT, { communityId }),
@@ -164,6 +190,32 @@ export const communityService = {
   leaveCommunity(communityId: string) {
     return customApiCall.delete<CommunityMembershipResponse>(
       appendQueryParams(COMMUNITY_MEMBERSHIP_ENDPOINT, { communityId }),
+      { requiresAuth: true }
+    );
+  },
+
+  getJoinRequests(communityId: string, args?: { page?: number; size?: number }) {
+    return customApiCall.get<CommunityJoinRequestsResponse>(
+      `${COMMUNITIES_ENDPOINT}/${encodePathSegment(communityId)}/join-requests`,
+      {
+        page: args?.page ?? 0,
+        size: args?.size ?? 20,
+      },
+      { requiresAuth: true }
+    );
+  },
+
+  approveJoinRequest(communityId: string, requestId: string) {
+    return customApiCall.post<CommunityMemberResponse>(
+      `${COMMUNITIES_ENDPOINT}/${encodePathSegment(communityId)}/join-requests/${encodePathSegment(requestId)}/approve`,
+      undefined,
+      { requiresAuth: true }
+    );
+  },
+
+  declineJoinRequest(communityId: string, requestId: string) {
+    return customApiCall.delete<void>(
+      `${COMMUNITIES_ENDPOINT}/${encodePathSegment(communityId)}/join-requests/${encodePathSegment(requestId)}`,
       { requiresAuth: true }
     );
   },

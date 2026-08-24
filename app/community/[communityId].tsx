@@ -172,6 +172,7 @@ function applyMembershipUpdate(
       memberCount: membership.memberCount,
       currentUserRole: membership.role ?? null,
       isOwner: membership.isOwner ?? false,
+      hasPendingRequest: membership.pendingRequest ?? false,
     },
   };
 }
@@ -344,39 +345,62 @@ function PostAction({
 function MemberButton({
   busy,
   isMember,
+  isPrivate,
+  pendingRequest,
   onPress,
 }: {
   busy: boolean;
   isMember?: boolean | null;
+  isPrivate?: boolean;
+  pendingRequest?: boolean | null;
   onPress: () => void;
 }) {
+  const muted = Boolean(isMember || pendingRequest);
+  const label = isMember
+    ? "Sair da comunidade"
+    : pendingRequest
+      ? "Cancelar solicitação"
+      : isPrivate
+        ? "Solicitar entrada"
+        : "Participar";
+  const icon = isMember
+    ? "exit-outline"
+    : pendingRequest
+      ? "hourglass-outline"
+      : isPrivate
+        ? "lock-open-outline"
+        : "add-circle";
+
   return (
     <Pressable
       className={`mt-8 h-14 w-full flex-row items-center justify-center gap-3 rounded-xl border-2 ${
-        isMember
-          ? "border-[#494455] bg-[#2E2B33]"
-          : "border-[#EAEA00] bg-[#EAEA00]"
+        muted ? "border-[#494455] bg-[#2E2B33]" : "border-[#EAEA00] bg-[#EAEA00]"
       }`}
       onPress={onPress}
       disabled={busy}
       accessibilityRole="button"
-      accessibilityLabel={isMember ? "Sair da comunidade" : "Entrar na comunidade"}
+      accessibilityLabel={label}
+      accessibilityHint={
+        pendingRequest
+          ? "Cancela sua solicitação pendente de entrada nesta comunidade"
+          : undefined
+      }
     >
       {busy ? (
-        <ActivityIndicator color={isMember ? "#E5E2E1" : "#323200"} size="small" />
+        <ActivityIndicator color={muted ? "#E5E2E1" : "#323200"} size="small" />
       ) : (
         <>
           <Ionicons
-            name={isMember ? "exit-outline" : "add-circle"}
+            name={icon as ComponentProps<typeof Ionicons>["name"]}
             size={22}
-            color={isMember ? "#E5E2E1" : "#323200"}
+            color={muted ? "#E5E2E1" : "#323200"}
           />
           <Text
             className={`text-[18px] font-black ${
-              isMember ? "text-[#E5E2E1]" : "text-[#1D1D00]"
+              muted ? "text-[#E5E2E1]" : "text-[#1D1D00]"
             }`}
           >
-            {isMember ? "Sair da comunidade" : "Participar"}
+            {label}
           </Text>
         </>
       )}
@@ -432,17 +456,21 @@ function CommunityOwnerCard({
 function CommunityHeader({
   activeTab,
   authToken,
+  canViewMembers,
   community,
   membershipBusy,
   onChangeTab,
+  onOpenJoinRequests,
   onOpenSettings,
   onToggleMembership,
 }: {
   activeTab: CommunityViewTab;
   authToken: string | null;
+  canViewMembers: boolean;
   community: CommunitySummaryResponse;
   membershipBusy: boolean;
   onChangeTab: (tab: CommunityViewTab) => void;
+  onOpenJoinRequests: () => void;
   onOpenSettings: () => void;
   onToggleMembership: () => void;
 }) {
@@ -453,31 +481,64 @@ function CommunityHeader({
       <View className="flex-row items-start justify-between gap-4">
         <CommunityBadge authToken={authToken} community={community} />
 
-        {community.isOwner || community.currentUserRole === "ADMIN" ? (
-          <Pressable
-            className="rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-3"
-            onPress={onOpenSettings}
-            accessibilityRole="button"
-            accessibilityLabel="Configurações da comunidade"
-            accessibilityHint="Abre a tela para editar, sair ou excluir esta comunidade"
-          >
-            <Ionicons name="settings-outline" size={16} color="#E5E2E1" />
-          </Pressable>
-        ) : null}
+        <View className="flex-row items-center gap-2">
+          {community.privacy === "PRIVATE" && canModerateRole(community.currentUserRole) ? (
+            <Pressable
+              className="rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-3"
+              onPress={onOpenJoinRequests}
+              accessibilityRole="button"
+              accessibilityLabel="Solicitações de entrada"
+              accessibilityHint="Abre a fila de solicitações pendentes para aprovar ou recusar"
+            >
+              <Ionicons name="person-add-outline" size={16} color="#EAEA00" />
+            </Pressable>
+          ) : null}
+
+          {community.isOwner || community.currentUserRole === "ADMIN" ? (
+            <Pressable
+              className="rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-3"
+              onPress={onOpenSettings}
+              accessibilityRole="button"
+              accessibilityLabel="Configurações da comunidade"
+              accessibilityHint="Abre a tela para editar, sair ou excluir esta comunidade"
+            >
+              <Ionicons name="settings-outline" size={16} color="#E5E2E1" />
+            </Pressable>
+          ) : null}
+        </View>
       </View>
 
       <Text className="mt-5 text-[32px] font-black leading-10 text-[#E5E2E1]">
         {community.name}
       </Text>
 
-      {memberCountLabel ? (
-        <View className="mt-3 flex-row items-center gap-2">
-          <Ionicons name="person" size={16} color="#7C4DFF" />
-          <Text className="text-[16px] font-black text-[#7C4DFF]">
-            {memberCountLabel}
+      <View className="mt-3 flex-row items-center gap-4">
+        {memberCountLabel ? (
+          <View className="flex-row items-center gap-2">
+            <Ionicons name="person" size={16} color="#7C4DFF" />
+            <Text className="text-[16px] font-black text-[#7C4DFF]">
+              {memberCountLabel}
+            </Text>
+          </View>
+        ) : null}
+
+        <View
+          className="flex-row items-center gap-1.5"
+          accessible
+          accessibilityLabel={
+            community.privacy === "PRIVATE" ? "Comunidade privada" : "Comunidade pública"
+          }
+        >
+          <Ionicons
+            name={community.privacy === "PRIVATE" ? "lock-closed-outline" : "globe-outline"}
+            size={15}
+            color="#CAC3D8"
+          />
+          <Text className="text-[14px] font-bold text-content-secondary">
+            {community.privacy === "PRIVATE" ? "Privada" : "Pública"}
           </Text>
         </View>
-      ) : null}
+      </View>
 
       {/* <View className="mt-6 rounded-2xl border border-[#3A3246] bg-[#17181C] px-4 py-4"> */}
         {/* <Text className="text-[12px] font-black uppercase tracking-[1.2px] text-content-secondary">
@@ -487,11 +548,13 @@ function CommunityHeader({
           Escolha entre as publicacoes e a lista de membros.
         </Text> */}
 
-        <CommunityContentTabs
-          activeTab={activeTab}
-          memberCount={community.memberCount}
-          onChange={onChangeTab}
-        />
+        {canViewMembers ? (
+          <CommunityContentTabs
+            activeTab={activeTab}
+            memberCount={community.memberCount}
+            onChange={onChangeTab}
+          />
+        ) : null}
       {/* </View> */}
 
       {community.description ? (
@@ -509,13 +572,19 @@ function CommunityHeader({
             ? canModerateRole(community.currentUserRole)
               ? "Você participa com elevação e pode moderar conteúdo dentro desta comunidade."
               : "Você participa desta comunidade e já pode publicar, curtir e comentar."
-            : "Entre para publicar, curtir e comentar nos posts da comunidade."}
+            : community.hasPendingRequest
+              ? "Sua solicitação de entrada está pendente. Um administrador ou moderador precisa aprová-la."
+              : community.privacy === "PRIVATE"
+                ? "Esta comunidade é privada: solicite entrada e aguarde a aprovação da moderação."
+                : "Entre para publicar, curtir e comentar nos posts da comunidade."}
       </Text>
 
       {!community.isOwner ? (
         <MemberButton
           busy={membershipBusy}
           isMember={community.isMember}
+          isPrivate={community.privacy === "PRIVATE"}
+          pendingRequest={community.hasPendingRequest}
           onPress={onToggleMembership}
         />
       ) : null}
@@ -830,10 +899,20 @@ export default function CommunityDetailScreen() {
   const [pendingDeletePostId, setPendingDeletePostId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const spokenCommunityIdRef = useRef<string | null>(null);
+  // A aba de membros e restrita a quem participa: o backend recusa a listagem
+  // para nao membros, entao a aba nem chega a ser exibida.
+  const canViewMembers = canParticipateInCommunity(feed?.community);
 
   useEffect(() => {
     setActiveTab(requestedTab);
   }, [requestedTab]);
+
+  // Deep link com `tab=members` ou saida da comunidade caem de volta nas publicacoes.
+  useEffect(() => {
+    if (!canViewMembers) {
+      setActiveTab("posts");
+    }
+  }, [canViewMembers]);
 
   // Abrir a comunidade (inclusive por deep link) anuncia o conteudo semantico
   // real dela uma unica vez por comunidade carregada.
@@ -944,7 +1023,12 @@ export default function CommunityDetailScreen() {
   }, [canAccessCompletedOnboardingContent, isFocused, loadFeed]);
 
   useEffect(() => {
-    if (!isFocused || !canAccessCompletedOnboardingContent || activeTab !== "members") {
+    if (
+      !isFocused ||
+      !canAccessCompletedOnboardingContent ||
+      !canViewMembers ||
+      activeTab !== "members"
+    ) {
       return;
     }
 
@@ -952,7 +1036,7 @@ export default function CommunityDetailScreen() {
     membersInitialLoadRef.current = true;
 
     void loadMembers({ showLoader: shouldShowLoader });
-  }, [activeTab, canAccessCompletedOnboardingContent, isFocused, loadMembers]);
+  }, [activeTab, canAccessCompletedOnboardingContent, canViewMembers, isFocused, loadMembers]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
@@ -961,13 +1045,13 @@ export default function CommunityDetailScreen() {
       try {
         await Promise.all([
           loadFeed(),
-          activeTab === "members" ? loadMembers() : Promise.resolve(),
+          activeTab === "members" && canViewMembers ? loadMembers() : Promise.resolve(),
         ]);
       } finally {
         setRefreshing(false);
       }
     })();
-  }, [activeTab, loadFeed, loadMembers]);
+  }, [activeTab, canViewMembers, loadFeed, loadMembers]);
 
   const handleChangeTab = useCallback((tab: CommunityViewTab) => {
     setActiveTab(tab);
@@ -991,32 +1075,57 @@ export default function CommunityDetailScreen() {
       return;
     }
 
+    const leavingOrCanceling = Boolean(
+      feed.community.isMember || feed.community.hasPendingRequest
+    );
+
     // Acao sobre entidade dinamica: inclui o nome real da comunidade.
     speak(
       buildActionSpeech(
-        feed.community.isMember ? "Sair da comunidade" : "Participar da comunidade",
+        feed.community.isMember
+          ? "Sair da comunidade"
+          : feed.community.hasPendingRequest
+            ? "Cancelar solicitação de entrada na comunidade"
+            : feed.community.privacy === "PRIVATE"
+              ? "Solicitar entrada na comunidade"
+              : "Participar da comunidade",
         feed.community.name
       )
     );
     setMembershipBusy(true);
 
     try {
-      const response = feed.community.isMember
+      const response = leavingOrCanceling
         ? await communityService.leaveCommunity(communityId)
         : await communityService.joinCommunity(communityId);
 
       setFeed((currentFeed) => applyMembershipUpdate(currentFeed, response));
 
-      if (activeTab === "members") {
+      // Sair da comunidade tira o acesso a listagem: so recarrega quem continua membro.
+      if (activeTab === "members" && response.isMember) {
         void loadMembers();
+      } else if (!response.isMember) {
+        setMembers([]);
+        setMembersLoadError(null);
+        membersInitialLoadRef.current = false;
       }
 
       showGlobalToast({
-        title: response.isMember ? "Você entrou na comunidade" : "Você saiu da comunidade",
+        title: response.isMember
+          ? "Você entrou na comunidade"
+          : response.pendingRequest
+            ? "Solicitação enviada"
+            : leavingOrCanceling && !feed.community.isMember
+              ? "Solicitação cancelada"
+              : "Você saiu da comunidade",
         variant: "success",
         message: response.isMember
           ? "Agora você pode publicar, curtir e comentar nos posts."
-          : "Você pode entrar novamente quando quiser.",
+          : response.pendingRequest
+            ? "Um administrador ou moderador da comunidade vai revisar sua entrada."
+            : leavingOrCanceling && !feed.community.isMember
+              ? "Você pode solicitar entrada novamente quando quiser."
+              : "Você pode entrar novamente quando quiser.",
       });
     } catch {
       // Global API error toast already explains the failure.
@@ -1174,6 +1283,28 @@ export default function CommunityDetailScreen() {
   // Excluir/sair da comunidade migrou para `app/community/settings.tsx`
   // (hook `use-community-danger-actions`), acessivel pela engrenagem do
   // cabecalho para owner/admin.
+  const handleOpenJoinRequests = useCallback(() => {
+    const communityId = feed?.community?.id ?? requestedCommunityId;
+
+    if (!communityId) {
+      return;
+    }
+
+    speak(
+      buildActionSpeech(
+        "Solicitações de entrada da comunidade",
+        feed?.community?.name ?? null
+      )
+    );
+    router.push({
+      pathname: "/community/join-requests",
+      params: {
+        communityId,
+        communityName: feed?.community?.name ?? "",
+      },
+    });
+  }, [feed?.community?.id, feed?.community?.name, requestedCommunityId, router, speak]);
+
   const handleOpenCommunitySettings = useCallback(() => {
     const communityId = feed?.community?.id ?? requestedCommunityId;
 
@@ -1336,9 +1467,11 @@ export default function CommunityDetailScreen() {
                   <CommunityHeader
                     activeTab={activeTab}
                     authToken={authToken}
+                    canViewMembers={canParticipate}
                     community={community}
                     membershipBusy={membershipBusy}
                     onChangeTab={handleChangeTab}
+                    onOpenJoinRequests={handleOpenJoinRequests}
                     onOpenSettings={handleOpenCommunitySettings}
                     onToggleMembership={handleToggleMembership}
                   />

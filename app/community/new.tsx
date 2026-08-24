@@ -18,8 +18,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { buildActionSpeech, useTTS } from "../../src/accessibility/tts";
 import { CommunityCategoryChips } from "../../src/components/community/category-chips";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
+import { CommunityPrivacySelector } from "../../src/components/community/privacy-selector";
 import { communityService } from "../../src/services/communityService";
-import type { CommunityCategoryResponse } from "../../src/types/community";
+import type {
+  CommunityCategoryResponse,
+  CommunityPrivacy,
+} from "../../src/types/community";
 import { showGlobalToast } from "../../src/utils/globalToast";
 
 const IMAGE_MEDIA_TYPES: ImagePicker.MediaType[] = ["images"];
@@ -28,11 +32,13 @@ function createCommunityFormData(
   name: string,
   description: string,
   categoryId: number | null,
+  privacy: CommunityPrivacy,
   asset: ImagePicker.ImagePickerAsset | null
 ) {
   const formData = new FormData();
 
   formData.append("name", name);
+  formData.append("privacy", privacy);
 
   if (description.trim().length > 0) {
     formData.append("description", description.trim());
@@ -82,6 +88,7 @@ export default function CommunityCreateScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [categories, setCategories] = useState<CommunityCategoryResponse[]>([]);
   const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [privacy, setPrivacy] = useState<CommunityPrivacy>("PUBLIC");
 
   const trimmedName = useMemo(() => name.trim(), [name]);
 
@@ -167,6 +174,7 @@ export default function CommunityCreateScreen() {
         trimmedName,
         description,
         categoryId,
+        privacy,
         selectedImage
       );
       const community = await communityService.createCommunity(formData);
@@ -186,7 +194,7 @@ export default function CommunityCreateScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [categoryId, description, router, selectedImage, submitting, trimmedName]);
+  }, [categoryId, description, privacy, router, selectedImage, submitting, trimmedName]);
 
   return (
     <View className="flex-1 bg-[#09090A]">
@@ -287,6 +295,15 @@ export default function CommunityCreateScreen() {
               <Text className="mt-2 text-right text-[12px] font-semibold text-[#948EA1]">
                 {description.length} / 400
               </Text>
+            </View>
+
+            <View className="mt-6 rounded-[28px] bg-[#111214] p-6">
+              <Text className="mb-1 text-[22px] font-bold text-white">Privacidade</Text>
+              <Text className="mb-4 text-[14px] font-semibold leading-6 text-[#CAC3D8]">
+                Defina como novas pessoas entram na comunidade.
+              </Text>
+
+              <CommunityPrivacySelector value={privacy} onChange={setPrivacy} />
             </View>
 
             {categories.length > 0 ? (

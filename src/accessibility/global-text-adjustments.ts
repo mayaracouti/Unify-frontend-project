@@ -48,14 +48,12 @@ import { StyleSheet, type StyleProp, type TextStyle } from "react-native";
 export type GlobalAccessibilityState = {
   fontScaleMultiplier: number;
   highContrast: boolean;
-  screenReaderOptimized: boolean;
   reduceMotion: boolean;
 };
 
 export const DEFAULT_GLOBAL_ACCESSIBILITY_STATE: GlobalAccessibilityState = {
   fontScaleMultiplier: 1,
   highContrast: false,
-  screenReaderOptimized: false,
   reduceMotion: false,
 };
 
@@ -94,7 +92,6 @@ export function setGlobalTextAdjustments(
   if (
     merged.fontScaleMultiplier === currentState.fontScaleMultiplier &&
     merged.highContrast === currentState.highContrast &&
-    merged.screenReaderOptimized === currentState.screenReaderOptimized &&
     merged.reduceMotion === currentState.reduceMotion
   ) {
     return;

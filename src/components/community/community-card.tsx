@@ -122,8 +122,9 @@ export function CommunityDirectoryCard({
       accessibilityRole="button"
       accessibilityLabel={`Abrir ${community.name}`}
     >
-      <View className="flex-row items-start gap-4">
-        <View className="h-20 w-20 overflow-hidden rounded-2xl border border-[#CDBDFF] bg-[#7C4DFF]">
+      {/* Linha 1: identidade da comunidade (icone, nome e selo de papel). */}
+      <View className="flex-row items-center gap-4">
+        <View className="h-16 w-16 overflow-hidden rounded-2xl border border-[#CDBDFF] bg-[#7C4DFF]">
           {iconUrl ? (
             <AuthenticatedRemoteImage
               uri={iconUrl}
@@ -132,101 +133,112 @@ export function CommunityDirectoryCard({
               resizeMode="cover"
               fallback={
                 <View className="flex-1 items-center justify-center bg-[#7C4DFF]">
-                  <Ionicons name="people" size={34} color="#FCF6FF" />
+                  <Ionicons name="people" size={28} color="#FCF6FF" />
                 </View>
               }
             />
           ) : (
             <View className="flex-1 items-center justify-center bg-[#7C4DFF]">
-              <Ionicons name="people" size={34} color="#FCF6FF" />
+              <Ionicons name="people" size={28} color="#FCF6FF" />
             </View>
           )}
         </View>
 
-        <View className="flex-1">
-          <View className="flex-row items-start justify-between gap-3">
-            <Text className="flex-1 text-[24px] font-black leading-8 text-white">
-              {community.name}
-            </Text>
-            <CommunityRoleBadge
-              fallbackLabel="Explorar"
-              isOwner={community.isOwner}
-              role={community.currentUserRole}
-            />
-          </View>
+        <Text
+          className="flex-1 text-[22px] font-black leading-7 text-white"
+          numberOfLines={2}
+        >
+          {community.name}
+        </Text>
 
-          {community.description ? (
-            <Text className="mt-3 text-[15px] font-semibold leading-6 text-content-secondary">
-              {community.description}
-            </Text>
-          ) : (
-            <Text className="mt-3 text-[15px] font-semibold leading-6 text-[#948EA1]">
-              Esta comunidade ainda não possui descrição.
-            </Text>
-          )}
+        <CommunityRoleBadge
+          fallbackLabel="Explorar"
+          isOwner={community.isOwner}
+          role={community.currentUserRole}
+        />
+      </View>
 
-          <View className="mt-4 flex-row items-center gap-3 rounded-2xl bg-[#17181C] px-4 py-3">
-            <View className="h-10 w-10 overflow-hidden rounded-full bg-[#2C2834]">
-              {ownerAvatarUrl ? (
-                <AuthenticatedRemoteImage
-                  uri={ownerAvatarUrl}
-                  authToken={authToken}
-                  className="h-full w-full"
-                  resizeMode="cover"
-                  fallback={
-                    <View className="flex-1 items-center justify-center bg-[#2C2834]">
-                      <Ionicons name="person" size={16} color="#E5E2E1" />
-                    </View>
-                  }
-                />
-              ) : (
+      {/* Linha 2: descricao ocupando a largura inteira do cartao. */}
+      {community.description ? (
+        <Text className="mt-4 text-[15px] font-semibold leading-6 text-content-secondary">
+          {community.description}
+        </Text>
+      ) : (
+        <Text className="mt-4 text-[15px] font-semibold leading-6 text-[#948EA1]">
+          Esta comunidade ainda não possui descrição.
+        </Text>
+      )}
+
+      {/* Linha 3: autoria em linha unica, sem caixa aninhada. */}
+      <View className="mt-4 flex-row items-center gap-3">
+        <View className="h-9 w-9 overflow-hidden rounded-full bg-[#2C2834]">
+          {ownerAvatarUrl ? (
+            <AuthenticatedRemoteImage
+              uri={ownerAvatarUrl}
+              authToken={authToken}
+              className="h-full w-full"
+              resizeMode="cover"
+              fallback={
                 <View className="flex-1 items-center justify-center bg-[#2C2834]">
                   <Ionicons name="person" size={16} color="#E5E2E1" />
                 </View>
-              )}
+              }
+            />
+          ) : (
+            <View className="flex-1 items-center justify-center bg-[#2C2834]">
+              <Ionicons name="person" size={16} color="#E5E2E1" />
             </View>
-
-            <View className="flex-1">
-              <Text className="text-[13px] font-semibold text-content-secondary">Criada por</Text>
-              <Text className="text-[15px] font-black text-white">
-                {community.owner?.name ?? "Comunidade sem criador informado"}
-              </Text>
-            </View>
-          </View>
-
-          <View className="mt-4 flex-row flex-wrap gap-2">
-            {community.category ? (
-              <View className="rounded-full border border-[#3A3246] bg-[#17181C] px-3 py-2">
-                <Text className="text-[13px] font-bold text-[#E5E2E1]">
-                  {community.category.description}
-                </Text>
-              </View>
-            ) : null}
-
-            {memberCountLabel ? (
-              <View className="rounded-full border border-[#3A3246] bg-[#17181C] px-3 py-2">
-                <Text className="text-[13px] font-bold text-[#E5E2E1]">{memberCountLabel}</Text>
-              </View>
-            ) : null}
-
-            <View className="rounded-full border border-[#3A3246] bg-[#17181C] px-3 py-2">
-              <Text className="text-[13px] font-bold text-[#E5E2E1]">
-                {community.isMember ? "Você participa" : "Você ainda não participa"}
-              </Text>
-            </View>
-          </View>
+          )}
         </View>
+
+        <Text
+          className="flex-1 text-[14px] font-semibold text-content-secondary"
+          numberOfLines={1}
+        >
+          Criada por{" "}
+          <Text className="font-black text-white">
+            {community.owner?.name ?? "criador não informado"}
+          </Text>
+        </Text>
       </View>
 
-      <View className="mt-5 flex-row items-center justify-between rounded-2xl bg-[#17181C] px-4 py-4">
-        <View>
-          <Text className="text-[15px] font-bold text-white">Abrir comunidade</Text>
-          <Text className="mt-1 text-[13px] font-semibold text-content-secondary">
-            Veja publicações, comentários e ações de participação.
+      {/* Linha 4: metadados. */}
+      <View className="mt-4 flex-row flex-wrap items-center gap-2 border-t border-[#2A2A2E] pt-4">
+        <View className="flex-row items-center gap-1.5 rounded-full border border-[#3A3246] bg-[#17181C] px-3 py-2">
+          <Ionicons
+            name={community.privacy === "PRIVATE" ? "lock-closed-outline" : "globe-outline"}
+            size={13}
+            color="#CAC3D8"
+          />
+          <Text className="text-[13px] font-bold text-[#E5E2E1]">
+            {community.privacy === "PRIVATE" ? "Privada" : "Pública"}
           </Text>
         </View>
 
-        <Ionicons name="chevron-forward" size={24} color="#EAEA00" />
+        {community.category ? (
+          <View className="rounded-full border border-[#3A3246] bg-[#17181C] px-3 py-2">
+            <Text className="text-[13px] font-bold text-[#E5E2E1]">
+              {community.category.description}
+            </Text>
+          </View>
+        ) : null}
+
+        {memberCountLabel ? (
+          <View className="flex-row items-center gap-1.5 rounded-full border border-[#3A3246] bg-[#17181C] px-3 py-2">
+            <Ionicons name="people-outline" size={13} color="#CAC3D8" />
+            <Text className="text-[13px] font-bold text-[#E5E2E1]">{memberCountLabel}</Text>
+          </View>
+        ) : null}
+
+        <View className="rounded-full border border-[#3A3246] bg-[#17181C] px-3 py-2">
+          <Text className="text-[13px] font-bold text-[#E5E2E1]">
+            {community.isMember
+              ? "Você participa"
+              : community.hasPendingRequest
+                ? "Solicitação pendente"
+                : "Você ainda não participa"}
+          </Text>
+        </View>
       </View>
     </Pressable>
   );

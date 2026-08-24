@@ -37,6 +37,87 @@ type ImageSource = "camera" | "gallery";
 
 const IMAGE_MEDIA_TYPES: ImagePicker.MediaType[] = ["images"];
 
+type ProfileAction = {
+  route: "/profile/edit" | "/profile/edit-match-preferences" | "/profile/accessibility-settings";
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  hint: string;
+  primary?: boolean;
+};
+
+const PROFILE_ACTIONS: ProfileAction[] = [
+  {
+    route: "/profile/edit",
+    icon: "create-outline",
+    label: "Editar perfil",
+    hint: "Abre a tela de edição do seu perfil",
+    primary: true,
+  },
+  {
+    route: "/profile/edit-match-preferences",
+    icon: "options-outline",
+    label: "Editar preferências de match",
+    hint: "Abre a tela de preferências de match",
+  },
+  {
+    route: "/profile/accessibility-settings",
+    icon: "accessibility-outline",
+    label: "Configurações de acessibilidade",
+    hint: "Abre os ajustes de fonte, contraste, leitura por voz e movimento",
+  },
+];
+
+function ProfileActionButton({
+  action,
+  onPress,
+}: {
+  action: ProfileAction;
+  onPress: () => void;
+}) {
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+
+  return (
+    <View className="flex-1">
+      {tooltipVisible ? (
+        <View
+          className="absolute bottom-[62px] left-0 right-0 items-center"
+          pointerEvents="none"
+        >
+          <View className="rounded-xl border border-[#494455] bg-[#0E0F11] px-3 py-2">
+            <Text className="text-center text-[13px] font-bold text-white">
+              {action.label}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
+      <Pressable
+        className={`h-14 items-center justify-center rounded-[18px] ${
+          action.primary
+            ? "bg-[#F1EF00]"
+            : "border border-[#494455] bg-[#1A1C1F]"
+        }`}
+        onPress={() => {
+          setTooltipVisible(false);
+          onPress();
+        }}
+        onLongPress={() => setTooltipVisible(true)}
+        onPressOut={() => setTooltipVisible(false)}
+        delayLongPress={300}
+        accessibilityRole="button"
+        accessibilityLabel={action.label}
+        accessibilityHint={action.hint}
+      >
+        <Ionicons
+          name={action.icon}
+          size={22}
+          color={action.primary ? "#212000" : "#FFFFFF"}
+        />
+      </Pressable>
+    </View>
+  );
+}
+
 function isIoniconName(
   value?: string | null
 ): value is keyof typeof Ionicons.glyphMap {
@@ -589,53 +670,18 @@ export default function Profile() {
               </View>
             )}
 
-            <Pressable
-              className="mt-6 h-14 flex-row items-center justify-center rounded-[18px] bg-[#F1EF00]"
-              onPress={() => {
-                speak("Editar perfil");
-                router.push("/profile/edit");
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Editar perfil"
-              accessibilityHint="Abre a tela de edição do seu perfil"
-            >
-              <Ionicons name="create-outline" size={18} color="#212000" />
-              <Text className="ml-2 text-[17px] font-black text-[#212000]">
-                Editar Perfil
-              </Text>
-            </Pressable>
-
-            <Pressable
-              className="mt-3 h-14 flex-row items-center justify-center rounded-[18px] border border-[#494455] bg-[#1A1C1F]"
-              onPress={() => {
-                speak("Editar preferências de match");
-                router.push("/profile/edit-match-preferences");
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Editar preferências de match"
-              accessibilityHint="Abre a tela de preferências de match"
-            >
-              <Ionicons name="options-outline" size={18} color="#FFFFFF" />
-              <Text className="ml-2 text-[16px] font-black text-white">
-                Editar preferências de match
-              </Text>
-            </Pressable>
-
-            <Pressable
-              className="mt-3 h-14 flex-row items-center justify-center rounded-[18px] border border-[#494455] bg-[#1A1C1F]"
-              onPress={() => {
-                speak("Configurações de acessibilidade");
-                router.push("/profile/accessibility-settings");
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Configurações de acessibilidade"
-              accessibilityHint="Abre os ajustes de fonte, contraste, leitor de tela e movimento"
-            >
-              <Ionicons name="accessibility-outline" size={18} color="#FFFFFF" />
-              <Text className="ml-2 text-[16px] font-black text-white">
-                Configurações de acessibilidade
-              </Text>
-            </Pressable>
+            <View className="mt-6 flex-row items-center justify-center gap-3">
+              {PROFILE_ACTIONS.map((action) => (
+                <ProfileActionButton
+                  key={action.route}
+                  action={action}
+                  onPress={() => {
+                    speak(action.label);
+                    router.push(action.route);
+                  }}
+                />
+              ))}
+            </View>
 
             {actionError ? (
               <ScreenError
