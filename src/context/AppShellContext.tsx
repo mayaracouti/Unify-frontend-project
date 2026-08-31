@@ -8,7 +8,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { AppState } from "react-native";
 
+import { chatService } from "../services/chatService";
 import { matchService } from "../services/matchService";
 import { getCompletionForActiveSession } from "../services/onboardingCompletionService";
 import { profileService } from "../services/profileService";
@@ -28,8 +30,10 @@ type AppShellContextValue = {
   currentUserName: string;
   currentUserPhotoUrl: string | null;
   refreshProfileSummary: () => Promise<void>;
+  refreshUnreadChatCount: () => Promise<void>;
   refreshUnseenProfilesCount: () => Promise<void>;
   syncProfileSummary: (profile: UserProfileResponse | null) => void;
+  unreadChatCount: number;
   unseenProfilesCount: number;
 };
 
@@ -46,6 +50,9 @@ const DEFAULT_PROFILE_SUMMARY: ProfileSummary = {
   name: "Perfil",
   photoUrl: null,
 };
+
+/** Badge global de conversas: polling lento (C12 do plano). */
+const UNREAD_CHAT_POLL_INTERVAL_MS = 60000;
 
 const AppShellContext = createContext<AppShellContextValue | undefined>(undefined);
 
@@ -91,7 +98,9 @@ export function AppShellProvider({ children }: PropsWithChildren) {
   const { isAuthenticated, isReady, session } = useAuth();
   const [profileSummary, setProfileSummary] = useState(DEFAULT_PROFILE_SUMMARY);
   const [unseenProfilesCount, setUnseenProfilesCount] = useState(0);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
   const unseenCountRequestRef = useRef(0);
+  const unreadChatRequestRef = useRef(0);
   const shellHydrationRequestRef = useRef(0);
   const sessionRef = useRef(session);
   const hydratedSessionScopeIdRef = useRef<string | null>(null);
@@ -183,6 +192,48 @@ export function AppShellProvider({ children }: PropsWithChildren) {
       }
     }
   }, []);
+
+  /**
+   * Contagem global de mensagens nao lidas (badge da aba "Conversas").
+   * Silenciosa por natureza: o badge e informacao secundaria e nao pode
+   * disparar toast de erro por falha de rede.
+   */
+  const refreshUnreadChatCount = useCallback(async () => {
+    if (!sessionRef.current?.accessToken) {
+      setUnreadChatCount(0);
+      return;
+    }
+
+    const requestId = ++unreadChatRequestRef.current;
+
+    try {
+      const response = await chatService.pollConversations();
+
+      if (requestId === unreadChatRequestRef.current) {
+        setUnreadChatCount(response.totalUnread ?? 0);
+      }
+    } catch {
+      // silencioso: mantem o ultimo valor conhecido
+    }
+  }, []);
+
+  // Polling lento do badge, apenas com o app ativo.
+  useEffect(() => {
+    if (!isReady || !isAuthenticated || !session?.accessToken) {
+      setUnreadChatCount(0);
+      return;
+    }
+
+    void refreshUnreadChatCount();
+
+    const intervalId = setInterval(() => {
+      if (AppState.currentState === "active") {
+        void refreshUnreadChatCount();
+      }
+    }, UNREAD_CHAT_POLL_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
+  }, [isAuthenticated, isReady, refreshUnreadChatCount, session?.accessToken]);
 
   useEffect(() => {
     if (!isReady || !isAuthenticated || !sessionScopeId) {
@@ -277,8 +328,10 @@ export function AppShellProvider({ children }: PropsWithChildren) {
       currentUserName: profileSummary.name,
       currentUserPhotoUrl: profileSummary.photoUrl,
       refreshProfileSummary,
+      refreshUnreadChatCount,
       refreshUnseenProfilesCount,
       syncProfileSummary,
+      unreadChatCount,
       unseenProfilesCount,
     }),
     [
@@ -287,8 +340,10 @@ export function AppShellProvider({ children }: PropsWithChildren) {
       profileSummary.name,
       profileSummary.photoUrl,
       refreshProfileSummary,
+      refreshUnreadChatCount,
       refreshUnseenProfilesCount,
       syncProfileSummary,
+      unreadChatCount,
       unseenProfilesCount,
     ]
   );

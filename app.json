@@ -43,6 +43,12 @@
         {
           "locationWhenInUsePermission": "Permita que a Unify use sua localização para melhorar a distância dos seus matches."
         }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Permita que a Unify use o microfone para você gravar mensagens de áudio nas suas conversas."
+        }
       ]
     ]
   }

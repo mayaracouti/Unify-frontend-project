@@ -25,6 +25,8 @@ export interface MutualMatchResponse {
 }
 
 export interface MutualMatchSummaryResponse {
+  /** Necessario para abrir a conversa (`POST /chats?matchId=...`). */
+  matchId: string | null;
   userId: string;
   userProfileId: string;
   fullName: string | null;

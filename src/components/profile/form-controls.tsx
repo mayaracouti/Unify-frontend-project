@@ -19,36 +19,52 @@ export function OptionChip({
   selected,
   iconName,
   onPress,
+  disabled,
   role = "button",
 }: {
   label: string;
   selected: boolean;
   iconName?: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
+  disabled?: boolean;
   role?: "button" | "radio" | "checkbox";
 }) {
   return (
     <Pressable
+      accessible
       className={`min-h-[52px] flex-row items-center rounded-full border-2 px-5 py-3 ${
         selected
           ? "border-[#EAEA00] bg-[#EAEA00]"
           : "border-[#494455] bg-transparent"
       }`}
+      disabled={disabled}
+      // O visual do chip ja passa de 44x44, mas o hitSlop cobre o espacamento
+      // entre chips vizinhos em telas pequenas.
+      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
       onPress={onPress}
       accessibilityRole={role}
       accessibilityLabel={label}
       accessibilityState={
-        role === "checkbox" ? { checked: selected } : { selected }
+        role === "button"
+          ? { selected, disabled: Boolean(disabled) }
+          : { checked: selected, disabled: Boolean(disabled) }
       }
     >
+      {/* O icone e decorativo: o estado ja vai em accessibilityState. */}
       {iconName ? (
         <Ionicons
           name={iconName}
           size={18}
           color={selected ? "#323200" : "#E5E2E1"}
+          importantForAccessibility="no"
         />
       ) : selected ? (
-        <Ionicons name="checkmark-circle" size={18} color="#323200" />
+        <Ionicons
+          name="checkmark-circle"
+          size={18}
+          color="#323200"
+          importantForAccessibility="no"
+        />
       ) : null}
       <Text
         className={`text-[15px] font-bold ${(selected || iconName) ? "ml-2" : ""} ${selected ? "text-[#323200]" : "text-[#E5E2E1]"}`}
@@ -76,8 +92,18 @@ export function SingleChoice({
 
   return (
     <View className="mb-8">
-      <Text className="mb-3 text-[22px] font-bold text-white">{title}</Text>
-      <View className="flex-row flex-wrap gap-3">
+      <Text
+        accessibilityRole="header"
+        className="mb-3 text-[22px] font-bold text-white"
+      >
+        {title}
+      </Text>
+      {/* Escolha unica: o grupo declara a semantica de radiogroup. */}
+      <View
+        accessibilityRole="radiogroup"
+        accessibilityLabel={title}
+        className="flex-row flex-wrap gap-3"
+      >
         {options.map((option) => (
           <OptionChip
             key={option.id}
@@ -120,8 +146,17 @@ export function MultiChoice({
 
   return (
     <View className="mb-8">
-      <Text className="mb-3 text-[22px] font-bold text-white">{title}</Text>
-      <View className="flex-row flex-wrap gap-3">
+      <Text
+        accessibilityRole="header"
+        className="mb-3 text-[22px] font-bold text-white"
+      >
+        {title}
+      </Text>
+      {/* Selecao multipla: o rotulo do grupo avisa que mais de uma opcao vale. */}
+      <View
+        accessibilityLabel={`${title}. Seleção múltipla.`}
+        className="flex-row flex-wrap gap-3"
+      >
         {options.map((option) => (
           <OptionChip
             key={option.id}
@@ -148,33 +183,46 @@ export function MultiChoice({
 
 export function ChoiceCard({
   label,
+  description,
   selected,
   onPress,
 }: {
   label: string;
+  /** Texto complementar do card, concatenado ao rotulo lido pelo leitor de tela. */
+  description?: string;
   selected: boolean;
   onPress: () => void;
 }) {
   const { speak } = useTTS();
+  const accessibilityLabel = description?.trim()
+    ? `${label}. ${description.trim()}`
+    : label;
 
   return (
     <Pressable
+      accessible
       className={`min-h-[56px] flex-1 basis-[46%] flex-row items-center justify-between rounded-lg border-2 px-5 py-3 ${
         selected
           ? "border-[#EAEA00] bg-[#EAEA00]/10"
           : "border-[#262626] bg-[#201F1F]"
       }`}
+      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
       onPress={() => {
         speak(buildOptionToggleSpeech(label, true));
         onPress();
       }}
       accessibilityRole="radio"
-      accessibilityLabel={label}
-      accessibilityState={{ selected }}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ checked: selected }}
     >
       <Text className="flex-1 text-[16px] font-bold text-white">{label}</Text>
       {selected ? (
-        <Ionicons name="checkmark-circle" size={22} color="#EAEA00" />
+        <Ionicons
+          name="checkmark-circle"
+          size={22}
+          color="#EAEA00"
+          importantForAccessibility="no"
+        />
       ) : null}
     </Pressable>
   );
@@ -189,7 +237,12 @@ export function SectionTitle({
 }) {
   return (
     <View className="mb-3 flex-row items-center">
-      <Ionicons name={icon} size={22} color="#00DAF3" />
+      <Ionicons
+        name={icon}
+        size={22}
+        color="#00DAF3"
+        importantForAccessibility="no"
+      />
       <Text
         className="ml-2 text-[22px] font-bold text-white"
         accessibilityRole="header"
@@ -217,14 +270,25 @@ export function SimilaritySelector({
 
   return (
     <View className="mb-6">
-      <Text className="mb-3 text-[15px] font-bold text-[#CAC3D8]">{title}</Text>
-      <View className="flex-row flex-wrap gap-3">
+      <Text
+        accessibilityRole="header"
+        className="mb-3 text-[15px] font-bold text-[#CAC3D8]"
+      >
+        {title}
+      </Text>
+      <View
+        accessibilityRole="radiogroup"
+        accessibilityLabel={title}
+        className="flex-row flex-wrap gap-3"
+      >
         {options.map((option) => {
           const selected = option.value === value;
 
           return (
             <Pressable
               key={option.value}
+              accessible
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               className={`min-h-[48px] rounded-full border-2 px-4 py-3 ${
                 selected
                   ? "border-[#7C4DFF] bg-[#7C4DFF]"
@@ -242,7 +306,7 @@ export function SimilaritySelector({
               }}
               accessibilityRole="radio"
               accessibilityLabel={option.description}
-              accessibilityState={{ selected }}
+              accessibilityState={{ checked: selected }}
             >
               <Text className="text-[14px] font-bold text-white">
                 {option.description}

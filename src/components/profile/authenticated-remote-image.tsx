@@ -2,6 +2,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { ActivityIndicator, Image, type ImageProps, View } from "react-native";
 
 type AuthenticatedRemoteImageProps = {
+  /** Rotulo lido pelo leitor de tela. Quando ausente, a imagem e tratada como decorativa. */
+  accessibilityLabel?: string;
   authToken: string | null;
   className: string;
   fallback: ReactNode;
@@ -108,6 +110,7 @@ export function clearAuthenticatedRemoteImageCache() {
 }
 
 export function AuthenticatedRemoteImage({
+  accessibilityLabel,
   authToken,
   className,
   fallback,
@@ -164,7 +167,15 @@ export function AuthenticatedRemoteImage({
 
   if (isLoading || !resolvedUri) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#2D2A33]">
+      <View
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel={
+          accessibilityLabel ? `Carregando ${accessibilityLabel}` : "Carregando imagem"
+        }
+        accessibilityState={{ busy: true }}
+        className="flex-1 items-center justify-center bg-[#2D2A33]"
+      >
         <ActivityIndicator color="#EAEA00" size="small" />
       </View>
     );
@@ -173,6 +184,11 @@ export function AuthenticatedRemoteImage({
   return (
     <Image
       accessibilityIgnoresInvertColors
+      accessible={Boolean(accessibilityLabel)}
+      accessibilityRole={accessibilityLabel ? "image" : undefined}
+      accessibilityLabel={accessibilityLabel}
+      // Sem rotulo a imagem e decorativa: some da arvore de acessibilidade.
+      importantForAccessibility={accessibilityLabel ? "yes" : "no-hide-descendants"}
       className={className}
       resizeMode={resizeMode}
       source={{ uri: resolvedUri }}

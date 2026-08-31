@@ -21,6 +21,7 @@ import { FormField, type FormFieldHandle } from "../../src/components/ui/form-fi
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { profileService } from "../../src/services/profileService";
 import type { LookupOptionResponse, ProfileOptionsResponse } from "../../src/types/profile";
+import { announceForAccessibility } from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
 import {
   getForegroundLocationPermissionState,
@@ -281,6 +282,7 @@ export default function EditProfile() {
         location: nextLocation,
       });
 
+      announceForAccessibility("Perfil salvo com sucesso.");
       router.replace("/profile");
     } catch (nextError) {
       setError(formatApiErrorMessage(nextError, "Não foi possível salvar seu perfil."));
@@ -301,21 +303,39 @@ export default function EditProfile() {
                 router.replace("/profile");
               }}
               accessibilityRole="button"
-              accessibilityLabel="Voltar"
+              accessibilityLabel="Voltar para o perfil"
               accessibilityHint="Retorna para o seu perfil"
             >
-              <Ionicons name="arrow-back" size={24} color="#E5E2E1" />
+              <Ionicons
+                name="arrow-back"
+                size={24}
+                color="#E5E2E1"
+                importantForAccessibility="no"
+              />
             </Pressable>
-            <Text className="text-2xl font-black text-[#7C4DFF]">Unify</Text>
+            {/* Marca: nao acrescenta informacao ao leitor de tela. */}
+            <Text
+              importantForAccessibility="no"
+              className="text-2xl font-black text-[#7C4DFF]"
+            >
+              Unify
+            </Text>
           </View>
-          <Text className="text-[14px] font-bold text-[#CAC3D8]">Editar perfil</Text>
+          <Text
+            accessibilityRole="header"
+            className="text-[14px] font-bold text-[#CAC3D8]"
+          >
+            Editar perfil
+          </Text>
         </View>
 
         {loading ? (
           <View
             className="flex-1 items-center justify-center"
             accessible
+            accessibilityRole="progressbar"
             accessibilityLabel="Carregando dados"
+            accessibilityState={{ busy: true }}
           >
             <ActivityIndicator color="#CDBDFF" />
           </View>
@@ -326,7 +346,10 @@ export default function EditProfile() {
             keyboardShouldPersistTaps="handled"
           >
             <View className="mb-8 rounded-[28px] bg-[#111214] p-6">
-              <Text className="text-[30px] font-extrabold leading-10 text-white">
+              <Text
+                accessibilityRole="header"
+                className="text-[30px] font-extrabold leading-10 text-white"
+              >
                 Ajuste seu perfil
               </Text>
               <Text className="mt-2 text-[15px] font-semibold leading-6 text-[#CAC3D8]">
@@ -349,10 +372,14 @@ export default function EditProfile() {
                 textAlignVertical="top"
                 value={bio}
                 onChangeText={setBio}
-                hint="Campo opcional. Conte um pouco sobre você para as próximas conexões."
+                hint="Campo opcional. Máximo de 500 caracteres."
                 disabled={saving}
               />
-              <Text className="mt-1 text-right text-[12px] font-semibold text-[#948EA1]">
+              <Text
+                accessibilityLabel={`${bioLength} de 500 caracteres usados`}
+                accessibilityLiveRegion="polite"
+                className="mt-1 text-right text-[12px] font-semibold text-[#948EA1]"
+              >
                 {bioLength} / 500
               </Text>
             </View>
@@ -394,12 +421,16 @@ export default function EditProfile() {
                       }
                       size={20}
                       color={hasLocationPermission ? "#5DDB85" : "#00DAF3"}
+                      importantForAccessibility="no"
                     />
                     <View className="ml-3 flex-1">
                       {/* Agrupado em um unico no de acessibilidade: o texto muda
                           de forma assincrona conforme a permissao de GPS. */}
                       <View accessible accessibilityLiveRegion="polite">
-                        <Text className="text-[16px] font-bold text-white">
+                        <Text
+                          accessibilityRole="header"
+                          className="text-[16px] font-bold text-white"
+                        >
                           Localização automática
                         </Text>
                         {hasLocationPermission ? (
@@ -479,7 +510,13 @@ export default function EditProfile() {
             ) : null}
 
             {isRefreshingLocation ? (
-              <View className="mb-4 flex-row items-center justify-center rounded-lg border border-[#2E4952] bg-[#112028] px-4 py-3">
+              <View
+                accessible
+                accessibilityRole="progressbar"
+                accessibilityLabel="Atualizando sua localização antes de salvar o perfil"
+                accessibilityState={{ busy: true }}
+                className="mb-4 flex-row items-center justify-center rounded-lg border border-[#2E4952] bg-[#112028] px-4 py-3"
+              >
                 <ActivityIndicator color="#00DAF3" size="small" />
                 <Text className="ml-3 text-center text-[13px] font-semibold text-[#BFEFFF]">
                   Atualizando sua localização antes de salvar o perfil...

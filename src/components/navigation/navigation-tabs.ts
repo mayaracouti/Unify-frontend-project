@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 export type NavigationTab = {
-  badgeKey?: "matches";
+  badgeKey?: "matches" | "chats";
   icon: ComponentProps<typeof Ionicons>["name"];
   iconActive?: ComponentProps<typeof Ionicons>["name"];
   label: string;
@@ -18,6 +18,13 @@ export const navigationTabs: NavigationTab[] = [
     iconActive: "heart",
     route: "/matches",
     badgeKey: "matches",
+  },
+  {
+    label: "Conversas",
+    icon: "chatbubbles-outline",
+    iconActive: "chatbubbles",
+    route: "/chats",
+    badgeKey: "chats",
   },
   { label: "Comunidades", icon: "people-outline", iconActive: "people", route: "/community" },
   { label: "Perfil", icon: "person-outline", iconActive: "person", route: "/profile" },

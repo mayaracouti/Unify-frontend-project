@@ -26,6 +26,7 @@ import type {
   ProfileOptionsResponse,
   SimilarityPreference,
 } from "../../src/types/profile";
+import { announceForAccessibility } from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
 import { showGlobalToast } from "../../src/utils/globalToast";
 import {
@@ -230,6 +231,9 @@ export default function EditMatchPreferences() {
     const parsedMinAge = Number(minAge);
     const parsedMaxAge = Number(maxAge);
 
+    // Uma fonte de anuncio por evento: o toast global ja fala e mostra a
+    // mensagem, entao NAO duplicamos no bloco de erro inline (que tem
+    // `accessibilityRole="alert"` e seria lido uma segunda vez).
     if (!canSave || Number.isNaN(distance)) {
       showGlobalToast({
         title: "Atenção",
@@ -237,9 +241,6 @@ export default function EditMatchPreferences() {
         message:
           "Preencha objetivo, gêneros desejados, afinidade de linguagem do amor, faixa etária válida e uma distância maior que zero.",
       });
-      setError(
-        "Preencha objetivo, gêneros desejados, afinidade de linguagem do amor, faixa etária válida e uma distância maior que zero."
-      );
       return;
     }
 
@@ -249,7 +250,6 @@ export default function EditMatchPreferences() {
         variant: "error",
         message: "A faixa etária mínima e máxima deve ser de pelo menos 18 anos.",
       });
-      setError("A faixa etária mínima e máxima deve ser de pelo menos 18 anos.");
       return;
     }
 
@@ -259,7 +259,6 @@ export default function EditMatchPreferences() {
         variant: "error",
         message: "A idade mínima não pode ser maior que a idade máxima.",
       });
-      setError("A idade mínima não pode ser maior que a idade máxima.");
       return;
     }
 
@@ -280,12 +279,18 @@ export default function EditMatchPreferences() {
         desiredGenderIds,
       });
 
+      announceForAccessibility("Preferências de match salvas.");
       router.replace("/profile");
     } catch (nextError) {
-      showGlobalToast({ title: "Erro", variant: "error", message: "Não foi possível salvar suas preferências." });
-      setError(
-        formatApiErrorMessage(nextError, "Não foi possível salvar suas preferências.")
-      );
+      // Idem: o toast e a unica fonte do anuncio deste erro.
+      showGlobalToast({
+        title: "Erro",
+        variant: "error",
+        message: formatApiErrorMessage(
+          nextError,
+          "Não foi possível salvar suas preferências."
+        ),
+      });
     } finally {
       setSaving(false);
     }
@@ -303,21 +308,38 @@ export default function EditMatchPreferences() {
                 router.replace("/profile");
               }}
               accessibilityRole="button"
-              accessibilityLabel="Voltar"
+              accessibilityLabel="Voltar para o perfil"
               accessibilityHint="Retorna para o seu perfil"
             >
-              <Ionicons name="arrow-back" size={24} color="#E5E2E1" />
+              <Ionicons
+                name="arrow-back"
+                size={24}
+                color="#E5E2E1"
+                importantForAccessibility="no"
+              />
             </Pressable>
-            <Text className="text-2xl font-black text-[#7C4DFF]">Unify</Text>
+            <Text
+              importantForAccessibility="no"
+              className="text-2xl font-black text-[#7C4DFF]"
+            >
+              Unify
+            </Text>
           </View>
-          <Text className="text-[14px] font-bold text-[#CAC3D8]">Preferências</Text>
+          <Text
+            accessibilityRole="header"
+            className="text-[14px] font-bold text-[#CAC3D8]"
+          >
+            Preferências
+          </Text>
         </View>
 
         {loading ? (
           <View
             className="flex-1 items-center justify-center"
             accessible
+            accessibilityRole="progressbar"
             accessibilityLabel="Carregando dados"
+            accessibilityState={{ busy: true }}
           >
             <ActivityIndicator color="#CDBDFF" />
           </View>
@@ -328,7 +350,10 @@ export default function EditMatchPreferences() {
             keyboardShouldPersistTaps="handled"
           >
             <View className="mb-8 rounded-[28px] bg-[#111214] p-6">
-              <Text className="text-[30px] font-extrabold leading-10 text-white">
+              <Text
+                accessibilityRole="header"
+                className="text-[30px] font-extrabold leading-10 text-white"
+              >
                 Ajuste suas preferências de match
               </Text>
               <Text className="mt-2 text-[15px] font-semibold leading-6 text-[#CAC3D8]">
@@ -359,6 +384,8 @@ export default function EditMatchPreferences() {
                       option.id !== 4 ? (
                       <Pressable
                         key={option.id}
+                        accessible
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                         className={`min-h-[22px] rounded-full border-2 px-5 py-3 ${
                           desiredGenderIds.includes(option.id)
                             ? "border-[#7C4DFF] bg-[#7C4DFF]"
@@ -382,7 +409,12 @@ export default function EditMatchPreferences() {
                       >
                         <View className="flex-row items-center justify-center">
                           {desiredGenderIds.includes(option.id) ? (
-                            <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={18}
+                              color="#FFFFFF"
+                              importantForAccessibility="no"
+                            />
                           ) : null}
                           <Text className={`text-center text-[16px] font-bold text-white ${desiredGenderIds.includes(option.id) ? "ml-2" : ""}`}>
                             {option.description}
@@ -406,7 +438,7 @@ export default function EditMatchPreferences() {
                       onChangeText={setMinAge}
                       onFocus={() => speak("Idade mínima")}
                       accessibilityLabel="Idade mínima"
-                      accessibilityHint="Idade mínima das pessoas que você deseja encontrar"
+                      accessibilityHint="Valor entre 18 e 99"
                     />
                     <TextInput
                       className="min-h-[56px] flex-1 rounded-t-lg border-b-2 border-[#948EA1] bg-[#1C1B1B] px-4 text-[16px] text-white"
@@ -417,7 +449,7 @@ export default function EditMatchPreferences() {
                       onChangeText={setMaxAge}
                       onFocus={() => speak("Idade máxima")}
                       accessibilityLabel="Idade máxima"
-                      accessibilityHint="Idade máxima das pessoas que você deseja encontrar"
+                      accessibilityHint="Valor entre 18 e 99"
                     />
                   </View>
                 </View>

@@ -44,6 +44,10 @@ import {
 } from "../../src/storage/matchDiscoveryStorage";
 import { getAuthSnapshot } from "../../src/storage/tokenStorage";
 import type { UserPublicProfileResponse } from "../../src/types/profile";
+import {
+  accessibilityAnnouncements,
+  announceForAccessibility,
+} from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
 import { showGlobalToast } from "../../src/utils/globalToast";
 import { getForegroundLocationPermissionState } from "../../src/utils/location";
@@ -93,8 +97,15 @@ function ChipList({ items }: { items: string[] }) {
     return null;
   }
 
+  // A lista de chips e uma unidade semantica: um foco de leitor de tela em vez
+  // de N paradas, uma por chip.
   return (
-    <View className="mt-3 flex-row flex-wrap gap-2">
+    <View
+      accessible
+      accessibilityRole="list"
+      accessibilityLabel={items.join(", ")}
+      className="mt-3 flex-row flex-wrap gap-2"
+    >
       {items.map((item) => (
         <View key={item} className="rounded-full bg-[#24262B] px-4 py-3">
           <Text className="text-[15px] font-bold text-white">{item}</Text>
@@ -117,8 +128,13 @@ function InfoRow({
 
   return (
     <View className="border-b border-white/10 py-3">
-      <View className="flex-row items-center">
-        <Ionicons name={icon} size={21} color="#A7A6B3" />
+      <View accessible accessibilityLabel={label} className="flex-row items-center">
+        <Ionicons
+          name={icon}
+          size={21}
+          color="#A7A6B3"
+          importantForAccessibility="no"
+        />
         <Text className="ml-3 text-[18px] font-semibold text-white">
           {label}
         </Text>
@@ -138,8 +154,16 @@ function DetailCard({
   return (
     <View className="mb-4 rounded-[28px] bg-[#111214] p-5">
       <View className="flex-row items-center">
-        <Ionicons name={icon} size={23} color="#A7A6B3" />
-        <Text className="ml-3 text-[19px] font-black text-[#C9C6D3]">
+        <Ionicons
+          name={icon}
+          size={23}
+          color="#A7A6B3"
+          importantForAccessibility="no"
+        />
+        <Text
+          accessibilityRole="header"
+          className="ml-3 text-[19px] font-black text-[#C9C6D3]"
+        >
           {title}
         </Text>
       </View>
@@ -151,7 +175,10 @@ function DetailCard({
 function ProfileDetailsContent({ profile }: { profile: MatchProfile }) {
   return (
     <View className="bg-black px-4 pb-40 pt-8">
-      <Text className="mb-5 px-1 text-[36px] font-semibold text-white">
+      <Text
+        accessibilityRole="header"
+        className="mb-5 px-1 text-[36px] font-semibold text-white"
+      >
         {profile.name}, {profile.age}
       </Text>
 
@@ -278,6 +305,57 @@ function toMatchProfile(profile: UserPublicProfileResponse): MatchProfile {
   };
 }
 
+/**
+ * Descricao completa do perfil para o leitor de tela.
+ * Regra: nome, idade, pronomes, distancia e bio resumida — nessa ordem, porque e
+ * a ordem em que a informacao aparece visualmente.
+ */
+function buildProfileAccessibilityLabel(profile: MatchProfile): string {
+  const parts: string[] = [profile.name];
+
+  if (profile.age > 0) {
+    parts.push(`${profile.age} anos`);
+  }
+
+  if (profile.pronouns && !profile.pronouns.startsWith("Prefiro")) {
+    parts.push(`pronomes ${profile.pronouns}`);
+  }
+
+  if (typeof profile.distanceKm === "number") {
+    parts.push(`a ${Math.round(profile.distanceKm)} quilômetros de você`);
+  }
+
+  const summary = summarizeBio(profile.bio);
+
+  if (summary) {
+    parts.push(summary);
+  }
+
+  if (profile.photoUrls.length > 1) {
+    parts.push(`${profile.photoUrls.length} fotos disponíveis`);
+  }
+
+  return `${parts.join(". ")}.`;
+}
+
+/** Resume a bio em no maximo 160 caracteres, cortando na ultima palavra inteira. */
+function summarizeBio(bio: string): string {
+  const normalized = bio?.trim();
+
+  if (!normalized) {
+    return "";
+  }
+
+  if (normalized.length <= 160) {
+    return normalized;
+  }
+
+  const cut = normalized.slice(0, 160);
+  const lastSpace = cut.lastIndexOf(" ");
+
+  return `${(lastSpace > 80 ? cut.slice(0, lastSpace) : cut).trim()}...`;
+}
+
 function normalizeProfileIds(profileIds: string[] | null | undefined) {
   const uniqueProfileIds = new Set<string>();
 
@@ -310,14 +388,25 @@ function appendSeenProfileId(profileIds: string[], profileId: string | null | un
 
 function ProfilePhoto({
   authToken,
+  photoCount,
+  photoIndex,
   photoUrl,
+  profileName,
 }: {
   authToken: string | null;
+  photoCount: number;
+  photoIndex: number;
   photoUrl: string | null;
+  profileName: string;
 }) {
   if (photoUrl) {
     return (
       <AuthenticatedRemoteImage
+        accessibilityLabel={
+          photoCount > 1
+            ? `Foto de ${profileName}, ${photoIndex + 1} de ${photoCount}`
+            : `Foto de ${profileName}`
+        }
         uri={photoUrl}
         authToken={authToken}
         className="h-full w-full"
@@ -396,6 +485,10 @@ export default function Matches() {
     setCurrentPhotoIndex((currentIndex) => {
       const nextIndex = currentIndex === 0 ? totalPhotos - 1 : currentIndex - 1;
       speak(`Foto ${nextIndex + 1} de ${totalPhotos}`);
+      // Fonte unica do anuncio da troca de foto: vale para as duas setas.
+      announceForAccessibility(
+        accessibilityAnnouncements.photoChanged(nextIndex + 1, totalPhotos)
+      );
       return nextIndex;
     });
   }, [currentProfile?.photoUrls.length, speak]);
@@ -410,6 +503,9 @@ export default function Matches() {
     setCurrentPhotoIndex((currentIndex) => {
       const nextIndex = currentIndex === totalPhotos - 1 ? 0 : currentIndex + 1;
       speak(`Foto ${nextIndex + 1} de ${totalPhotos}`);
+      announceForAccessibility(
+        accessibilityAnnouncements.photoChanged(nextIndex + 1, totalPhotos)
+      );
       return nextIndex;
     });
   }, [currentProfile?.photoUrls.length, speak]);
@@ -434,7 +530,25 @@ export default function Matches() {
 
     spokenProfileIdRef.current = currentProfile.id;
     speak(buildPublicProfileSpeech(currentProfile));
+    // Canal do leitor de tela do sistema: o `speak` acima fica mudo quando o
+    // TalkBack/VoiceOver esta ligado, entao os dois nunca falam juntos.
+    announceForAccessibility(
+      accessibilityAnnouncements.profileShown(
+        currentProfile.name,
+        currentProfile.age,
+        currentProfile.distanceKm
+      )
+    );
   }, [currentProfile, isFocused, speak]);
+
+  // Fim da fila: nada muda visualmente sob o foco do usuario, entao o aviso
+  // precisa ser anunciado. O estado de carregamento ja e coberto pela
+  // `accessibilityLiveRegion` do `ScreenLoading` — nao anunciamos de novo aqui.
+  useEffect(() => {
+    if (!loadingProfiles && !currentProfile && canAccessCompletedOnboardingContent) {
+      announceForAccessibility(accessibilityAnnouncements.queueEnded());
+    }
+  }, [canAccessCompletedOnboardingContent, currentProfile, loadingProfiles]);
 
   useEffect(() => {
     if (!currentProfile || currentProfile.photoUrls.length === 0) {
@@ -695,14 +809,39 @@ export default function Matches() {
     resetContentScroll();
   }
 
-  function rejectCurrentProfile() {
+  /**
+   * Recusa o perfil visivel e registra a decisao no servidor.
+   *
+   * A recusa e uma acao de baixo risco: se o servidor falhar, seguimos em frente
+   * (o id continua na lista local de vistos) e NAO interrompemos o fluxo com um
+   * toast de erro.
+   */
+  async function declineCurrentProfile() {
     if (!currentProfile || submitting) {
       return;
     }
 
+    const declinedName = currentProfile.name;
+
     // Acao sobre entidade dinamica: "Recusar" + nome vindo do backend.
-    speak(buildActionSpeech("Recusar", currentProfile.name));
-    void showNextProfile();
+    speak(buildActionSpeech("Recusar", declinedName));
+    setSubmitting(true);
+
+    try {
+      await matchService.createOrAnswerMatch({
+        targetProfileId: currentProfile.id,
+        accepted: false,
+      });
+    } catch (nextError) {
+      if (__DEV__) {
+        console.warn("[matches] Falha ao registrar recusa", nextError);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+
+    await showNextProfile();
+    announceForAccessibility(accessibilityAnnouncements.profileDeclined(declinedName));
   }
 
   async function acceptCurrentProfile() {
@@ -722,15 +861,26 @@ export default function Matches() {
       await showNextProfile();
 
       if (response.mutualMatch) {
+        announceForAccessibility(
+          accessibilityAnnouncements.newMutualMatch(currentProfile.name)
+        );
+        // A4: a tela de sucesso le `reduceMotion` do proprio contexto, entao
+        // nao ha nada de movimento para propagar por parametro aqui.
+        // F-C11.2: `matchId` alimenta o botao "Iniciar Conversa" da tela de sucesso.
         router.push({
           pathname: "/matches/success",
           params: {
+            matchId: response.id,
             name: currentProfile.name,
             photo: currentPhotoUrl ?? undefined,
           },
         });
         return;
       }
+
+      announceForAccessibility(
+        accessibilityAnnouncements.interestSent(currentProfile.name)
+      );
     } catch (nextError) {
       showGlobalToast({
         title: "Não foi possível enviar",
@@ -766,10 +916,21 @@ export default function Matches() {
                 showsVerticalScrollIndicator={false}
               >
                 <View style={{ height: contentHeight || undefined }}>
-                  <ProfilePhoto authToken={authToken} photoUrl={currentPhotoUrl} />
+                  <ProfilePhoto
+                    authToken={authToken}
+                    photoCount={currentProfile.photoUrls.length}
+                    photoIndex={currentPhotoIndex}
+                    photoUrl={currentPhotoUrl}
+                    profileName={currentProfile.name}
+                  />
 
                   {currentProfile.photoUrls.length > 1 ? (
-                    <View className="absolute top-4 left-0 right-0 items-center justify-center">
+                    <View
+                      accessible
+                      accessibilityRole="text"
+                      accessibilityLabel={`Foto ${currentPhotoIndex + 1} de ${currentProfile.photoUrls.length}`}
+                      className="absolute top-4 left-0 right-0 items-center justify-center"
+                    >
                       <Text className="text-[16px] font-bold text-white/75">
                         {currentPhotoIndex + 1}/{currentProfile.photoUrls.length}
                       </Text>
@@ -806,38 +967,62 @@ export default function Matches() {
                     >
                       <View className="flex-row items-center justify-between px-5">
                         <Pressable
+                          accessible
+                          accessibilityRole="button"
                           accessibilityLabel="Ver foto anterior"
+                          accessibilityHint={`Foto ${currentPhotoIndex + 1} de ${currentProfile.photoUrls.length}`}
                           className="h-14 w-14 items-center justify-center rounded-full border border-white/20 bg-black/35"
                           onPress={showPreviousPhoto}
                         >
-                          <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+                          <Ionicons
+                            name="chevron-back"
+                            size={28}
+                            color="#FFFFFF"
+                            importantForAccessibility="no"
+                          />
                         </Pressable>
 
                         <Pressable
+                          accessible
+                          accessibilityRole="button"
                           accessibilityLabel="Ver próxima foto"
+                          accessibilityHint={`Foto ${currentPhotoIndex + 1} de ${currentProfile.photoUrls.length}`}
                           className="h-14 w-14 items-center justify-center rounded-full border border-white/20 bg-black/35"
                           onPress={showNextPhotoImage}
                         >
-                          <Ionicons name="chevron-forward" size={28} color="#FFFFFF" />
+                          <Ionicons
+                            name="chevron-forward"
+                            size={28}
+                            color="#FFFFFF"
+                            importantForAccessibility="no"
+                          />
                         </Pressable>
                       </View>
                     </View>
                   ) : null}
 
                   <View className="absolute bottom-32 left-7 right-7">
-                    <Text className="text-[34px] font-semibold text-white">
-                      {currentProfile.name}{", "}
-                      <Text className="text-[34px] font-normal text-white/75">
-                        {currentProfile.age}
+                    {/* Nome, idade, pronomes e bio sao uma unidade semantica:
+                        um unico foco de leitor de tela, nao quatro. */}
+                    <View
+                      accessible
+                      accessibilityRole="summary"
+                      accessibilityLabel={buildProfileAccessibilityLabel(currentProfile)}
+                    >
+                      <Text className="text-[34px] font-semibold text-white">
+                        {currentProfile.name}{", "}
+                        <Text className="text-[34px] font-normal text-white/75">
+                          {currentProfile.age}
+                        </Text>
+                        <Text className="text-[18px] font-normal text-white/75">
+                          {currentProfile.pronouns && !currentProfile.pronouns.startsWith("Prefiro") ? ` (${currentProfile.pronouns})` : ""}
+                        </Text>
                       </Text>
-                      <Text className="text-[18px] font-normal text-white/75">
-                        {currentProfile.pronouns && !currentProfile.pronouns.startsWith("Prefiro") ? ` (${currentProfile.pronouns})` : ""}
-                      </Text>
-                    </Text>
 
-                    <Text className="mt-2 text-[16px] font-normal leading-2 text-white">
-                      {currentProfile.bio}
-                    </Text>
+                      <Text className="mt-2 text-[16px] font-normal leading-2 text-white">
+                        {currentProfile.bio}
+                      </Text>
+                    </View>
 
                     <View
                       accessible
@@ -867,34 +1052,66 @@ export default function Matches() {
                   right: 0,
                 }}
               >
-                <View className="absolute bottom-8 left-0 right-0 flex-row items-center justify-center gap-11">
+                {/* Barra de decisao — alternativa acessivel ao swipe.
+                    Alvos de 72x72 (acima do minimo de 44), rotulos completos e
+                    estado busy durante o envio. */}
+                <View
+                  accessibilityRole="toolbar"
+                  accessibilityLabel="Decisão sobre este perfil"
+                  className="absolute bottom-8 left-0 right-0 flex-row items-center justify-center gap-11"
+                >
                   <Pressable
+                    accessible
                     accessibilityRole="button"
-                    accessibilityLabel={`Recusar ${currentProfile.name}`}
-                    className="h-[68px] w-[68px] items-center justify-center rounded-full bg-[#26282B]"
+                    accessibilityLabel={`Recusar o perfil de ${currentProfile.name}`}
+                    accessibilityHint="O perfil sai da fila e não será mostrado novamente"
+                    accessibilityState={{ disabled: submitting, busy: submitting }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    className="h-[72px] w-[72px] items-center justify-center rounded-full bg-[#26282B]"
                     disabled={submitting}
-                    onPress={rejectCurrentProfile}
+                    onPress={() => {
+                      void declineCurrentProfile();
+                    }}
                   >
-                    <Ionicons name="close" size={36} color="#FF2D73" />
+                    <Ionicons
+                      name="close"
+                      size={36}
+                      color="#FF2D73"
+                      importantForAccessibility="no"
+                    />
                   </Pressable>
                   <Pressable
+                    accessible
                     accessibilityRole="button"
-                    accessibilityLabel={`Curtir ${currentProfile.name}`}
-                    className="h-[68px] w-[68px] items-center justify-center rounded-full bg-[#26282B]"
+                    accessibilityLabel={`Curtir o perfil de ${currentProfile.name}`}
+                    accessibilityHint="Se a pessoa também curtir você, vocês formam um match e podem conversar"
+                    accessibilityState={{ disabled: submitting, busy: submitting }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    className="h-[72px] w-[72px] items-center justify-center rounded-full bg-[#26282B]"
                     disabled={submitting}
                     onPress={acceptCurrentProfile}
                   >
                     {submitting ? (
                       <ActivityIndicator color="#65E568" size="small" />
                     ) : (
-                      <Ionicons name="heart" size={36} color="#65E568" />
+                      <Ionicons
+                        name="heart"
+                        size={36}
+                        color="#65E568"
+                        importantForAccessibility="no"
+                      />
                     )}
                   </Pressable>
                 </View>
               </LinearGradient>
             </>
           ) : loadError ? (
-            <View className="flex-1 items-center justify-center px-8">
+            // `accessibilityRole="alert"` da a semantica do aviso; o anuncio em
+            // si sai do `useEffect` de fim de fila (uma fonte por evento).
+            <View
+              accessibilityRole="alert"
+              className="flex-1 items-center justify-center px-8"
+            >
               <ScreenError
                 title="Você chegou ao fim da lista"
                 message={loadError}
@@ -902,11 +1119,18 @@ export default function Matches() {
               />
             </View>
           ) : (
-            <View className="flex-1 items-center justify-center px-8">
+            <View
+              accessibilityRole="alert"
+              className="flex-1 items-center justify-center px-8"
+            >
               <ScreenEmpty
                 title="Você chegou ao fim da lista"
                 description="Novos perfis aparecerão aqui quando estiverem disponíveis."
-                action={{ label: "Ver novamente", onPress: restartProfiles }}
+                action={{
+                  label: "Ver novamente",
+                  onPress: restartProfiles,
+                  accessibilityHint: "Recarrega a lista de perfis compatíveis",
+                }}
               />
             </View>
           )}

@@ -20,10 +20,12 @@ import {
   useTTS,
 } from "../../src/accessibility/tts";
 import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
+import { useAccessibility } from "../../src/context/AccessibilityContext";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { profileService } from "../../src/services/profileService";
 import { getAuthSnapshot, subscribeToAuthStorage } from "../../src/storage/tokenStorage";
 import type { UserProfileResponse } from "../../src/types/profile";
+import { announceForAccessibility } from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
 
 const DISCOVERY_ACCENT = "#7C4DFF";
@@ -42,15 +44,21 @@ function getPrimaryProfilePhotoUrl(profile: UserProfileResponse | null) {
 }
 
 function DiscoverySlider({
+  accessibilityLabel,
+  formatValue,
   max = 100,
   min = 0,
   onChange,
+  step = 1,
   value,
   values,
 }: {
+  accessibilityLabel: string;
+  formatValue: (value: number | [number, number]) => string;
   max?: number;
   min?: number;
   onChange: (value: number | [number, number]) => void;
+  step?: number;
   value?: number;
   values?: [number, number];
 }) {
@@ -94,6 +102,28 @@ function DiscoverySlider({
       : "second";
   }
 
+  /**
+   * Ajuste por passo, usado tanto pelos gestos de acessibilidade
+   * (TalkBack/VoiceOver) quanto pelos botoes -/+ visiveis.
+   */
+  function adjust(direction: 1 | -1) {
+    if (!values) {
+      const next = Math.min(max, Math.max(min, (value ?? min) + direction * step));
+      onChange(next);
+      return;
+    }
+
+    // Em modo faixa, o gesto de acessibilidade ajusta o thumb ativo.
+    const [first, second] = values;
+
+    if (activeThumbRef.current === "first") {
+      onChange([Math.min(Math.max(min, first + direction * step), second), second]);
+      return;
+    }
+
+    onChange([first, Math.max(Math.min(max, second + direction * step), first)]);
+  }
+
   const sliderPanResponder = PanResponder.create({
     onMoveShouldSetPanResponder: () => true,
     onStartShouldSetPanResponder: () => true,
@@ -108,56 +138,126 @@ function DiscoverySlider({
   });
 
   return (
-    <View
-      {...sliderPanResponder.panHandlers}
-      className="mt-7 h-8 justify-center"
-      onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
-    >
-      <View className="h-1 rounded-full bg-[#81818C]" />
+    <View className="mt-7">
+      {/* O PanResponder sozinho e invisivel para o leitor de tela e impossivel
+          de operar sem arrastar: `adjustable` + acoes de acessibilidade cobrem
+          o TalkBack/VoiceOver, e os botoes -/+ abaixo cobrem quem nao arrasta. */}
       <View
-        className="absolute h-1 rounded-full"
-        style={{
-          backgroundColor: DISCOVERY_ACCENT,
-          left: values ? `${firstPercent}%` : 0,
-          width: values
-            ? `${secondPercent - firstPercent}%`
-            : `${firstPercent}%`,
+        {...sliderPanResponder.panHandlers}
+        accessible
+        accessibilityRole="adjustable"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityValue={{
+          min,
+          max,
+          now: values ? values[0] : (value ?? min),
+          text: formatValue(values ?? value ?? min),
         }}
-      />
-      <View
-        className="absolute h-7 w-7 rounded-full"
-        style={{
-          backgroundColor: DISCOVERY_ACCENT,
-          left: `${firstPercent}%`,
-          marginLeft: -14,
+        accessibilityActions={[
+          { name: "increment", label: "Aumentar" },
+          { name: "decrement", label: "Diminuir" },
+        ]}
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === "increment") {
+            adjust(1);
+            return;
+          }
+
+          if (event.nativeEvent.actionName === "decrement") {
+            adjust(-1);
+          }
         }}
-      />
-      {values ? (
+        className="h-8 justify-center"
+        onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
+      >
         <View
-          className="absolute h-7 w-7 rounded-full"
+          className="h-1 rounded-full bg-[#81818C]"
+          importantForAccessibility="no"
+        />
+        <View
+          className="absolute h-1 rounded-full"
+          importantForAccessibility="no"
           style={{
             backgroundColor: DISCOVERY_ACCENT,
-            left: `${secondPercent}%`,
+            left: values ? `${firstPercent}%` : 0,
+            width: values
+              ? `${secondPercent - firstPercent}%`
+              : `${firstPercent}%`,
+          }}
+        />
+        <View
+          className="absolute h-7 w-7 rounded-full"
+          importantForAccessibility="no"
+          style={{
+            backgroundColor: DISCOVERY_ACCENT,
+            left: `${firstPercent}%`,
             marginLeft: -14,
           }}
         />
-      ) : null}
+        {values ? (
+          <View
+            className="absolute h-7 w-7 rounded-full"
+            importantForAccessibility="no"
+            style={{
+              backgroundColor: DISCOVERY_ACCENT,
+              left: `${secondPercent}%`,
+              marginLeft: -14,
+            }}
+          />
+        ) : null}
+      </View>
+
+      {/* Alternativa motora: alvos de 44x44 para quem nao consegue arrastar. */}
+      <View className="mt-3 flex-row items-center justify-between">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Diminuir ${accessibilityLabel}`}
+          className="h-11 w-11 items-center justify-center rounded-full bg-[#1D1F24]"
+          onPress={() => adjust(-1)}
+        >
+          <Ionicons
+            name="remove"
+            size={22}
+            color="#FFFFFF"
+            importantForAccessibility="no"
+          />
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Aumentar ${accessibilityLabel}`}
+          className="h-11 w-11 items-center justify-center rounded-full bg-[#1D1F24]"
+          onPress={() => adjust(1)}
+        >
+          <Ionicons
+            name="add"
+            size={22}
+            color="#FFFFFF"
+            importantForAccessibility="no"
+          />
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 function DiscoveryToggle({
+  accessibilityLabel,
   onValueChange,
   value,
 }: {
+  accessibilityLabel: string;
   onValueChange: (value: boolean) => void;
   value: boolean;
 }) {
   return (
     <Pressable
+      accessible
       className="h-8 w-16 flex-row items-center justify-end rounded-full border-2 pr-0.5"
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       onPress={() => onValueChange(!value)}
       accessibilityRole="switch"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ checked: value }}
       style={{
         alignItems: "center",
@@ -174,6 +274,7 @@ function DiscoveryToggle({
           name={value ? "checkmark" : "close"}
           size={value ? 23 : 20}
           color="#FFFFFF"
+          importantForAccessibility="no"
         />
       </View>
     </Pressable>
@@ -204,6 +305,8 @@ function MultiOptionModal({
   visible: boolean;
 }) {
   const { speak } = useTTS();
+  const { settings } = useAccessibility();
+  const reduceMotion = settings.reduceMotion;
   const [nextOptions, setNextOptions] = useState<string[]>(selectedOptions);
 
   useEffect(() => {
@@ -222,11 +325,33 @@ function MultiOptionModal({
   }
 
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
-      <View className="flex-1 justify-end bg-black/70 px-5 pb-6">
-        <Pressable className="absolute inset-0" onPress={onClose} />
+    <Modal
+      transparent
+      // reduceMotion desliga a animacao de fade.
+      animationType={reduceMotion ? "none" : "fade"}
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <View
+        accessibilityViewIsModal
+        importantForAccessibility="yes"
+        className="flex-1 justify-end bg-black/70 px-5 pb-6"
+      >
+        {/* Backdrop: antes era um Pressable sem rotulo nenhum. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Fechar"
+          accessibilityHint={`Fecha ${title} sem salvar`}
+          className="absolute inset-0"
+          onPress={onClose}
+        />
         <View className="rounded-[28px] bg-[#111214] p-5">
-          <Text className="text-[20px] font-black text-white">{title}</Text>
+          <Text
+            accessibilityRole="header"
+            className="text-[20px] font-black text-white"
+          >
+            {title}
+          </Text>
 
           <View className="mt-4">
             {options.map((option) => {
@@ -235,6 +360,7 @@ function MultiOptionModal({
               return (
                 <Pressable
                   key={option}
+                  accessible
                   className="mb-3 h-14 flex-row items-center justify-between rounded-[18px] bg-[#1D1F24] px-4"
                   onPress={() => toggleOption(option)}
                   accessibilityRole="checkbox"
@@ -243,7 +369,12 @@ function MultiOptionModal({
                 >
                   <Text className="text-[16px] font-bold text-white">{option}</Text>
                   {selected ? (
-                    <Ionicons name="checkmark-circle" size={24} color={DISCOVERY_ACCENT} />
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={24}
+                      color={DISCOVERY_ACCENT}
+                      importantForAccessibility="no"
+                    />
                   ) : null}
                 </Pressable>
               );
@@ -287,6 +418,8 @@ function LocationModal({
   visible: boolean;
 }) {
   const { speak } = useTTS();
+  const { settings } = useAccessibility();
+  const reduceMotion = settings.reduceMotion;
   const [nextValue, setNextValue] = useState(value);
 
   useEffect(() => {
@@ -296,13 +429,35 @@ function LocationModal({
   }, [value, visible]);
 
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
-      <View className="flex-1 justify-end bg-black/70 px-5 pb-6">
-        <Pressable className="absolute inset-0" onPress={onClose} />
+    <Modal
+      transparent
+      animationType={reduceMotion ? "none" : "fade"}
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <View
+        accessibilityViewIsModal
+        importantForAccessibility="yes"
+        className="flex-1 justify-end bg-black/70 px-5 pb-6"
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Fechar"
+          accessibilityHint="Fecha a edição de localização sem salvar"
+          className="absolute inset-0"
+          onPress={onClose}
+        />
         <View className="rounded-[28px] bg-[#111214] p-5">
-          <Text className="text-[20px] font-black text-white">Editar localização</Text>
+          <Text
+            accessibilityRole="header"
+            className="text-[20px] font-black text-white"
+          >
+            Editar localização
+          </Text>
 
           <TextInput
+            accessibilityLabel="Cidade e país"
+            accessibilityHint="Digite a cidade onde você quer buscar conexões"
             className="mt-5 h-14 rounded-[18px] border border-[#494455] bg-[#1D1F24] px-4 text-[16px] font-bold text-white"
             cursorColor={DISCOVERY_ACCENT}
             onChangeText={setNextValue}
@@ -483,7 +638,12 @@ export default function MatchMyProfile() {
               accessibilityRole="button"
               accessibilityLabel="Voltar para encontros"
             >
-              <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+              <Ionicons
+                name="chevron-back"
+                size={22}
+                color="#FFFFFF"
+                importantForAccessibility="no"
+              />
             </Pressable>
 
             <Pressable
@@ -495,7 +655,12 @@ export default function MatchMyProfile() {
               accessibilityRole="button"
               accessibilityLabel="Editar preferências de match"
             >
-              <Ionicons name="settings" size={24} color="#E5E2E1" />
+              <Ionicons
+                name="settings"
+                size={24}
+                color="#E5E2E1"
+                importantForAccessibility="no"
+              />
             </Pressable>
           </View>
 
@@ -505,6 +670,7 @@ export default function MatchMyProfile() {
                 <View className="h-20 w-20 overflow-hidden rounded-full bg-[#2D2A33]">
                   {photoUrl ? (
                     <AuthenticatedRemoteImage
+                      accessibilityLabel="Sua foto de perfil"
                       uri={photoUrl}
                       authToken={authToken}
                       className="h-full w-full"
@@ -530,13 +696,21 @@ export default function MatchMyProfile() {
                   }}
                   accessibilityRole="button"
                   accessibilityLabel="Alterar foto de perfil"
+                  accessibilityHint="Abre a tela de perfil para gerenciar suas fotos"
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <Ionicons name="camera" size={16} color="#FFFFFF" />
+                  <Ionicons
+                    name="camera"
+                    size={16}
+                    color="#FFFFFF"
+                    importantForAccessibility="no"
+                  />
                 </Pressable>
               </View>
 
               <View className="ml-4 flex-1">
                 <Text
+                  accessibilityRole="header"
                   className="text-[25px] font-extrabold text-white"
                   numberOfLines={1}
                   adjustsFontSizeToFit
@@ -555,7 +729,12 @@ export default function MatchMyProfile() {
                   accessibilityRole="button"
                   accessibilityLabel={`Editar perfil de ${displayName}`}
                 >
-                  <Ionicons name="pencil" size={18} color="#25262A" />
+                  <Ionicons
+                    name="pencil"
+                    size={18}
+                    color="#25262A"
+                    importantForAccessibility="no"
+                  />
                   <Text
                     className="ml-2 text-[15px] font-black text-[#25262A]"
                     numberOfLines={1}
@@ -568,18 +747,29 @@ export default function MatchMyProfile() {
           </View>
 
           {error ? (
-            <View className="mt-8 rounded-[20px] bg-[#2A1216] p-4">
+            <View
+              accessible
+              accessibilityRole="alert"
+              accessibilityLabel={error}
+              className="mt-8 rounded-[20px] bg-[#2A1216] p-4"
+            >
               <Text className="text-[14px] font-bold text-red-200">{error}</Text>
             </View>
           ) : null}
 
           <View className="mt-9">
-            <Text className="text-[24px] font-black text-white">
+            <Text
+              accessibilityRole="header"
+              className="text-[24px] font-black text-white"
+            >
               Ajustes de descoberta
             </Text>
 
             <DiscoveryCard>
-              <Text className="text-[18px] font-black text-white">
+              <Text
+                accessibilityRole="header"
+                className="text-[18px] font-black text-white"
+              >
                 Localização
               </Text>
 
@@ -596,9 +786,15 @@ export default function MatchMyProfile() {
                   setLocationModalOpen(true);
                 }}
                 accessibilityRole="button"
-                accessibilityLabel={`Editar localização, ${discoveryLocationLabel}`}
+                accessibilityLabel={`Alterar localização de busca, atualmente ${discoveryLocationLabel}`}
+                accessibilityHint="Abre a edição da localização usada na descoberta"
               >
-                <Ionicons name="location" size={34} color={DISCOVERY_ACCENT} />
+                <Ionicons
+                  name="location"
+                  size={34}
+                  color={DISCOVERY_ACCENT}
+                  importantForAccessibility="no"
+                />
                 <Text className="ml-4 text-[22px] font-semibold text-white">
                   {discoveryLocationLabel}
                 </Text>
@@ -612,6 +808,7 @@ export default function MatchMyProfile() {
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Adicionar novo local"
+                accessibilityHint="Abre a edição da localização usada na descoberta"
               >
                 <Text
                   className="text-[18px] font-black"
@@ -628,7 +825,10 @@ export default function MatchMyProfile() {
 
             <DiscoveryCard>
               <View className="flex-row items-center justify-between">
-                <Text className="text-[20px] font-semibold text-white">
+                <Text
+                  accessibilityRole="header"
+                  className="text-[20px] font-semibold text-white"
+                >
                   Distância máxima
                 </Text>
                 <Text className="text-[20px] font-semibold text-[#CAC3D8]">
@@ -637,6 +837,8 @@ export default function MatchMyProfile() {
               </View>
 
               <DiscoverySlider
+                accessibilityLabel="Distância máxima em quilômetros"
+                formatValue={(next) => `${next} quilômetros`}
                 min={1}
                 max={150}
                 value={maxDistanceKm}
@@ -648,10 +850,16 @@ export default function MatchMyProfile() {
               />
 
               <View className="mt-8 flex-row items-center justify-between gap-5">
-                <Text className="flex-1 text-[20px] font-semibold leading-8 text-white">
+                {/* O rotulo do switch ja carrega esta frase: escondemos o texto
+                    para o leitor de tela nao ler duas vezes. */}
+                <Text
+                  importantForAccessibility="no"
+                  className="flex-1 text-[20px] font-semibold leading-8 text-white"
+                >
                   Mostrar pessoas mais longe de mim se eu ficar sem perfis pra ver
                 </Text>
                 <DiscoveryToggle
+                  accessibilityLabel="Mostrar pessoas mais distantes quando acabarem os perfis"
                   value={expandDistance}
                   onValueChange={(value) => {
                     speak(buildSwitchSpeech("Mostrar pessoas mais longe", value));
@@ -676,7 +884,8 @@ export default function MatchMyProfile() {
                 setInterestModalOpen(true);
               }}
               accessibilityRole="button"
-              accessibilityLabel={`Tem interesse em: ${interestedInLabel}`}
+              accessibilityLabel={`Interesse em: ${interestedInLabel}`}
+              accessibilityHint="Abre a lista de opções"
             >
               <DiscoveryCard>
               <Text className="text-[16px] font-black text-white">
@@ -686,14 +895,22 @@ export default function MatchMyProfile() {
                 <Text className="text-[22px] font-semibold text-white">
                   {interestedInLabel}
                 </Text>
-                <Ionicons name="chevron-forward" size={25} color="#8B8C98" />
+                <Ionicons
+                  name="chevron-forward"
+                  size={25}
+                  color="#8B8C98"
+                  importantForAccessibility="no"
+                />
               </View>
               </DiscoveryCard>
             </Pressable>
 
             <DiscoveryCard>
               <View className="flex-row items-center justify-between">
-                <Text className="text-[20px] font-semibold text-white">
+                <Text
+                  accessibilityRole="header"
+                  className="text-[20px] font-semibold text-white"
+                >
                   Faixa etária
                 </Text>
                 <Text className="text-[20px] font-semibold text-[#CAC3D8]">
@@ -702,6 +919,12 @@ export default function MatchMyProfile() {
               </View>
 
               <DiscoverySlider
+                accessibilityLabel="Faixa etária desejada"
+                formatValue={(next) =>
+                  Array.isArray(next)
+                    ? `de ${next[0]} a ${next[1]} anos`
+                    : `${next} anos`
+                }
                 min={18}
                 max={80}
                 values={ageRange}
@@ -713,10 +936,14 @@ export default function MatchMyProfile() {
               />
 
               <View className="mt-8 flex-row items-center justify-between gap-5">
-                <Text className="flex-1 text-[20px] font-semibold leading-8 text-white">
+                <Text
+                  importantForAccessibility="no"
+                  className="flex-1 text-[20px] font-semibold leading-8 text-white"
+                >
                   Mostrar pessoas um pouco fora da minha faixa de preferência se eu ficar sem perfis pra ver
                 </Text>
                 <DiscoveryToggle
+                  accessibilityLabel="Mostrar pessoas fora da faixa etária quando acabarem os perfis"
                   value={expandAgeRange}
                   onValueChange={(value) => {
                     speak(
@@ -737,9 +964,11 @@ export default function MatchMyProfile() {
               onPress={() => {
                 speak("Ajustes aplicados nesta sessão.");
                 setAppliedMessage("Ajustes aplicados nesta sessão.");
+                announceForAccessibility("Ajustes aplicados nesta sessão.");
               }}
               accessibilityRole="button"
               accessibilityLabel="Aplicar ajustes"
+              accessibilityHint="Aplica os ajustes de descoberta somente nesta sessão"
             >
               <Text className="text-[16px] font-black text-white">
                 Aplicar ajustes
@@ -747,17 +976,28 @@ export default function MatchMyProfile() {
             </Pressable>
 
             {appliedMessage ? (
-              <Text className="mt-4 text-center text-[14px] font-bold text-[#CDBDFF]">
+              // Sem `accessibilityLiveRegion` aqui: o anuncio ja sai do
+              // `onPress` de "Aplicar ajustes" (uma fonte por evento) e a live
+              // region so existe no Android, o que deixaria o iOS mudo.
+              <Text
+                accessibilityRole="alert"
+                className="mt-4 text-center text-[14px] font-bold text-[#CDBDFF]"
+              >
                 {appliedMessage}
               </Text>
             ) : null}
 
+            {/* Sem `onPress`: os dois botoes abaixo ainda nao fazem nada. Em vez
+                de deixar um alvo morto sem sinalizacao, ficam desabilitados e
+                dizem por que. */}
             <View className="mt-7 gap-3">
               <Pressable
-                className="h-14 items-center justify-center rounded-[18px] border border-[#7C4DFF] bg-transparent"
-                onPress={() => speak("Desativar perfil")}
+                className="h-14 items-center justify-center rounded-[18px] border border-[#7C4DFF] bg-transparent opacity-60"
+                disabled
                 accessibilityRole="button"
                 accessibilityLabel="Desativar perfil"
+                accessibilityHint="Funcionalidade em desenvolvimento"
+                accessibilityState={{ disabled: true }}
               >
                 <Text className="text-[16px] font-black text-[#CDBDFF]">
                   Desativar perfil
@@ -765,10 +1005,12 @@ export default function MatchMyProfile() {
               </Pressable>
 
               <Pressable
-                className="h-14 items-center justify-center rounded-[18px] border border-[#FF6B6B] bg-transparent"
-                onPress={() => speak("Apagar perfil")}
+                className="h-14 items-center justify-center rounded-[18px] border border-[#FF6B6B] bg-transparent opacity-60"
+                disabled
                 accessibilityRole="button"
                 accessibilityLabel="Apagar perfil"
+                accessibilityHint="Funcionalidade em desenvolvimento"
+                accessibilityState={{ disabled: true }}
               >
                 <Text className="text-[16px] font-black text-[#FFB4AB]">
                   Apagar perfil

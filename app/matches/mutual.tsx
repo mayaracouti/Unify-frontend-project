@@ -24,13 +24,16 @@ import { ScreenLoading } from "../../src/components/ui/screen-loading";
 import { useAuth } from "../../src/context/AuthContext";
 import { useAsyncState } from "../../src/hooks/useAsyncState";
 import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
+import { chatService } from "../../src/services/chatService";
 import { matchService } from "../../src/services/matchService";
 import { profileService } from "../../src/services/profileService";
 import type {
   MutualMatchPageResponse,
   MutualMatchSummaryResponse,
 } from "../../src/types/match";
+import { announceForAccessibility } from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
+import { showGlobalToast } from "../../src/utils/globalToast";
 
 const MUTUAL_MATCHES_PAGE_SIZE = 20;
 
@@ -100,43 +103,54 @@ function MutualMatchesEmptyState({
   onRetry?: () => void;
 }) {
   return (
-    <ScreenEmpty
-      className="rounded-[28px] border border-[#353534] bg-[#111214] px-6 py-10"
-      title="Sem matches por enquanto"
-      description={`${message} Arraste a tela para baixo para atualizar.`}
-      action={
-        onRetry
-          ? {
-              label: "Tentar novamente",
-              onPress: onRetry,
-              accessibilityHint: "Atualiza a lista de matches confirmados",
-            }
-          : undefined
-      }
-    />
+    // `role="alert"` no container: o botao de retry continua focavel porque o
+    // wrapper nao e `accessible`.
+    <View accessibilityRole="alert">
+      <ScreenEmpty
+        className="rounded-[28px] border border-[#353534] bg-[#111214] px-6 py-10"
+        title="Sem matches por enquanto"
+        description={`${message} Arraste a tela para baixo para atualizar.`}
+        action={
+          onRetry
+            ? {
+                label: "Tentar novamente",
+                onPress: onRetry,
+                accessibilityHint: "Atualiza a lista de matches confirmados",
+              }
+            : undefined
+        }
+      />
+    </View>
   );
 }
 
 function MutualMatchCard({
   authToken,
   match,
+  onOpenChat,
+  openingChat,
 }: {
   authToken: string | null;
   match: MutualMatchSummaryResponse;
+  onOpenChat: (match: MutualMatchSummaryResponse) => void;
+  openingChat: boolean;
 }) {
   const { speak } = useTTS();
   const imageUrl = profileService.resolveProfileImageUrl(match.profilePicture?.url);
   const displayName = match.fullName?.trim() || "Pessoa sem nome";
+  const ageLabel = formatAgeLabel(match.age);
 
   return (
-    <Pressable
-      className="rounded-[28px] border border-[#353534] bg-[#111214] p-5"
-      accessibilityRole="button"
-      accessibilityLabel={displayName}
-      // Toque no card fala o match (nome e idade vindos do backend).
-      onPress={() => speak(buildMutualMatchSpeech(match) ?? displayName)}
-    >
-      <View className="flex-row items-center gap-4">
+    <View className="rounded-[28px] border border-[#353534] bg-[#111214] p-5">
+      {/* Foto, nome, idade e selo formam UM foco de leitor de tela. */}
+      <Pressable
+        accessible
+        accessibilityRole="summary"
+        accessibilityLabel={`${displayName}, ${ageLabel}. Match confirmado.`}
+        className="flex-row items-center gap-4"
+        // Toque no resumo fala o match (nome e idade vindos do backend).
+        onPress={() => speak(buildMutualMatchSpeech(match) ?? displayName)}
+      >
         <View className="h-20 w-20 overflow-hidden rounded-[24px] border border-[#CDBDFF] bg-[#2D2A33]">
           {imageUrl ? (
             <AuthenticatedRemoteImage
@@ -160,7 +174,7 @@ function MutualMatchCard({
         <View className="flex-1">
           <Text className="text-[21px] font-black text-white">{displayName}</Text>
           <Text className="mt-1 text-[15px] font-semibold text-[#CAC3D8]">
-            {formatAgeLabel(match.age)}
+            {ageLabel}
           </Text>
 
           <View className="mt-3 flex-row flex-wrap gap-2">
@@ -169,27 +183,38 @@ function MutualMatchCard({
                 Match confirmado
               </Text>
             </View>
-
-            {/* <View
-              className={`rounded-full px-3 py-2 ${
-                imageUrl ? "bg-[#1B2631]" : "bg-[#312114]"
-              }`}
-            >
-              <Text
-                className={`text-[11px] font-black uppercase tracking-[1.1px] ${
-                  imageUrl ? "text-[#9FD9FF]" : "text-[#FFD28A]"
-                }`}
-              >
-                {imageUrl ? "Foto disponível" : "Sem foto"}
-              </Text>
-            </View> */}
           </View>
         </View>
-      </View>
-        <View className="absolute top-14 right-6">
-            <Ionicons name="chatbubble-ellipses" size={24} color="#E5E2E1" />
-        </View>
-    </Pressable>
+      </Pressable>
+
+      {/* Botao "Conversar" — antes era um icone decorativo sem acao. */}
+      <Pressable
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={`Conversar com ${displayName}`}
+        accessibilityHint="Abre a conversa com esta pessoa"
+        accessibilityState={{ disabled: openingChat, busy: openingChat }}
+        className="mt-4 h-12 w-full flex-row items-center justify-center rounded-[14px] bg-[#EAEA00]"
+        disabled={openingChat}
+        onPress={() => onOpenChat(match)}
+      >
+        {openingChat ? (
+          <ActivityIndicator color="#686800" size="small" />
+        ) : (
+          <>
+            <Ionicons
+              name="chatbubble-ellipses"
+              size={20}
+              color="#686800"
+              importantForAccessibility="no"
+            />
+            <Text className="ml-2 text-[16px] font-black text-[#686800]">
+              Conversar
+            </Text>
+          </>
+        )}
+      </Pressable>
+    </View>
   );
 }
 
@@ -209,8 +234,56 @@ export default function MutualMatchesScreen() {
   } = useAsyncState<MutualMatchPageResponse>(createEmptyMutualMatchesResponse());
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [openingChatFor, setOpeningChatFor] = useState<string | null>(null);
   const requestIdRef = useRef(0);
   const authToken = session?.accessToken ?? null;
+
+  function announceMatchesLoaded(response: MutualMatchPageResponse) {
+    announceForAccessibility(
+      response.totalElements === 0
+        ? "Nenhum match confirmado ainda."
+        : `${response.totalElements} ${
+            response.totalElements === 1 ? "match confirmado" : "matches confirmados"
+          }.`
+    );
+  }
+
+  async function handleOpenChat(match: MutualMatchSummaryResponse) {
+    if (openingChatFor) {
+      return;
+    }
+
+    if (!match.matchId) {
+      showGlobalToast({
+        title: "Não foi possível abrir a conversa",
+        message: "Atualize a lista de matches e tente de novo.",
+        variant: "warning",
+      });
+      return;
+    }
+
+    setOpeningChatFor(match.userProfileId);
+
+    try {
+      const conversation = await chatService.openConversation(match.matchId);
+
+      router.push({
+        pathname: "/chats/[conversationId]",
+        params: {
+          conversationId: conversation.conversationId,
+          name: conversation.otherUserName ?? match.fullName ?? "",
+        },
+      });
+    } catch (nextError) {
+      showGlobalToast({
+        title: "Não foi possível abrir a conversa",
+        message: formatApiErrorMessage(nextError, "Tente novamente em instantes."),
+        variant: "error",
+      });
+    } finally {
+      setOpeningChatFor(null);
+    }
+  }
 
   useEffect(() => {
     if (!canAccessCompletedOnboardingContent || !isFocused) {
@@ -233,6 +306,8 @@ export default function MutualMatchesScreen() {
         if (imageUrls.length > 0) {
           void preloadAuthenticatedRemoteImages(imageUrls, authToken);
         }
+
+        announceMatchesLoaded(response);
       }
 
       setRefreshing(false);
@@ -267,6 +342,8 @@ export default function MutualMatchesScreen() {
       if (imageUrls.length > 0) {
         void preloadAuthenticatedRemoteImages(imageUrls, authToken);
       }
+
+      announceMatchesLoaded(response);
     } catch (error) {
       if (requestId !== requestIdRef.current) {
         return;
@@ -354,12 +431,22 @@ export default function MutualMatchesScreen() {
               }}
               accessibilityRole="button"
               accessibilityLabel="Voltar para encontros">
-              <Ionicons name="arrow-back" size={22} color="#E5E2E1" />
+              <Ionicons
+                name="arrow-back"
+                size={22}
+                color="#E5E2E1"
+                importantForAccessibility="no"
+              />
               <Text className="color-slate-100 ml-2">Voltar para Encontros</Text>
             </Pressable>
             <View className="mb-6 flex-row items-start justify-between gap-4">
                 <View className="flex-1">
-                <Text className="text-[32px] font-extrabold text-white">Seus matches</Text>
+                <Text
+                  accessibilityRole="header"
+                  className="text-[32px] font-extrabold text-white"
+                >
+                  Seus matches
+                </Text>
                 <Text className="mt-2 text-[15px] font-semibold leading-6 text-[#CAC3D8]">
                     Veja quem já confirmou interesse em você e acompanhe a lista paginada dos encontros recíprocos.
                 </Text>
@@ -370,6 +457,7 @@ export default function MutualMatchesScreen() {
             <ScreenLoading label="Buscando matches confirmados..." />
           ) : (
             <ScrollView
+              accessibilityLabel="Lista de matches confirmados"
               className="flex-1"
               contentContainerClassName="min-h-full pb-6"
               refreshControl={
@@ -396,7 +484,12 @@ export default function MutualMatchesScreen() {
               </View> */}
 
               {loadError && matchesPage.matches.length > 0 ? (
-                <View className="mt-6 rounded-2xl border border-[#6A4456] bg-[#2A1C24] px-4 py-4">
+                <View
+                  accessible
+                  accessibilityRole="alert"
+                  accessibilityLabel={`Atualização parcial. ${loadError}`}
+                  className="mt-6 rounded-2xl border border-[#6A4456] bg-[#2A1C24] px-4 py-4"
+                >
                   <Text className="text-[15px] font-bold text-[#FFD3DD]">
                     Atualização parcial
                   </Text>
@@ -423,6 +516,10 @@ export default function MutualMatchesScreen() {
                       key={match.userProfileId}
                       authToken={authToken}
                       match={match}
+                      onOpenChat={(selectedMatch) => {
+                        void handleOpenChat(selectedMatch);
+                      }}
+                      openingChat={openingChatFor === match.userProfileId}
                     />
                   ))
                 )}
