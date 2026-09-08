@@ -47,14 +47,26 @@ export interface ChatMessageResponse {
   senderName: string | null;
   fromMe: boolean;
   type: ChatMessageType;
+  /** Nulo em mídia sem legenda e em mensagens apagadas. */
   body: string | null;
+  /** Nulo em TEXT e em mensagens apagadas. */
   mediaUrl: string | null;
   mediaContentType: string | null;
   mediaSizeBytes: number | null;
   mediaDurationSeconds: number | null;
   createdAt: string;
+  /** Destinatario buscou a mensagem (estado "entregue"). Nulo = so enviada. */
+  deliveredAt: string | null;
+  /** Destinatario abriu a conversa (estado "vista"). */
   readAt: string | null;
+  /** Texto alterado pelo remetente depois de enviar. */
+  editedAt: string | null;
+  /** Exclusao logica: a linha fica no historico como "Mensagem apagada". */
+  deletedAt: string | null;
 }
+
+/** Estado do indicador ao lado do horario nas mensagens enviadas por mim. */
+export type ChatDeliveryStatus = "sent" | "delivered" | "read";
 
 export interface ChatMessagePageResponse {
   messages: ChatMessageResponse[];

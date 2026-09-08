@@ -2,13 +2,20 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { File, Paths } from "expo-file-system";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import {
+  type AccessibilityActionEvent,
+  type AccessibilityActionInfo,
+  ActivityIndicator,
+  Pressable,
+  Text,
+  View,
+} from "react-native";
 
 import {
   accessibilityAnnouncements,
   announceForAccessibility,
 } from "../../utils/accessibilityAnnouncements";
-import { formatAudioDuration } from "../../utils/chatFormatting";
+import { describeAudioMessage, formatAudioClock } from "../../utils/chatFormatting";
 
 const audioFileCache = new Map<string, string>();
 
@@ -54,16 +61,26 @@ async function resolveLocalAudioUri(
 }
 
 export function AudioMessagePlayer({
+  accessibilityActions,
   authToken,
   durationSeconds,
   messageId,
+  messageLabel,
   mine,
+  onAccessibilityAction,
+  onLongPress,
   uri,
 }: {
+  /** Acoes extras (editar/apagar) expostas no botao de play, o unico elemento focavel do balao. */
+  accessibilityActions?: AccessibilityActionInfo[];
   authToken: string | null;
   durationSeconds: number | null;
   messageId: string;
+  /** Rotulo completo da mensagem (autor, horario, status) lido junto com o controle. */
+  messageLabel?: string;
   mine: boolean;
+  onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
+  onLongPress?: () => void;
   uri: string;
 }) {
   const [localUri, setLocalUri] = useState<string | null>(null);
@@ -126,24 +143,38 @@ export function AudioMessagePlayer({
     announceForAccessibility(accessibilityAnnouncements.audioPlaybackStarted());
   }, [authToken, localUri, messageId, player, playing, status, uri]);
 
-  const durationLabel = formatAudioDuration(durationSeconds);
+  // Duracao conhecida: a informada pelo remetente ou, se faltar, a que o player
+  // descobriu ao carregar. Sem nenhuma das duas o cronometro mostra "0:00" —
+  // nunca um texto de "duracao desconhecida".
+  const knownDuration =
+    typeof durationSeconds === "number" && durationSeconds > 0
+      ? durationSeconds
+      : status?.duration && status.duration > 0
+        ? status.duration
+        : null;
+  const spokenAudio = describeAudioMessage(knownDuration);
+  const clock = formatAudioClock(playing ? status.currentTime : knownDuration);
+
+  const controlLabel = playing ? `Pausar ${spokenAudio}` : `Reproduzir ${spokenAudio}`;
+  const fullLabel = messageLabel ? `${controlLabel}. ${messageLabel}` : controlLabel;
 
   return (
     <View className="min-w-[190px] flex-row items-center gap-3">
       <Pressable
         accessible
         accessibilityRole="button"
-        accessibilityLabel={
-          playing
-            ? `Pausar mensagem de áudio de ${durationLabel}`
-            : `Reproduzir mensagem de áudio de ${durationLabel}`
-        }
+        accessibilityLabel={fullLabel}
+        accessibilityHint={onLongPress ? "Toque e segure para apagar" : undefined}
         accessibilityState={{ busy: preparing, disabled: failed }}
+        accessibilityActions={accessibilityActions}
+        onAccessibilityAction={onAccessibilityAction}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         className={`h-12 w-12 items-center justify-center rounded-full ${
           mine ? "bg-white/25" : "bg-[#7C4DFF]"
         }`}
+        delayLongPress={350}
         disabled={preparing}
+        onLongPress={onLongPress}
         onPress={() => {
           void handleToggle();
         }}
@@ -174,7 +205,7 @@ export function AudioMessagePlayer({
           />
         </View>
         <Text className={`mt-1 text-[12px] ${mine ? "text-white/80" : "text-[#CAC3D8]"}`}>
-          {failed ? "Não foi possível carregar o áudio" : durationLabel}
+          {failed ? "Não foi possível carregar o áudio" : clock}
         </Text>
       </View>
     </View>

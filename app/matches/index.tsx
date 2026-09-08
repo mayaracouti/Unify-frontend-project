@@ -13,8 +13,10 @@ import { useRouter } from "expo-router";
 import {
   ActivityIndicator,
   type LayoutChangeEvent,
+  Linking,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -50,12 +52,19 @@ import {
 } from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
 import { showGlobalToast } from "../../src/utils/globalToast";
-import { getForegroundLocationPermissionState } from "../../src/utils/location";
+import {
+  getForegroundLocationPermissionState,
+  requestForegroundLocationPermissionState,
+} from "../../src/utils/location";
 import { preloadAuthenticatedRemoteImages } from "../../src/components/profile/authenticated-remote-image";
 
 const MAX_SEEN_PROFILE_IDS = 500;
 const LOCATION_DISABLED_DISCOVERY_MESSAGE =
-  "Ative a localizacao do dispositivo para descobrir novos perfis.";
+  "Ative a localização do dispositivo para descobrir novos perfis.";
+const LOCATION_BLOCKED_DISCOVERY_MESSAGE =
+  "O acesso à localização foi bloqueado no celular. Abra os ajustes do aparelho para liberar e voltar a descobrir perfis.";
+const LOCATION_PERMISSION_FAILED_MESSAGE =
+  "Não foi possível obter a permissão de localização agora. Tente novamente.";
 const PHOTO_NAVIGATION_FALLBACK = (
   <LinearGradient
     colors={["#472D74", "#16151C"]}
@@ -433,6 +442,12 @@ export default function Matches() {
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [locationBlocked, setLocationBlocked] = useState(false);
+  const [canAskLocationPermissionAgain, setCanAskLocationPermissionAgain] =
+    useState(true);
+  const [locationStatus, setLocationStatus] = useState<
+    "idle" | "requesting" | "failed"
+  >("idle");
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [currentUserScopeId, setCurrentUserScopeId] = useState<string | null>(null);
@@ -441,6 +456,10 @@ export default function Matches() {
   const contentScrollRef = useRef<ScrollView | null>(null);
   const detailsSpokenProfileIdRef = useRef<string | null>(null);
   const currentPhotoUrl = getActiveProfilePhotoUrl(currentProfile, currentPhotoIndex);
+  // Sem "perguntar de novo" o popup nativo nao aparece mais: o unico caminho
+  // e abrir os ajustes do sistema.
+  const showLocationSettingsButton =
+    Platform.OS !== "web" && locationBlocked && !canAskLocationPermissionAgain;
 
   const resetContentScroll = useCallback(() => {
     detailsSpokenProfileIdRef.current = null;
@@ -545,10 +564,33 @@ export default function Matches() {
   // precisa ser anunciado. O estado de carregamento ja e coberto pela
   // `accessibilityLiveRegion` do `ScreenLoading` — nao anunciamos de novo aqui.
   useEffect(() => {
-    if (!loadingProfiles && !currentProfile && canAccessCompletedOnboardingContent) {
-      announceForAccessibility(accessibilityAnnouncements.queueEnded());
+    if (loadingProfiles || currentProfile || !canAccessCompletedOnboardingContent) {
+      return;
     }
-  }, [canAccessCompletedOnboardingContent, currentProfile, loadingProfiles]);
+
+    // A falta de localizacao tem aviso proprio (com o botao de ativar), entao
+    // nao anunciamos "fim da lista" — seria enganoso e duplicaria a fala.
+    if (locationBlocked) {
+      const locationMessage = showLocationSettingsButton
+        ? accessibilityAnnouncements.locationPermissionBlocked()
+        : accessibilityAnnouncements.locationPermissionRequired();
+
+      // Dois canais que nunca soam juntos: `speak` fica mudo com o leitor de
+      // tela nativo ligado, `announceForAccessibility` so soa com ele ligado.
+      speak(locationMessage);
+      announceForAccessibility(locationMessage);
+      return;
+    }
+
+    announceForAccessibility(accessibilityAnnouncements.queueEnded());
+  }, [
+    canAccessCompletedOnboardingContent,
+    currentProfile,
+    loadingProfiles,
+    locationBlocked,
+    showLocationSettingsButton,
+    speak,
+  ]);
 
   useEffect(() => {
     if (!currentProfile || currentProfile.photoUrls.length === 0) {
@@ -710,10 +752,13 @@ export default function Matches() {
         setSeenProfileIds([]);
         setCurrentProfile(null);
         setNextProfile(null);
-        setLoadError(LOCATION_DISABLED_DISCOVERY_MESSAGE);
+        setLoadError("");
+        setLocationBlocked(true);
+        setCanAskLocationPermissionAgain(locationPermission?.canAskAgain ?? true);
         return;
       }
 
+      setLocationBlocked(false);
       setCurrentUserScopeId(scopeId);
 
       const storedState = await getStoredMatchDiscoveryState(scopeId);
@@ -807,6 +852,66 @@ export default function Matches() {
   function restartProfiles() {
     void loadDiscoveryProfiles();
     resetContentScroll();
+  }
+
+  /**
+   * Pede a permissao de localizacao ao sistema (o popup nativo). Se o usuario
+   * conceder, a fila de descoberta e recarregada na hora.
+   */
+  async function handleGrantLocationAccess() {
+    if (locationStatus === "requesting") {
+      return;
+    }
+
+    try {
+      setLocationStatus("requesting");
+
+      const permission = await requestForegroundLocationPermissionState();
+
+      setCanAskLocationPermissionAgain(permission.canAskAgain);
+      setLocationStatus("idle");
+
+      if (permission.granted) {
+        setLocationBlocked(false);
+        speak(accessibilityAnnouncements.locationPermissionGranted());
+        announceForAccessibility(
+          accessibilityAnnouncements.locationPermissionGranted()
+        );
+        restartProfiles();
+        return;
+      }
+
+      // Quando o sistema para de perguntar, o bloco troca para o botao de
+      // ajustes e o proprio efeito da tela anuncia a mudanca — nao falamos
+      // duas vezes aqui.
+      if (permission.canAskAgain) {
+        speak(accessibilityAnnouncements.locationPermissionDenied());
+        announceForAccessibility(
+          accessibilityAnnouncements.locationPermissionDenied()
+        );
+      }
+    } catch {
+      const permission = await getForegroundLocationPermissionState().catch(
+        () => null
+      );
+
+      if (permission) {
+        setCanAskLocationPermissionAgain(permission.canAskAgain);
+      }
+
+      setLocationStatus("failed");
+      speak(LOCATION_PERMISSION_FAILED_MESSAGE);
+      announceForAccessibility(LOCATION_PERMISSION_FAILED_MESSAGE);
+    }
+  }
+
+  /** Ultimo recurso: o sistema nao pergunta mais, so os ajustes resolvem. */
+  async function handleOpenLocationSettings() {
+    if (Platform.OS === "web") {
+      return;
+    }
+
+    await Linking.openSettings();
   }
 
   /**
@@ -1105,6 +1210,98 @@ export default function Matches() {
                 </View>
               </LinearGradient>
             </>
+          ) : locationBlocked ? (
+            // Bloco proprio da localizacao: o erro generico nao tem acao util
+            // aqui — o que destrava a tela e a permissao, entao o botao dela
+            // fica junto da mensagem.
+            <View
+              accessibilityRole="alert"
+              accessibilityLiveRegion="assertive"
+              className="flex-1 items-center justify-center px-8"
+            >
+              <View className="w-full items-center rounded-[28px] border border-danger/40 bg-surface-alt px-6 py-10">
+                <Ionicons
+                  name="location-outline"
+                  size={40}
+                  color="#EAEA00"
+                  importantForAccessibility="no"
+                />
+                <Text className="mt-4 text-center text-title font-black text-content">
+                  Localização desativada
+                </Text>
+                <Text className="mt-3 text-center text-body font-semibold text-content-secondary">
+                  {showLocationSettingsButton
+                    ? LOCATION_BLOCKED_DISCOVERY_MESSAGE
+                    : LOCATION_DISABLED_DISCOVERY_MESSAGE}
+                </Text>
+
+                {showLocationSettingsButton ? (
+                  <Pressable
+                    className="mt-6 h-12 w-full items-center justify-center rounded-full border border-[#5DDB85] bg-[#132519] px-6"
+                    onPress={() => {
+                      speak("Abrir configurações do celular");
+                      void handleOpenLocationSettings();
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Abrir configurações do celular"
+                    accessibilityHint="Isso vai abrir as configurações do sistema, fora do aplicativo, para liberar a localização"
+                  >
+                    <Text className="text-body font-black text-[#5DDB85]">
+                      Abrir configurações do celular
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    className={`mt-6 h-12 w-full items-center justify-center rounded-full px-6 ${locationStatus === "requesting" ? "bg-[#CFCF62]" : "bg-[#EAEA00]"}`}
+                    disabled={locationStatus === "requesting"}
+                    onPress={() => {
+                      speak("Ativar localização");
+                      void handleGrantLocationAccess();
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Ativar localização"
+                    accessibilityHint="Solicita a permissão de localização do aparelho para descobrir novos perfis"
+                    accessibilityState={{
+                      disabled: locationStatus === "requesting",
+                      busy: locationStatus === "requesting",
+                    }}
+                  >
+                    {locationStatus === "requesting" ? (
+                      <ActivityIndicator color="#323200" size="small" />
+                    ) : (
+                      <Text className="text-body font-black text-[#323200]">
+                        Ativar localização
+                      </Text>
+                    )}
+                  </Pressable>
+                )}
+
+                <Pressable
+                  className="mt-3 h-12 w-full items-center justify-center rounded-full border border-content-muted/40 bg-surface-muted px-6"
+                  onPress={() => {
+                    speak("Tentar novamente");
+                    restartProfiles();
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Tentar novamente"
+                  accessibilityHint="Verifica de novo a permissão de localização e busca perfis"
+                >
+                  <Text className="text-body font-black text-content">
+                    Tentar novamente
+                  </Text>
+                </Pressable>
+
+                {locationStatus === "failed" ? (
+                  <Text
+                    className="mt-3 text-center text-[13px] font-semibold text-red-300"
+                    accessibilityRole="alert"
+                    accessibilityLiveRegion="polite"
+                  >
+                    {LOCATION_PERMISSION_FAILED_MESSAGE}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
           ) : loadError ? (
             // `accessibilityRole="alert"` da a semantica do aviso; o anuncio em
             // si sai do `useEffect` de fim de fila (uma fonte por evento).

@@ -58,6 +58,8 @@ export const accessibilityAnnouncements = {
 
   messageSent: () => "Mensagem enviada.",
   messageSendFailed: () => "Não foi possível enviar a mensagem. Tente novamente.",
+  messageEdited: () => "Mensagem editada.",
+  messageDeleted: () => "Mensagem apagada.",
   newMessages: (count: number, senderName: string) =>
     count === 1
       ? `Nova mensagem de ${senderName}.`
@@ -65,9 +67,21 @@ export const accessibilityAnnouncements = {
 
   recordingStarted: () => "Gravação de áudio iniciada. Toque em parar quando terminar.",
   recordingStopped: (seconds: number) =>
-    `Gravação finalizada com ${seconds} segundos. Toque em enviar para mandar o áudio.`,
+    `Gravação finalizada com ${seconds} segundos. Enviando o áudio.`,
   recordingCancelled: () => "Gravação cancelada.",
 
   audioPlaybackStarted: () => "Reproduzindo áudio.",
   audioPlaybackStopped: () => "Áudio pausado.",
+
+  locationPermissionRequired: () =>
+    "Localização desativada. A descoberta de perfis precisa da localização do aparelho. Use o botão Ativar localização.",
+
+  locationPermissionBlocked: () =>
+    "Localização bloqueada nas configurações do aparelho. Use o botão Abrir configurações do celular para liberar o acesso.",
+
+  locationPermissionGranted: () =>
+    "Localização ativada. Buscando perfis compatíveis.",
+
+  locationPermissionDenied: () =>
+    "Permissão de localização negada. Sem ela não é possível descobrir novos perfis.",
 };

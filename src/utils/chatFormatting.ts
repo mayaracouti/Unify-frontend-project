@@ -45,10 +45,14 @@ export function formatTimeForSpeech(isoDate: string): string {
   return `${date.toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })} às ${time}`;
 }
 
-/** "12 segundos" / "1 minuto e 5 segundos" */
+/**
+ * "12 segundos" / "1 minuto e 5 segundos" — uso em FALA (leitor de tela).
+ * Duracao desconhecida ou zero devolve string vazia: quem chama decide a frase
+ * (ver `describeAudioMessage`), nunca mostra "duracao desconhecida".
+ */
 export function formatAudioDuration(seconds: number | null | undefined): string {
-  if (typeof seconds !== "number" || seconds <= 0) {
-    return "duração desconhecida";
+  if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds <= 0) {
+    return "";
   }
 
   const totalSeconds = Math.round(seconds);
@@ -63,4 +67,21 @@ export function formatAudioDuration(seconds: number | null | undefined): string 
   return remaining === 0
     ? minutePart
     : `${minutePart} e ${remaining} ${remaining === 1 ? "segundo" : "segundos"}`;
+}
+
+/** "Mensagem de áudio de 12 segundos" ou, sem duracao, so "Mensagem de áudio". */
+export function describeAudioMessage(seconds: number | null | undefined): string {
+  const spoken = formatAudioDuration(seconds);
+  return spoken ? `Mensagem de áudio de ${spoken}` : "Mensagem de áudio";
+}
+
+/** "0:07" / "1:05" — cronometro VISUAL (gravacao e player). Zero vira "0:00". */
+export function formatAudioClock(seconds: number | null | undefined): string {
+  const total =
+    typeof seconds === "number" && Number.isFinite(seconds) && seconds > 0
+      ? Math.floor(seconds)
+      : 0;
+  const minutes = Math.floor(total / 60);
+  const remaining = total % 60;
+  return `${minutes}:${String(remaining).padStart(2, "0")}`;
 }

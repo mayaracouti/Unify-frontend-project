@@ -12,6 +12,7 @@ type UseChatMessagesArgs = {
   conversationId: string | null;
   /** Tela em foco. Fora de foco o polling nao roda. */
   enabled: boolean;
+  /** So mensagens NOVAS do outro participante — atualizacoes (lida, editada, apagada) nao entram. */
   onNewIncomingMessages?: (messages: ChatMessageResponse[]) => void;
 };
 
@@ -24,6 +25,10 @@ type UseChatMessagesArgs = {
  *  - clearTimeout no cleanup (desmontagem, perda de foco)
  *  - backoff exponencial em erro, reset no primeiro sucesso
  *  - deduplicacao por id ao mesclar
+ *
+ * O backend compara `since` com `updatedAt`, entao o polling tambem traz
+ * mensagens ja conhecidas que mudaram (entregue/vista, editada, apagada). A
+ * mesclagem substitui a versao antiga pela nova.
  */
 export function useChatMessages({
   conversationId,
@@ -43,6 +48,13 @@ export function useChatMessages({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
+  // Espelho do estado para o polling distinguir "nova" de "atualizada" sem
+  // depender de closure desatualizada.
+  const messagesRef = useRef<ChatMessageResponse[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
   // O callback muda de identidade a cada render da tela; guardar em ref evita
   // reiniciar o ciclo de polling por causa disso.
   const onNewIncomingMessagesRef = useRef(onNewIncomingMessages);
@@ -58,8 +70,12 @@ export function useChatMessages({
           return incoming;
         }
 
+        // No Map o ultimo `set` vence. "prepend" e o que chega do servidor ou o
+        // que acabei de enviar/editar/apagar: a versao nova substitui a antiga.
+        // "append" e historico antigo rolando para cima: o que ja esta na tela
+        // e mais recente e prevalece.
         const byId = new Map<string, ChatMessageResponse>();
-        const base = mode === "prepend" ? [...incoming, ...current] : [...current, ...incoming];
+        const base = mode === "prepend" ? [...current, ...incoming] : [...incoming, ...current];
 
         for (const message of base) {
           byId.set(message.id, message);
@@ -156,9 +172,13 @@ export function useChatMessages({
         backoffRef.current = POLL_INTERVAL_MS; // sucesso: reseta o backoff
 
         if (!disposed && response.messages.length > 0) {
+          const knownIds = new Set(messagesRef.current.map((message) => message.id));
+          const incoming = response.messages.filter(
+            (message) => !message.fromMe && !knownIds.has(message.id)
+          );
+
           mergeMessages(response.messages, "prepend");
 
-          const incoming = response.messages.filter((message) => !message.fromMe);
           if (incoming.length > 0) {
             onNewIncomingMessagesRef.current?.(incoming);
           }
@@ -207,8 +227,11 @@ export function useChatMessages({
     }
   }, [conversationId, hasNext, loadingMore, mergeMessages]);
 
-  /** Insercao otimista do que o proprio usuario acabou de enviar. */
-  const appendLocalMessage = useCallback(
+  /**
+   * Insercao/atualizacao otimista do que o proprio usuario acabou de enviar,
+   * editar ou apagar: a resposta do servidor substitui a versao em tela.
+   */
+  const upsertLocalMessage = useCallback(
     (message: ChatMessageResponse) => {
       mergeMessages([message], "prepend");
     },
@@ -216,12 +239,12 @@ export function useChatMessages({
   );
 
   return {
-    appendLocalMessage,
     error,
     hasNext,
     loadOlderMessages,
     loading,
     loadingMore,
     messages,
+    upsertLocalMessage,
   };
 }

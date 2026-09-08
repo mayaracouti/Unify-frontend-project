@@ -125,5 +125,25 @@ export const chatService = {
     );
   },
 
+  /** So o remetente edita, e so mensagens de texto. Devolve a mensagem com `editedAt`. */
+  editMessage(conversationId: string, messageId: string, body: string) {
+    return customApiCall.put<ChatMessageResponse, ChatMessageCreateRequest>(
+      `${CHATS_ENDPOINT}/${encodePathSegment(conversationId)}/messages/${encodePathSegment(messageId)}`,
+      { body },
+      { requiresAuth: true, suppressErrorToast: true }
+    );
+  },
+
+  /**
+   * Exclusao logica: a mensagem continua no historico com `deletedAt` e sem
+   * conteudo ("Mensagem apagada" para os dois lados).
+   */
+  deleteMessage(conversationId: string, messageId: string) {
+    return customApiCall.delete<ChatMessageResponse>(
+      `${CHATS_ENDPOINT}/${encodePathSegment(conversationId)}/messages/${encodePathSegment(messageId)}`,
+      { requiresAuth: true, suppressErrorToast: true }
+    );
+  },
+
   resolveAssetUrl: resolveChatAssetUrl,
 };

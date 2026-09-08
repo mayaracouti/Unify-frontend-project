@@ -1,46 +1,53 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   RecordingPresets,
   getRecordingPermissionsAsync,
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
-  useAudioRecorder,
+  useAudioRecorder as useExpoAudioRecorder,
   useAudioRecorderState,
 } from "expo-audio";
+import { File } from "expo-file-system";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
 
-import type { ChatMediaUpload } from "../../types/chat";
+import type { ChatMediaUpload } from "../types/chat";
 import {
   accessibilityAnnouncements,
   announceForAccessibility,
-} from "../../utils/accessibilityAnnouncements";
-import { formatAudioDuration } from "../../utils/chatFormatting";
-import { showGlobalToast } from "../../utils/globalToast";
+} from "../utils/accessibilityAnnouncements";
+import { showGlobalToast } from "../utils/globalToast";
 
 /** Limite aceito pelo backend (`unify.chat.audio.max-duration-seconds`). */
-const MAX_DURATION_SECONDS = 120;
+export const MAX_AUDIO_DURATION_SECONDS = 120;
+
+type UseAudioRecorderArgs = {
+  /** Chamado quando a gravacao termina com sucesso (toque em parar ou limite atingido). */
+  onRecorded: (media: ChatMediaUpload) => void;
+};
 
 /**
- * Botao de gravar audio ACESSIVEL: toque para iniciar, toque para parar.
+ * Gravacao de audio ACESSIVEL: toque para iniciar, toque para parar (ou descartar).
  *
  * Nunca "segurar para gravar" — pressao longa e inacessivel para quem tem
  * limitacao motora e e incompativel com o leitor de tela, que consome o gesto.
+ *
+ * A UI fica por conta de quem usa o hook (`ChatComposer`): enquanto `recording`
+ * e true o compositor troca a caixa de texto pelo cronometro e pelos botoes
+ * de descartar/enviar.
  */
-export function AudioRecorderButton({
-  disabled,
-  onRecorded,
-}: {
-  disabled?: boolean;
-  onRecorded: (media: ChatMediaUpload) => void;
-}) {
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+export function useAudioRecorder({ onRecorded }: UseAudioRecorderArgs) {
+  const recorder = useExpoAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
   const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null);
 
   const recording = Boolean(recorderState?.isRecording);
   const elapsedSeconds = Math.floor((recorderState?.durationMillis ?? 0) / 1000);
   const autoStoppedRef = useRef(false);
+
+  // O callback muda a cada render do compositor; a ref evita recriar `stop`.
+  const onRecordedRef = useRef(onRecorded);
+  useEffect(() => {
+    onRecordedRef.current = onRecorded;
+  }, [onRecorded]);
 
   // Consulta o estado atual SEM abrir o dialogo: a permissao so e pedida
   // quando a pessoa realmente toca em gravar.
@@ -64,15 +71,21 @@ export function AudioRecorderButton({
     };
   }, []);
 
-  const stopRecording = useCallback(async () => {
+  const restorePlaybackMode = useCallback(async () => {
+    // Devolve a sessao de audio ao modo de reproducao (iOS): com
+    // `allowsRecording` ligado o player sai baixo no alto-falante.
+    await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(
+      () => undefined
+    );
+  }, []);
+
+  const stop = useCallback(async () => {
     try {
       await recorder.stop();
       const uri = recorder.uri;
       const seconds = Math.max(1, elapsedSeconds);
 
-      // Devolve a sessao de audio ao modo de reproducao (iOS): com
-      // `allowsRecording` ligado o player sai baixo no alto-falante.
-      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+      await restorePlaybackMode();
 
       if (!uri) {
         announceForAccessibility(accessibilityAnnouncements.recordingCancelled());
@@ -81,7 +94,7 @@ export function AudioRecorderButton({
 
       announceForAccessibility(accessibilityAnnouncements.recordingStopped(seconds));
 
-      onRecorded({
+      onRecordedRef.current({
         type: "AUDIO",
         uri,
         name: `audio-${Date.now()}.m4a`,
@@ -95,7 +108,32 @@ export function AudioRecorderButton({
         variant: "error",
       });
     }
-  }, [elapsedSeconds, onRecorded, recorder]);
+  }, [elapsedSeconds, recorder, restorePlaybackMode]);
+
+  /** Descarta a gravacao em andamento: nada e enviado e o arquivo local e apagado. */
+  const cancel = useCallback(async () => {
+    try {
+      await recorder.stop();
+    } catch {
+      // Ja parado ou nunca comecou: seguir para a limpeza mesmo assim.
+    }
+
+    await restorePlaybackMode();
+
+    const uri = recorder.uri;
+    if (uri) {
+      try {
+        const file = new File(uri);
+        if (file.exists) {
+          file.delete();
+        }
+      } catch {
+        // Na web a URI e um blob: nao ha arquivo para apagar.
+      }
+    }
+
+    announceForAccessibility(accessibilityAnnouncements.recordingCancelled());
+  }, [recorder, restorePlaybackMode]);
 
   // Corte automatico no limite de duracao aceito pelo backend.
   useEffect(() => {
@@ -104,16 +142,16 @@ export function AudioRecorderButton({
       return;
     }
 
-    if (elapsedSeconds >= MAX_DURATION_SECONDS && !autoStoppedRef.current) {
+    if (elapsedSeconds >= MAX_AUDIO_DURATION_SECONDS && !autoStoppedRef.current) {
       autoStoppedRef.current = true;
       announceForAccessibility(
-        `Limite de ${MAX_DURATION_SECONDS} segundos atingido. Finalizando a gravação.`
+        `Limite de ${MAX_AUDIO_DURATION_SECONDS} segundos atingido. Finalizando a gravação.`
       );
-      void stopRecording();
+      void stop();
     }
-  }, [elapsedSeconds, recording, stopRecording]);
+  }, [elapsedSeconds, recording, stop]);
 
-  const startRecording = useCallback(async () => {
+  const start = useCallback(async () => {
     let granted = permissionGranted === true;
 
     if (!granted) {
@@ -146,48 +184,5 @@ export function AudioRecorderButton({
     }
   }, [permissionGranted, recorder]);
 
-  return (
-    <View className="flex-row items-center gap-2">
-      {recording ? (
-        <Text
-          accessibilityLiveRegion="polite"
-          accessibilityLabel={`Gravando há ${formatAudioDuration(elapsedSeconds)}`}
-          className="text-[13px] font-bold text-[#FF6B6B]"
-        >
-          {formatAudioDuration(elapsedSeconds)}
-        </Text>
-      ) : null}
-
-      <Pressable
-        accessible
-        accessibilityRole="button"
-        accessibilityLabel={
-          recording
-            ? `Parar gravação. Gravando há ${formatAudioDuration(elapsedSeconds)}`
-            : "Gravar mensagem de áudio"
-        }
-        accessibilityHint={
-          recording
-            ? "Toque para finalizar e enviar o áudio"
-            : `Toque para começar a gravar. Duração máxima de ${MAX_DURATION_SECONDS} segundos`
-        }
-        accessibilityState={{ disabled: Boolean(disabled), busy: recording }}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        className={`h-12 w-12 items-center justify-center rounded-full ${
-          recording ? "bg-[#FF2D73]" : "bg-[#1D1F24]"
-        }`}
-        disabled={disabled}
-        onPress={() => {
-          void (recording ? stopRecording() : startRecording());
-        }}
-      >
-        <Ionicons
-          name={recording ? "stop" : "mic"}
-          size={24}
-          color={recording ? "#FFFFFF" : "#CAC3D8"}
-          importantForAccessibility="no"
-        />
-      </Pressable>
-    </View>
-  );
+  return { cancel, elapsedSeconds, recording, start, stop };
 }
