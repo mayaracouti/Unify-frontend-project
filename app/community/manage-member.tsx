@@ -5,7 +5,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { buildActionSpeech, useTTS } from "../../src/accessibility/tts";
-import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
+import { useScreenHeadingFocus } from "../../src/hooks/use-screen-heading-focus";
 import { communityService } from "../../src/services/communityService";
 import type { CommunityRole } from "../../src/types/community";
 import { showGlobalToast } from "../../src/utils/globalToast";
@@ -52,7 +52,8 @@ export default function CommunityManageMemberScreen() {
     returnTab?: string | string[];
   }>();
 
-  useRequireCompletedOnboarding();
+  // Ao entrar na tela, o leitor de tela do sistema comeca pelo titulo.
+  const headingRef = useScreenHeadingFocus<Text>();
 
   const communityId = useMemo(
     () => normalizeRouteParam(params.communityId).trim(),
@@ -145,6 +146,7 @@ export default function CommunityManageMemberScreen() {
               }}
               accessibilityRole="button"
               accessibilityLabel="Voltar para a comunidade"
+              accessibilityHint="Sai da gestão de cargos sem alterar o cargo do membro."
             >
               <Ionicons name="arrow-back" size={24} color="#E5E2E1" />
             </Pressable>
@@ -163,7 +165,11 @@ export default function CommunityManageMemberScreen() {
             <Text className="text-[14px] font-bold uppercase tracking-[1.4px] text-[#7C4DFF]">
               Gestão de cargos
             </Text>
-            <Text className="mt-4 text-[30px] font-extrabold leading-10 text-white">
+            <Text
+              ref={headingRef}
+              accessibilityRole="header"
+              className="mt-4 text-[30px] font-extrabold leading-10 text-white"
+            >
               {userName}
             </Text>
             {communityName ? (
@@ -198,6 +204,7 @@ export default function CommunityManageMemberScreen() {
                     disabled={Boolean(pendingRole)}
                     accessibilityRole="button"
                     accessibilityLabel={`Tornar ${userName} ${ROLE_LABELS[role]}`}
+                    accessibilityHint="Aplica o novo cargo na hora e volta para a comunidade."
                     accessibilityState={{ disabled: Boolean(pendingRole), busy: isPending }}
                   >
                     <View className="flex-row items-start gap-4">

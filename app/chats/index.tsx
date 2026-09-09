@@ -9,7 +9,7 @@ import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-n
 import { GlobalTopNav } from "../../src/components/navigation/global-top-nav";
 import { useAppShell } from "../../src/context/AppShellContext";
 import { useAuth } from "../../src/context/AuthContext";
-import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
+import { useScreenHeadingFocus } from "../../src/hooks/use-screen-heading-focus";
 import { chatService } from "../../src/services/chatService";
 import type { ConversationSummaryResponse } from "../../src/types/chat";
 import { announceForAccessibility } from "../../src/utils/accessibilityAnnouncements";
@@ -18,7 +18,8 @@ import { formatApiErrorMessage } from "../../src/utils/auth";
 const LIST_POLL_INTERVAL_MS = 15000;
 
 export default function ChatsScreen() {
-  const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
+  // Ao entrar na tela, o leitor de tela do sistema comeca pelo titulo.
+  const headingRef = useScreenHeadingFocus<Text>();
   const isFocused = useIsFocused();
   const router = useRouter();
   const { session } = useAuth();
@@ -72,7 +73,7 @@ export default function ChatsScreen() {
   }, []);
 
   useEffect(() => {
-    if (!canAccessCompletedOnboardingContent || !isFocused) {
+    if (!isFocused) {
       return;
     }
 
@@ -86,7 +87,7 @@ export default function ChatsScreen() {
 
     // Cleanup obrigatorio: fora de foco o polling para.
     return () => clearInterval(intervalId);
-  }, [canAccessCompletedOnboardingContent, isFocused, load, refreshUnreadChatCount]);
+  }, [isFocused, load, refreshUnreadChatCount]);
 
   return (
     <View className="flex-1 bg-[#1F2023]">
@@ -94,7 +95,11 @@ export default function ChatsScreen() {
         <GlobalTopNav />
 
         <View className="flex-1 px-5 pt-5">
-          <Text accessibilityRole="header" className="text-[32px] font-extrabold text-white">
+          <Text
+            ref={headingRef}
+            accessibilityRole="header"
+            className="text-[32px] font-extrabold text-white"
+          >
             Conversas
           </Text>
           <Text className="mt-2 text-[15px] font-semibold leading-6 text-[#CAC3D8]">

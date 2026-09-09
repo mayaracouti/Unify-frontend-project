@@ -21,7 +21,6 @@ import {
 } from "../../src/accessibility/tts";
 import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
 import { useAccessibility } from "../../src/context/AccessibilityContext";
-import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { profileService } from "../../src/services/profileService";
 import { getAuthSnapshot, subscribeToAuthStorage } from "../../src/storage/tokenStorage";
 import type { UserProfileResponse } from "../../src/types/profile";
@@ -491,8 +490,6 @@ function LocationModal({
 }
 
 export default function MatchMyProfile() {
-  const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
-
   const router = useRouter();
   const { speak } = useTTS();
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
@@ -538,9 +535,7 @@ export default function MatchMyProfile() {
       }
     }
 
-    if (canAccessCompletedOnboardingContent) {
-      void loadProfile();
-    }
+    void loadProfile();
 
     const unsubscribe = subscribeToAuthStorage((snapshot) => {
       if (active) {
@@ -552,7 +547,7 @@ export default function MatchMyProfile() {
       active = false;
       unsubscribe();
     };
-  }, [canAccessCompletedOnboardingContent]);
+  }, []);
 
   // Sliders: fala o valor final quando o usuario para de arrastar (700 ms sem
   // mudanca), nunca durante o gesto — evita metralhadora de fala.

@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { memo } from "react";
 import {
   type AccessibilityActionEvent,
   type AccessibilityActionInfo,
@@ -74,7 +75,11 @@ function buildMessageAccessibilityLabel(
     .trim();
 }
 
-export function MessageBubble({
+/**
+ * Balao de mensagem. `memo` com comparacao rasa padrao: o polling do chat
+ * substitui apenas as mensagens que mudaram, entao as demais nao repintam.
+ */
+export const MessageBubble = memo(function MessageBubble({
   authToken,
   message,
   onMessageAction,
@@ -254,4 +259,4 @@ export function MessageBubble({
       </View>
     </Pressable>
   );
-}
+});

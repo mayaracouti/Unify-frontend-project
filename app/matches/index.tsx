@@ -35,12 +35,10 @@ import { AuthenticatedRemoteImage } from "../../src/components/profile/authentic
 import { ScreenEmpty } from "../../src/components/ui/screen-empty";
 import { ScreenError } from "../../src/components/ui/screen-error";
 import { ScreenLoading } from "../../src/components/ui/screen-loading";
-import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { matchService } from "../../src/services/matchService";
 import { profileService } from "../../src/services/profileService";
 import {
   createEmptyMatchDiscoveryState,
-  createMatchDiscoveryScopeId,
   getStoredMatchDiscoveryState,
   saveStoredMatchDiscoveryState,
 } from "../../src/storage/matchDiscoveryStorage";
@@ -429,7 +427,6 @@ function ProfilePhoto({
 }
 
 export default function Matches() {
-  const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
 
   const isFocused = useIsFocused();
   const router = useRouter();
@@ -564,7 +561,7 @@ export default function Matches() {
   // precisa ser anunciado. O estado de carregamento ja e coberto pela
   // `accessibilityLiveRegion` do `ScreenLoading` — nao anunciamos de novo aqui.
   useEffect(() => {
-    if (loadingProfiles || currentProfile || !canAccessCompletedOnboardingContent) {
+    if (loadingProfiles || currentProfile) {
       return;
     }
 
@@ -584,7 +581,6 @@ export default function Matches() {
 
     announceForAccessibility(accessibilityAnnouncements.queueEnded());
   }, [
-    canAccessCompletedOnboardingContent,
     currentProfile,
     loadingProfiles,
     locationBlocked,
@@ -721,10 +717,6 @@ export default function Matches() {
   );
 
   const loadDiscoveryProfiles = useCallback(async () => {
-    if (!canAccessCompletedOnboardingContent) {
-      return;
-    }
-
     const requestId = ++visibleProfileLoadRef.current;
 
     setLoadingProfiles(true);
@@ -733,9 +725,7 @@ export default function Matches() {
     try {
       const snapshot = await getAuthSnapshot();
       const nextAuthToken = snapshot.session?.accessToken ?? null;
-      const scopeId = createMatchDiscoveryScopeId(
-        snapshot.session?.refreshToken ?? snapshot.session?.accessToken
-      );
+      const scopeId = snapshot.userId;
       const locationPermission = await getForegroundLocationPermissionState().catch(
         () => null
       );
@@ -759,6 +749,19 @@ export default function Matches() {
       }
 
       setLocationBlocked(false);
+
+      // Sem `sub` no access token nao ha escopo estavel para persistir o
+      // estado de descoberta; sem ele o feed nao pode ser montado.
+      if (!scopeId) {
+        setCurrentUserScopeId(null);
+        setQueuedProfileIds([]);
+        setSeenProfileIds([]);
+        setCurrentProfile(null);
+        setNextProfile(null);
+        setLoadError("Nao foi possivel identificar sua sessao. Entre novamente.");
+        return;
+      }
+
       setCurrentUserScopeId(scopeId);
 
       const storedState = await getStoredMatchDiscoveryState(scopeId);
@@ -796,13 +799,13 @@ export default function Matches() {
         setLoadingProfiles(false);
       }
     }
-  }, [canAccessCompletedOnboardingContent, resolveVisibleProfiles]);
+  }, [resolveVisibleProfiles]);
 
   useEffect(() => {
-    if (isFocused && canAccessCompletedOnboardingContent) {
+    if (isFocused) {
       void loadDiscoveryProfiles();
     }
-  }, [canAccessCompletedOnboardingContent, isFocused, loadDiscoveryProfiles]);
+  }, [isFocused, loadDiscoveryProfiles]);
 
   const showNextProfile = useCallback(async () => {
     if (!currentUserScopeId || !currentProfile) {

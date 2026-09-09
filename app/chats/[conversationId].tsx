@@ -20,7 +20,7 @@ import { ActionSheet, type ActionSheetOption } from "../../src/components/ui/act
 import { useAppShell } from "../../src/context/AppShellContext";
 import { useAuth } from "../../src/context/AuthContext";
 import { useChatMessages } from "../../src/hooks/useChatMessages";
-import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
+import { useScreenHeadingFocus } from "../../src/hooks/use-screen-heading-focus";
 import { chatService } from "../../src/services/chatService";
 import type { ChatMediaUpload, ChatMessageResponse } from "../../src/types/chat";
 import {
@@ -33,7 +33,8 @@ import { showGlobalToast } from "../../src/utils/globalToast";
 type Lightbox = { uri: string; label: string };
 
 export default function ConversationScreen() {
-  useRequireCompletedOnboarding();
+  // Ao entrar na tela, o leitor de tela do sistema comeca pelo titulo.
+  const headingRef = useScreenHeadingFocus<Text>();
 
   const router = useRouter();
   const isFocused = useIsFocused();
@@ -271,6 +272,7 @@ export default function ConversationScreen() {
           </Pressable>
 
           <Text
+            ref={headingRef}
             accessibilityRole="header"
             className="flex-1 text-[20px] font-black text-white"
             numberOfLines={1}

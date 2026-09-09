@@ -21,7 +21,6 @@ import { ScreenEmpty } from "../../src/components/ui/screen-empty";
 import { ScreenLoading } from "../../src/components/ui/screen-loading";
 import { useAuth } from "../../src/context/AuthContext";
 import { useAsyncState } from "../../src/hooks/useAsyncState";
-import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { communityService } from "../../src/services/communityService";
 import type {
   CommunityDirectoryResponse,
@@ -80,8 +79,6 @@ export default function MyCommunitiesScreen() {
   const { speak } = useTTS();
   const { session } = useAuth();
 
-  const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
-
   const authToken = session?.accessToken ?? null;
   const initialLoadRef = useRef(false);
   const requestIdRef = useRef(0);
@@ -97,7 +94,7 @@ export default function MyCommunitiesScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    if (!isFocused || !canAccessCompletedOnboardingContent) {
+    if (!isFocused) {
       return;
     }
 
@@ -148,13 +145,9 @@ export default function MyCommunitiesScreen() {
     };
 
     void loadDirectory();
-  }, [authToken, canAccessCompletedOnboardingContent, isFocused]);
+  }, [authToken, isFocused]);
 
   const handleRefresh = async () => {
-    if (!canAccessCompletedOnboardingContent) {
-      return;
-    }
-
     setRefreshing(true);
     const requestId = ++requestIdRef.current;
 
@@ -187,7 +180,7 @@ export default function MyCommunitiesScreen() {
   };
 
   const handleLoadMore = async () => {
-    if (!canAccessCompletedOnboardingContent || !directory.hasNext || loadingMore) {
+    if (!directory.hasNext || loadingMore) {
       return;
     }
 

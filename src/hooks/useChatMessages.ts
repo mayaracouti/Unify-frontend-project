@@ -101,6 +101,11 @@ export function useChatMessages({
     setLoading(true);
     setError(null);
     pageRef.current = 0;
+    // Conversa nova: o cursor da conversa anterior nao vale mais. Sem esse
+    // reset o primeiro tick de polling buscaria "desde" o serverTime da outra
+    // conversa (e o backoff continuaria penalizando a conversa nova).
+    sinceRef.current = null;
+    backoffRef.current = POLL_INTERVAL_MS;
 
     chatService
       .getMessages(conversationId, { page: 0, size: PAGE_SIZE })

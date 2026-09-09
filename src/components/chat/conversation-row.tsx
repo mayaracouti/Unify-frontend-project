@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { memo } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { chatService } from "../../services/chatService";
@@ -6,7 +7,12 @@ import type { ConversationSummaryResponse } from "../../types/chat";
 import { formatRelativeDateTime, formatTimeForSpeech } from "../../utils/chatFormatting";
 import { AuthenticatedRemoteImage } from "../profile/authenticated-remote-image";
 
-export function ConversationRow({
+/**
+ * Linha da lista de conversas. `memo` com comparacao rasa padrao: em listas
+ * longas o re-render do container so precisa repintar as linhas cujo
+ * `conversation` mudou de identidade.
+ */
+export const ConversationRow = memo(function ConversationRow({
   authToken,
   conversation,
   onPress,
@@ -101,4 +107,4 @@ export function ConversationRow({
       </View>
     </Pressable>
   );
-}
+});

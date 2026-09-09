@@ -19,7 +19,6 @@ import {
   SectionTitle,
   SimilaritySelector,
 } from "../../src/components/profile/form-controls";
-import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { profileService } from "../../src/services/profileService";
 import type {
   LookupOptionResponse,
@@ -43,7 +42,6 @@ function toggleId(currentIds: number[], id: number): number[] {
 export default function EditMatchPreferences() {
   const router = useRouter();
   const { speak } = useTTS();
-  const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
 
   const [options, setOptions] = useState<ProfileOptionsResponse | null>(null);
   const [connectionTypeId, setConnectionTypeId] = useState<number | undefined>();
@@ -116,10 +114,6 @@ export default function EditMatchPreferences() {
     Platform.OS !== "web" && !hasLocationPermission && !canAskLocationPermissionAgain;
 
   useEffect(() => {
-    if (!canAccessCompletedOnboardingContent) {
-      return;
-    }
-
     let active = true;
 
     async function loadPreferences() {
@@ -162,7 +156,7 @@ export default function EditMatchPreferences() {
     return () => {
       active = false;
     };
-  }, [canAccessCompletedOnboardingContent]);
+  }, []);
 
   useEffect(() => {
     let active = true;

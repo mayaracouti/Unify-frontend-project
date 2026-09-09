@@ -22,7 +22,6 @@ import { ScreenLoading } from "../../src/components/ui/screen-loading";
 import { useAccessibility } from "../../src/context/AccessibilityContext";
 import { useAppShell } from "../../src/context/AppShellContext";
 import { useAsyncState } from "../../src/hooks/useAsyncState";
-import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { profileService } from "../../src/services/profileService";
 import { getAuthSnapshot, subscribeToAuthStorage } from "../../src/storage/tokenStorage";
 import type {
@@ -278,7 +277,6 @@ export default function Profile() {
   const { syncProfileSummary } = useAppShell();
   const { settings } = useAccessibility();
   const reduceMotion = settings.reduceMotion;
-  const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
 
   const {
     data: profile,
@@ -327,12 +325,8 @@ export default function Profile() {
   }, [syncProfileSummary]);
 
   useEffect(() => {
-    if (!canAccessCompletedOnboardingContent) {
-      return;
-    }
-
     void loadProfile();
-  }, [canAccessCompletedOnboardingContent, loadProfile]);
+  }, [loadProfile]);
 
   useEffect(() => {
     let active = true;

@@ -15,12 +15,12 @@ import { matchService } from "../services/matchService";
 import { getCompletionForActiveSession } from "../services/onboardingCompletionService";
 import { profileService } from "../services/profileService";
 import {
-  createMatchDiscoveryScopeId,
   getStoredMatchDiscoveryState,
   saveStoredMatchDiscoveryState,
   subscribeToMatchDiscoveryStorage,
 } from "../storage/matchDiscoveryStorage";
 import type { UserProfileResponse } from "../types/profile";
+import { getJwtSubject } from "../utils/jwt";
 import { getForegroundLocationPermissionState } from "../utils/location";
 import { useAuth } from "./AuthContext";
 
@@ -104,12 +104,12 @@ export function AppShellProvider({ children }: PropsWithChildren) {
   const shellHydrationRequestRef = useRef(0);
   const sessionRef = useRef(session);
   const hydratedSessionScopeIdRef = useRef<string | null>(null);
+  // Escopo estavel: o `sub` do access token (UUID do usuario). Antes era um
+  // hash do refresh token, que rotaciona a cada refresh e forcava uma
+  // re-hidratacao completa do shell.
   const sessionScopeId = useMemo(
-    () =>
-      session
-        ? createMatchDiscoveryScopeId(session.refreshToken ?? session.accessToken)
-        : null,
-    [session?.accessToken, session?.refreshToken]
+    () => getJwtSubject(session?.accessToken),
+    [session?.accessToken]
   );
 
   useEffect(() => {
@@ -149,9 +149,13 @@ export function AppShellProvider({ children }: PropsWithChildren) {
     }
 
     const requestId = ++unseenCountRequestRef.current;
-    const scopeId = createMatchDiscoveryScopeId(
-      activeSession.refreshToken ?? activeSession.accessToken
-    );
+    const scopeId = getJwtSubject(activeSession.accessToken);
+
+    if (!scopeId) {
+      setUnseenProfilesCount(0);
+      return;
+    }
+
     const locationPermission = await getForegroundLocationPermissionState().catch(() => null);
 
     if (!locationPermission?.granted) {
@@ -255,10 +259,7 @@ export function AppShellProvider({ children }: PropsWithChildren) {
 
     async function hydrateShellState() {
       try {
-        const completion = await getCompletionForActiveSession(
-          session?.accessToken,
-          session?.refreshToken
-        );
+        const completion = await getCompletionForActiveSession(session?.accessToken);
 
         if (!active || requestId !== shellHydrationRequestRef.current) {
           return;
@@ -301,7 +302,6 @@ export function AppShellProvider({ children }: PropsWithChildren) {
     isAuthenticated,
     isReady,
     session?.accessToken,
-    session?.refreshToken,
     sessionScopeId,
     refreshProfileSummary,
     refreshUnseenProfilesCount,
