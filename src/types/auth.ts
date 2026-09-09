@@ -62,9 +62,18 @@ export interface AuthSession {
   accessTokenExpiresAt: number;
 }
 
-export interface StoredAuthSnapshot {
+export interface StoredAuthState {
   session: AuthSession | null;
   pendingVerificationEmail: string | null;
+}
+
+export interface StoredAuthSnapshot extends StoredAuthState {
+  /**
+   * `sub` do access token (UUID do usuario no backend). E DERIVADO, nunca
+   * persistido: serve como chave estavel de escopo local, no lugar do refresh
+   * token, que rotaciona a cada `/auth/refresh`.
+   */
+  userId: string | null;
 }
 
 export interface NormalizedApiError extends Error {

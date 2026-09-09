@@ -41,6 +41,8 @@ type AuthContextValue = {
   signOut: () => Promise<void>;
   signUp: (payload: SignUpRequest) => Promise<VerificationCodeDispatchResponse>;
   verifyEmail: (payload: EmailVerificationRequest) => Promise<{ message: string }>;
+  /** UUID do usuario (`sub` do access token). Estavel entre refreshes. */
+  userId: string | null;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -48,6 +50,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 const INITIAL_SNAPSHOT: StoredAuthSnapshot = {
   session: null,
   pendingVerificationEmail: null,
+  userId: null,
 };
 
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -191,8 +194,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
       signOut,
       signUp,
       verifyEmail,
+      userId: snapshot.userId,
     }),
-    [isReady, snapshot.pendingVerificationEmail, snapshot.session]
+    [isReady, snapshot.pendingVerificationEmail, snapshot.session, snapshot.userId]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -23,7 +23,6 @@ import { ScreenEmpty } from "../../src/components/ui/screen-empty";
 import { ScreenLoading } from "../../src/components/ui/screen-loading";
 import { useAuth } from "../../src/context/AuthContext";
 import { useAsyncState } from "../../src/hooks/useAsyncState";
-import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { chatService } from "../../src/services/chatService";
 import { matchService } from "../../src/services/matchService";
 import { profileService } from "../../src/services/profileService";
@@ -223,7 +222,6 @@ export default function MutualMatchesScreen() {
   const isFocused = useIsFocused();
   const { speak } = useTTS();
   const { session } = useAuth();
-  const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
   const {
     data: matchesPage,
     setData: setMatchesPage,
@@ -286,7 +284,7 @@ export default function MutualMatchesScreen() {
   }
 
   useEffect(() => {
-    if (!canAccessCompletedOnboardingContent || !isFocused) {
+    if (!isFocused) {
       return;
     }
 
@@ -313,13 +311,9 @@ export default function MutualMatchesScreen() {
       setRefreshing(false);
       setLoadingMore(false);
     });
-  }, [authToken, canAccessCompletedOnboardingContent, isFocused, runLoadMutualMatches]);
+  }, [authToken, isFocused, runLoadMutualMatches]);
 
   const handleRefresh = async () => {
-    if (!canAccessCompletedOnboardingContent) {
-      return;
-    }
-
     setRefreshing(true);
     const requestId = ++requestIdRef.current;
 
@@ -360,7 +354,7 @@ export default function MutualMatchesScreen() {
   };
 
   const handleLoadMore = async () => {
-    if (!canAccessCompletedOnboardingContent || !matchesPage.hasNext || loadingMore) {
+    if (!matchesPage.hasNext || loadingMore) {
       return;
     }
 

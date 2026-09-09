@@ -16,7 +16,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTTS } from "../../src/accessibility/tts";
-import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
+import { useScreenHeadingFocus } from "../../src/hooks/use-screen-heading-focus";
 import { communityService } from "../../src/services/communityService";
 import { showGlobalToast } from "../../src/utils/globalToast";
 
@@ -68,7 +68,8 @@ export default function CommunityCreatePostScreen() {
   const { speak } = useTTS();
   const params = useLocalSearchParams<{ communityId?: string | string[] }>();
 
-  useRequireCompletedOnboarding();
+  // Ao entrar na tela, o leitor de tela do sistema comeca pelo titulo.
+  const headingRef = useScreenHeadingFocus<Text>();
 
   const communityId = useMemo(
     () => normalizeRouteParam(params.communityId).trim(),
@@ -185,6 +186,7 @@ export default function CommunityCreatePostScreen() {
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Voltar"
+                accessibilityHint="Sai da publicação sem salvar o texto digitado."
               >
                 <Ionicons name="arrow-back" size={24} color="#E5E2E1" />
               </Pressable>
@@ -204,6 +206,7 @@ export default function CommunityCreatePostScreen() {
               disabled={trimmedBody.length === 0 || submitting}
               accessibilityRole="button"
               accessibilityLabel="Publicar na comunidade"
+              accessibilityHint="Envia o texto e a imagem para o mural da comunidade."
               accessibilityState={{
                 disabled: trimmedBody.length === 0 || submitting,
                 busy: submitting,
@@ -224,7 +227,11 @@ export default function CommunityCreatePostScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View className="rounded-[28px] bg-[#111214] p-6">
-              <Text className="text-[30px] font-extrabold leading-10 text-white">
+              <Text
+                ref={headingRef}
+                accessibilityRole="header"
+                className="text-[30px] font-extrabold leading-10 text-white"
+              >
                 Compartilhe algo com a comunidade
               </Text>
               <Text className="mt-2 text-[15px] font-semibold leading-6 text-[#CAC3D8]">
@@ -300,6 +307,7 @@ export default function CommunityCreatePostScreen() {
                       }}
                       accessibilityRole="button"
                       accessibilityLabel="Remover imagem"
+                      accessibilityHint="Descarta a imagem anexada. O texto da publicação continua."
                     >
                       <Text className="text-[14px] font-bold text-[#FF8A8A]">Remover</Text>
                     </Pressable>

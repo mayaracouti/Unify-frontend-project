@@ -18,7 +18,6 @@ import { ScreenEmpty } from "../../src/components/ui/screen-empty";
 import { ScreenError } from "../../src/components/ui/screen-error";
 import { ScreenLoading } from "../../src/components/ui/screen-loading";
 import { useAuth } from "../../src/context/AuthContext";
-import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { communityService } from "../../src/services/communityService";
 import type {
   CommunityJoinRequestResponse,
@@ -170,8 +169,6 @@ export default function CommunityJoinRequestsScreen() {
     communityName?: string | string[];
   }>();
   const { session } = useAuth();
-
-  useRequireCompletedOnboarding();
 
   const communityId = useMemo(
     () => normalizeRouteParam(params.communityId).trim(),

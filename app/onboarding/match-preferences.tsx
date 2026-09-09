@@ -19,6 +19,8 @@ import {
   SectionTitle,
   SimilaritySelector,
 } from "../../src/components/profile/form-controls";
+import { useAuth } from "../../src/context/AuthContext";
+import { markOnboardingCompletionForSession } from "../../src/services/onboardingCompletionService";
 import { profileService } from "../../src/services/profileService";
 import type {
   LookupOptionResponse,
@@ -40,6 +42,7 @@ function toggleId(currentIds: number[], id: number): number[] {
 export default function MatchPreferencesOnboarding() {
   const router = useRouter();
   const { speak } = useTTS();
+  const { userId } = useAuth();
   const [options, setOptions] = useState<ProfileOptionsResponse | null>(null);
   const [connectionTypeId, setConnectionTypeId] = useState<number | undefined>();
   const [desiredGenderIds, setDesiredGenderIds] = useState<number[]>([]);
@@ -253,6 +256,10 @@ export default function MatchPreferencesOnboarding() {
         maxAge: parsedMaxAge,
         maxMatchDistanceKm: distance,
         desiredGenderIds,
+      });
+
+      await markOnboardingCompletionForSession(userId, {
+        matchPreferencesCompleted: true,
       });
 
       router.replace("/home");

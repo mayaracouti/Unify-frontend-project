@@ -17,7 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { buildActionSpeech, useTTS } from "../../src/accessibility/tts";
 import { CommunityCategoryChips } from "../../src/components/community/category-chips";
-import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
+import { useScreenHeadingFocus } from "../../src/hooks/use-screen-heading-focus";
 import { CommunityPrivacySelector } from "../../src/components/community/privacy-selector";
 import { communityService } from "../../src/services/communityService";
 import type {
@@ -77,7 +77,8 @@ export default function CommunityCreateScreen() {
   const router = useRouter();
   const { speak } = useTTS();
 
-  useRequireCompletedOnboarding();
+  // Ao entrar na tela, o leitor de tela do sistema comeca pelo titulo.
+  const headingRef = useScreenHeadingFocus<Text>();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -213,6 +214,7 @@ export default function CommunityCreateScreen() {
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Voltar"
+                accessibilityHint="Sai da criação da comunidade sem salvar o que foi preenchido."
               >
                 <Ionicons name="arrow-back" size={24} color="#E5E2E1" />
               </Pressable>
@@ -253,7 +255,11 @@ export default function CommunityCreateScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View className="rounded-[28px] bg-[#111214] p-6">
-              <Text className="text-[30px] font-extrabold leading-10 text-white">
+              <Text
+                ref={headingRef}
+                accessibilityRole="header"
+                className="text-[30px] font-extrabold leading-10 text-white"
+              >
                 Crie uma comunidade
               </Text>
               <Text className="mt-2 text-[15px] font-semibold leading-6 text-[#CAC3D8]">
@@ -374,6 +380,7 @@ export default function CommunityCreateScreen() {
                       }}
                       accessibilityRole="button"
                       accessibilityLabel="Remover ícone"
+                      accessibilityHint="Descarta a imagem escolhida. A comunidade fica sem ícone."
                     >
                       <Text className="text-[14px] font-bold text-[#FF8A8A]">Remover</Text>
                     </Pressable>

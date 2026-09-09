@@ -26,7 +26,7 @@ import {
   preloadAuthenticatedRemoteImages,
 } from "../../src/components/profile/authenticated-remote-image";
 import { useAuth } from "../../src/context/AuthContext";
-import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
+import { useScreenHeadingFocus } from "../../src/hooks/use-screen-heading-focus";
 import { communityService } from "../../src/services/communityService";
 import type { CommunityCommentResponse } from "../../src/types/community";
 import { formatApiErrorMessage } from "../../src/utils/auth";
@@ -179,7 +179,8 @@ export default function CommunityCommentsScreen() {
   const { session } = useAuth();
   const { speak } = useTTS();
 
-  const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
+  // Ao entrar na tela, o leitor de tela do sistema comeca pelo titulo.
+  const headingRef = useScreenHeadingFocus<Text>();
 
   const authToken = session?.accessToken ?? null;
   const communityId = useMemo(
@@ -260,21 +261,13 @@ export default function CommunityCommentsScreen() {
   );
 
   useEffect(() => {
-    if (!canAccessCompletedOnboardingContent) {
-      return;
-    }
-
     void loadComments({ showLoader: true });
-  }, [canAccessCompletedOnboardingContent, loadComments]);
+  }, [loadComments]);
 
   const handleRefresh = useCallback(() => {
-    if (!canAccessCompletedOnboardingContent) {
-      return;
-    }
-
     setRefreshing(true);
     void loadComments();
-  }, [canAccessCompletedOnboardingContent, loadComments]);
+  }, [loadComments]);
 
   const handleSubmitComment = useCallback(async () => {
     if (submitting || !postId) {
@@ -409,7 +402,13 @@ export default function CommunityCommentsScreen() {
               <Text className="text-2xl font-black text-[#7C4DFF]">Unify</Text>
             </View>
 
-            <Text className="text-[14px] font-bold text-[#CAC3D8]">Comentários</Text>
+            <Text
+              ref={headingRef}
+              accessibilityRole="header"
+              className="text-[14px] font-bold text-[#CAC3D8]"
+            >
+              Comentários
+            </Text>
           </View>
 
           {loading && comments.length === 0 ? (
@@ -531,6 +530,7 @@ export default function CommunityCommentsScreen() {
                         disabled={draft.trim().length === 0 || submitting}
                         accessibilityRole="button"
                         accessibilityLabel="Enviar comentário"
+                        accessibilityHint="Publica o comentário abaixo da publicação original."
                         accessibilityState={{
                           disabled: draft.trim().length === 0 || submitting,
                           busy: submitting,

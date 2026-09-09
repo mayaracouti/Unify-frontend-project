@@ -1,7 +1,8 @@
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
-import type { AuthSession, StoredAuthSnapshot } from "../types/auth";
+import type { AuthSession, StoredAuthSnapshot, StoredAuthState } from "../types/auth";
+import { getJwtSubject } from "../utils/jwt";
 
 const ACCESS_TOKEN_KEY = "unify.auth.accessToken";
 const REFRESH_TOKEN_KEY = "unify.auth.refreshToken";
@@ -18,7 +19,7 @@ type AuthStorageListener = (snapshot: StoredAuthSnapshot) => void;
 
 const listeners = new Set<AuthStorageListener>();
 
-let cachedSnapshot: StoredAuthSnapshot | null = null;
+let cachedSnapshot: StoredAuthState | null = null;
 
 const webStorageFallback = (() => {
   if (Platform.OS !== "web") {
@@ -58,14 +59,17 @@ async function deleteStoredValue(key: string): Promise<void> {
   await SecureStore.deleteItemAsync(key);
 }
 
-function cloneSnapshot(snapshot: StoredAuthSnapshot): StoredAuthSnapshot {
+// `userId` e computado na leitura (nunca gravado): a fonte da verdade e o
+// proprio access token.
+function cloneSnapshot(snapshot: StoredAuthState): StoredAuthSnapshot {
   return {
     session: snapshot.session ? { ...snapshot.session } : null,
     pendingVerificationEmail: snapshot.pendingVerificationEmail,
+    userId: getJwtSubject(snapshot.session?.accessToken),
   };
 }
 
-async function readSnapshotFromStorage(): Promise<StoredAuthSnapshot> {
+async function readSnapshotFromStorage(): Promise<StoredAuthState> {
   const [accessToken, refreshToken, expiresAtValue, pendingVerificationEmail] =
     await Promise.all([
       getStoredValue(ACCESS_TOKEN_KEY),
@@ -92,20 +96,40 @@ async function readSnapshotFromStorage(): Promise<StoredAuthSnapshot> {
   };
 }
 
-async function ensureSnapshot(): Promise<StoredAuthSnapshot> {
+// Single-flight da leitura inicial: sem isso, duas chamadas concorrentes de
+// `ensureSnapshot` fazem dois `readSnapshotFromStorage` e a segunda atribuicao
+// (resolvida depois do `await`) pode sobrescrever um snapshot MAIS NOVO gravado
+// por um `setSession`/`clearSession` que aconteceu no meio do caminho.
+let inFlightSnapshotRead: Promise<StoredAuthState> | null = null;
+
+async function ensureSnapshot(): Promise<StoredAuthState> {
   if (webStorageFallback) {
     cachedSnapshot = await readSnapshotFromStorage();
     return cachedSnapshot;
   }
 
+  if (cachedSnapshot) {
+    return cachedSnapshot;
+  }
+
+  if (!inFlightSnapshotRead) {
+    inFlightSnapshotRead = readSnapshotFromStorage().finally(() => {
+      inFlightSnapshotRead = null;
+    });
+  }
+
+  const snapshot = await inFlightSnapshotRead;
+
+  // So assume a leitura do disco se nada mais tiver populado o cache enquanto
+  // ela estava em andamento (uma escrita concorrente e sempre mais recente).
   if (!cachedSnapshot) {
-    cachedSnapshot = await readSnapshotFromStorage();
+    cachedSnapshot = snapshot;
   }
 
   return cachedSnapshot;
 }
 
-function notifyListeners(snapshot: StoredAuthSnapshot) {
+function notifyListeners(snapshot: StoredAuthState) {
   const nextSnapshot = cloneSnapshot(snapshot);
 
   listeners.forEach((listener) => {
@@ -125,6 +149,12 @@ export async function getAuthSnapshot(): Promise<StoredAuthSnapshot> {
 export async function getToken(): Promise<string | null> {
   const snapshot = await getAuthSnapshot();
   return snapshot.session?.accessToken ?? null;
+}
+
+/** UUID do usuario derivado do access token; `null` sem sessao valida. */
+export async function getUserId(): Promise<string | null> {
+  const snapshot = await getAuthSnapshot();
+  return snapshot.userId;
 }
 
 export async function getRefreshToken(): Promise<string | null> {

@@ -2,7 +2,6 @@ import type { PropsWithChildren, ReactNode } from "react";
 import { Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useRequireCompletedOnboarding } from "../../hooks/useRequireCompletedOnboarding";
 import { GlobalBottomNav } from "./global-bottom-nav";
 import { GlobalTopNav } from "./global-top-nav";
 
@@ -18,8 +17,6 @@ export function AppTabScreen({
   subtitle,
   headerRight,
 }: AppTabScreenProps) {
-  useRequireCompletedOnboarding();
-
   return (
     <View className="flex-1 bg-[#1F2023]">
       <SafeAreaView className="flex-1">

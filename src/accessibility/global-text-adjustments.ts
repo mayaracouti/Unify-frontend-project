@@ -43,7 +43,12 @@ import {
   type ReactElement,
 } from "react";
 import { cssInterop } from "nativewind";
-import { StyleSheet, type StyleProp, type TextStyle } from "react-native";
+import {
+  PixelRatio,
+  StyleSheet,
+  type StyleProp,
+  type TextStyle,
+} from "react-native";
 
 export type GlobalAccessibilityState = {
   fontScaleMultiplier: number;
@@ -59,6 +64,36 @@ export const DEFAULT_GLOBAL_ACCESSIBILITY_STATE: GlobalAccessibilityState = {
 
 /** Tamanho de fonte padrao do React Native quando nenhum `fontSize` e informado. */
 export const DEFAULT_TEXT_FONT_SIZE = 14;
+
+/**
+ * Teto da escala de fonte COMBINADA (multiplicador do app x escala do SO).
+ *
+ * Decisao de produto: 1.30 e o mesmo valor do nivel EXTRA_LARGE devolvido pelo
+ * backend — e ate onde os layouts do app foram validados sem quebrar. Sem esse
+ * teto, um usuario com fonte "enorme" no Android/iOS (que ja escala o texto por
+ * fora, via `allowFontScaling`) somado ao multiplicador in-app chegaria a ~2x e
+ * o texto estouraria os containers.
+ *
+ * O piso de 1 no calculo garante que o app NUNCA reduza o texto abaixo da
+ * escala escolhida pelo usuario no sistema: no pior caso o multiplicador
+ * in-app vira neutro (1), nunca negativo.
+ */
+export const COMBINED_FONT_SCALE_CAP = 1.3;
+
+/**
+ * Converte o multiplicador in-app no multiplicador efetivo a ser aplicado por
+ * cima do texto que o SO JA escalou por `os`. `inApp * os` e a escala total
+ * desejada; limitada pelo teto e dividida de volta por `os`, sobra o quanto o
+ * app ainda pode ampliar.
+ */
+export function getEffectiveFontScaleMultiplier(
+  inApp: number,
+  os: number = PixelRatio.getFontScale()
+): number {
+  const systemScale = Number.isFinite(os) && os > 0 ? os : 1;
+
+  return Math.max(1, Math.min(inApp * systemScale, COMBINED_FONT_SCALE_CAP) / systemScale);
+}
 
 const HIGH_CONTRAST_LIGHT = "#FFFFFF";
 const HIGH_CONTRAST_DARK = "#000000";
@@ -328,7 +363,8 @@ export function adjustTextStyle(
   const overrides: TextStyle = {};
   let hasOverrides = false;
 
-  const multiplier = state.fontScaleMultiplier;
+  // Escala efetiva: respeita a fonte do sistema e o teto combinado.
+  const multiplier = getEffectiveFontScaleMultiplier(state.fontScaleMultiplier);
 
   if (multiplier !== 1) {
     const fontSize = typeof flattened?.fontSize === "number" ? flattened.fontSize : null;

@@ -5,7 +5,8 @@
 import { usePathname } from "expo-router";
 import { useEffect, useRef } from "react";
 
-import { speak } from "./tts";
+import { announceForAccessibility } from "../utils/accessibilityAnnouncements";
+import { isSystemScreenReaderEnabled, speak } from "./tts";
 
 /** Nome amigavel (pt-BR) de cada rota real do diretorio `app/`. */
 const ROUTE_LABELS: Record<string, string> = {
@@ -41,6 +42,14 @@ const ROUTE_LABELS: Record<string, string> = {
   "/auth/underage": "Cadastro indisponível para menores de idade",
   "/reset-password": "Definir nova senha",
 };
+
+/**
+ * Janela de supressao de duplicata do anuncio nativo, espelhando
+ * `DUPLICATE_SUPPRESSION_MS` do TTS (`src/accessibility/tts/tts-service.ts`,
+ * 1200 ms) com uma folga: o leitor do sistema enfileira a fala e pode demorar
+ * mais que o motor in-app para consumi-la.
+ */
+const DUPLICATE_SUPPRESSION_MS = 1500;
 
 /** `/community/<id>` e a unica rota dinamica do app. */
 const COMMUNITY_DETAIL_PATTERN = /^\/community\/[^/]+$/;
@@ -83,6 +92,8 @@ export function getRouteAnnouncement(pathname: string): string {
 export function ScreenReaderAnnouncer() {
   const pathname = usePathname();
   const lastAnnouncedPathname = useRef<string | null>(null);
+  const lastNativeAnnouncement = useRef<string | null>(null);
+  const lastNativeAnnouncementAt = useRef(0);
 
   useEffect(() => {
     if (!pathname || lastAnnouncedPathname.current === pathname) {
@@ -97,7 +108,31 @@ export function ScreenReaderAnnouncer() {
       return;
     }
 
-    speak(getRouteAnnouncement(pathname));
+    const announcement = getRouteAnnouncement(pathname);
+
+    // `speak()` do TTS in-app se cala quando o leitor nativo esta ligado (mesma
+    // fonte de verdade: `isSystemScreenReaderEnabled`). Nesse caso o nome da
+    // rota precisa sair pelo canal do sistema, senao a troca de tela fica muda.
+    if (isSystemScreenReaderEnabled()) {
+      const now = Date.now();
+
+      // Mesma janela de supressao do TTS: evita fala dupla quando o toque na
+      // aba e o anuncio da rota produzem o mesmo texto.
+      if (
+        announcement === lastNativeAnnouncement.current &&
+        now - lastNativeAnnouncementAt.current < DUPLICATE_SUPPRESSION_MS
+      ) {
+        return;
+      }
+
+      lastNativeAnnouncement.current = announcement;
+      lastNativeAnnouncementAt.current = now;
+
+      announceForAccessibility(announcement);
+      return;
+    }
+
+    speak(announcement);
   }, [pathname]);
 
   return null;

@@ -38,7 +38,6 @@ import { ScreenError } from "../../src/components/ui/screen-error";
 import { ScreenLoading } from "../../src/components/ui/screen-loading";
 import { useAppShell } from "../../src/context/AppShellContext";
 import { useAuth } from "../../src/context/AuthContext";
-import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { communityService } from "../../src/services/communityService";
 import type {
   CommunityUserSummaryResponse,
@@ -875,8 +874,6 @@ export default function CommunityDetailScreen() {
   const { session } = useAuth();
   const { currentUserId, currentUserProfileId } = useAppShell();
 
-  const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
-
   const requestedCommunityId = useMemo(
     () => normalizeRouteParam(params.communityId).trim(),
     [params.communityId]
@@ -1012,7 +1009,7 @@ export default function CommunityDetailScreen() {
   );
 
   useEffect(() => {
-    if (!isFocused || !canAccessCompletedOnboardingContent) {
+    if (!isFocused) {
       return;
     }
 
@@ -1020,12 +1017,11 @@ export default function CommunityDetailScreen() {
     initialLoadRef.current = true;
 
     void loadFeed({ showLoader: shouldShowLoader });
-  }, [canAccessCompletedOnboardingContent, isFocused, loadFeed]);
+  }, [isFocused, loadFeed]);
 
   useEffect(() => {
     if (
       !isFocused ||
-      !canAccessCompletedOnboardingContent ||
       !canViewMembers ||
       activeTab !== "members"
     ) {
@@ -1036,7 +1032,7 @@ export default function CommunityDetailScreen() {
     membersInitialLoadRef.current = true;
 
     void loadMembers({ showLoader: shouldShowLoader });
-  }, [activeTab, canAccessCompletedOnboardingContent, canViewMembers, isFocused, loadMembers]);
+  }, [activeTab, canViewMembers, isFocused, loadMembers]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);

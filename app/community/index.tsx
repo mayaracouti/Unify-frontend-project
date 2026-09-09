@@ -24,7 +24,6 @@ import { ScreenEmpty } from "../../src/components/ui/screen-empty";
 import { ScreenLoading } from "../../src/components/ui/screen-loading";
 import { useAuth } from "../../src/context/AuthContext";
 import { useAsyncState } from "../../src/hooks/useAsyncState";
-import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { communityService } from "../../src/services/communityService";
 import {
   getLastCommunityHomeTab,
@@ -189,8 +188,6 @@ export default function CommunityDirectoryScreen() {
   const { speak } = useTTS();
   const { session } = useAuth();
 
-  const { canAccessCompletedOnboardingContent } = useRequireCompletedOnboarding();
-
   const authToken = session?.accessToken ?? null;
   const [searchQuery, setSearchQuery] = useState("");
   const deferredSearchQuery = useDeferredValue(searchQuery.trim());
@@ -250,7 +247,7 @@ export default function CommunityDirectoryScreen() {
   }, []);
 
   useEffect(() => {
-    if (!isFocused || !canAccessCompletedOnboardingContent) {
+    if (!isFocused) {
       return;
     }
 
@@ -320,7 +317,6 @@ export default function CommunityDirectoryScreen() {
     void loadDirectory();
   }, [
     authToken,
-    canAccessCompletedOnboardingContent,
     deferredSearchQuery,
     isFocused,
     selectedCategoryId,
@@ -329,10 +325,6 @@ export default function CommunityDirectoryScreen() {
 
   const loadForYouFeed = useCallback(
     async (options?: { refresh?: boolean; append?: boolean }) => {
-      if (!canAccessCompletedOnboardingContent) {
-        return;
-      }
-
       const requestId = ++forYouRequestIdRef.current;
 
       if (options?.refresh) {
@@ -404,11 +396,11 @@ export default function CommunityDirectoryScreen() {
         }
       }
     },
-    [authToken, canAccessCompletedOnboardingContent, forYouFeed.page]
+    [authToken, forYouFeed.page]
   );
 
   useEffect(() => {
-    if (!isFocused || !canAccessCompletedOnboardingContent || activeTab !== "forYou") {
+    if (!isFocused || activeTab !== "forYou") {
       return;
     }
 
@@ -416,7 +408,7 @@ export default function CommunityDirectoryScreen() {
     // Recarrega o feed "Para você" sempre que a aba volta ao foco para refletir
     // publicações e comunidades novas sem exigir pull-to-refresh.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, canAccessCompletedOnboardingContent, isFocused]);
+  }, [activeTab, isFocused]);
 
   const handleToggleForYouLike = useCallback(
     async (item: CommunityForYouPostResponse) => {
@@ -489,10 +481,6 @@ export default function CommunityDirectoryScreen() {
   );
 
   const handleRefresh = async () => {
-    if (!canAccessCompletedOnboardingContent) {
-      return;
-    }
-
     setRefreshing(true);
     const requestId = ++requestIdRef.current;
 
@@ -532,7 +520,7 @@ export default function CommunityDirectoryScreen() {
   };
 
   const handleLoadMore = async () => {
-    if (!canAccessCompletedOnboardingContent || !directory.hasNext || loadingMore) {
+    if (!directory.hasNext || loadingMore) {
       return;
     }
 

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type Ref } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
 import { joinSpeechParts, useTTS } from "../../accessibility/tts";
@@ -10,6 +10,11 @@ export type ScreenErrorProps = {
   onRetry?: () => void;
   retrying?: boolean;
   className?: string;
+  /**
+   * `ref` do titulo, para quem precisa mandar o foco do leitor de tela para o
+   * erro (ver `useScreenHeadingFocus` / `useHeadingFocusOnMount`).
+   */
+  titleRef?: Ref<Text>;
 };
 
 const DEFAULT_TITLE = "Algo deu errado";
@@ -28,6 +33,7 @@ export function ScreenError({
   onRetry,
   retrying,
   className,
+  titleRef,
 }: ScreenErrorProps) {
   const { speak } = useTTS();
 
@@ -46,7 +52,11 @@ export function ScreenError({
       accessibilityRole="alert"
       accessibilityLiveRegion="assertive"
     >
-      <Text className="text-center text-title font-black text-content">
+      <Text
+        ref={titleRef}
+        accessibilityRole="header"
+        className="text-center text-title font-black text-content"
+      >
         {title}
       </Text>
       <Text className="mt-3 text-center text-body font-semibold text-content-secondary">

@@ -19,6 +19,8 @@ import {
   MultiChoice,
   SingleChoice,
 } from "../../src/components/profile/form-controls";
+import { useAuth } from "../../src/context/AuthContext";
+import { markOnboardingCompletionForSession } from "../../src/services/onboardingCompletionService";
 import { profileService } from "../../src/services/profileService";
 import type { LookupOptionResponse, ProfileOptionsResponse } from "../../src/types/profile";
 import { formatApiErrorMessage } from "../../src/utils/auth";
@@ -114,6 +116,7 @@ async function requestForegroundLocationPermissionState(): Promise<LocationPermi
 export default function ProfileOnboarding() {
   const router = useRouter();
   const { speak } = useTTS();
+  const { userId } = useAuth();
   const [options, setOptions] = useState<ProfileOptionsResponse | null>(null);
   const [bio, setBio] = useState("");
   const [genderId, setGenderId] = useState<number | undefined>();
@@ -345,6 +348,11 @@ export default function ProfileOnboarding() {
         loveLanguageIds: loveLanguageIds.length > 0 ? loveLanguageIds : null,
         location: nextLocation,
       });
+
+      // O proprio app concluiu a etapa: marca no cache (memoria + storage) em
+      // vez de invalidar. Invalidar forcaria uma ida a rede que, se falhasse,
+      // jogaria o usuario na tela de erro do gate logo apos concluir o passo.
+      await markOnboardingCompletionForSession(userId, { profileCompleted: true });
 
       router.replace("/onboarding/match-preferences");
     } catch (error) {

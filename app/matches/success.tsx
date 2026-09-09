@@ -11,7 +11,6 @@ import { AuthenticatedRemoteImage } from "../../src/components/profile/authentic
 import { useAccessibility } from "../../src/context/AccessibilityContext";
 import { useAppShell } from "../../src/context/AppShellContext";
 import { useAuth } from "../../src/context/AuthContext";
-import { useRequireCompletedOnboarding } from "../../src/hooks/useRequireCompletedOnboarding";
 import { chatService } from "../../src/services/chatService";
 import {
   accessibilityAnnouncements,
@@ -88,8 +87,6 @@ function MatchPhoto({
 }
 
 export default function MatchSuccess() {
-  useRequireCompletedOnboarding();
-
   const router = useRouter();
   const { session } = useAuth();
   const { currentUserPhotoUrl } = useAppShell();
