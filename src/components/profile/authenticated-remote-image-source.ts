@@ -3,10 +3,10 @@
  * para poder ser testada sem renderizador (o projeto nao tem RNTL instalado).
  *
  * Dois assuntos vivem aqui:
- * 1. o builder do `source` com o header `Authorization` (usado no nativo, onde o
- *    `Image` do RN sabe mandar headers e cuidar do proprio cache em disco);
- * 2. o cache de object URLs do web, onde o `Image` NAO envia headers e ainda
- *    precisamos buscar os bytes via `fetch`.
+ * 1. o builder dos headers do `fetch` autenticado (`Authorization`). Ele NAO e
+ *    passado ao `Image` do RN como `source.headers`: no Android (Expo Go /
+ *    RN 0.81 nova arquitetura) esse header nao e enviado e a API responde 401;
+ * 2. o cache FIFO das URIs resolvidas (object URL no web, data URI no nativo).
  */
 
 export type AuthenticatedImageSource = {
@@ -14,7 +14,7 @@ export type AuthenticatedImageSource = {
   uri: string;
 };
 
-/** Teto do cache em memoria do web. Evicao FIFO simples. */
+/** Teto do cache em memoria de imagens resolvidas. Evicao FIFO simples. */
 export const MAX_CACHED_WEB_IMAGES = 60;
 
 export function getAuthenticatedImageCacheKey(uri: string) {
@@ -22,8 +22,9 @@ export function getAuthenticatedImageCacheKey(uri: string) {
 }
 
 /**
- * Monta o `source` do `Image`. Sem token o header e omitido (em vez de mandar
- * `Bearer null`), o que deixa o backend responder 401 e a tela cair no fallback.
+ * Monta uri + headers do `fetch` da imagem. Sem token o header e omitido (em
+ * vez de mandar `Bearer null`), o que deixa o backend responder 401 e a tela
+ * cair no fallback.
  */
 export function buildAuthenticatedImageSource(
   uri: string,
@@ -50,9 +51,10 @@ export type ObjectUrlCache = {
 };
 
 /**
- * Cache FIFO de object URLs. O cache e o dono do URL: quem consome nunca revoga,
- * senao um segundo consumidor da mesma imagem ficaria com um blob morto. A
- * revogacao acontece so na evicao e no `clear()` (logout).
+ * Cache FIFO de URIs resolvidas (object URL no web, data URI no nativo). O
+ * cache e o dono do URL: quem consome nunca revoga, senao um segundo consumidor
+ * da mesma imagem ficaria com um blob morto. A revogacao acontece so na evicao
+ * e no `clear()` (logout).
  */
 export function createObjectUrlCache({
   maxEntries = MAX_CACHED_WEB_IMAGES,
