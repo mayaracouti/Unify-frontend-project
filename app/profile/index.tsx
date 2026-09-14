@@ -22,6 +22,7 @@ import { ScreenLoading } from "../../src/components/ui/screen-loading";
 import { useAccessibility } from "../../src/context/AccessibilityContext";
 import { useAppShell } from "../../src/context/AppShellContext";
 import { useAsyncState } from "../../src/hooks/useAsyncState";
+import { followService } from "../../src/services/followService";
 import { profileService } from "../../src/services/profileService";
 import { getAuthSnapshot, subscribeToAuthStorage } from "../../src/storage/tokenStorage";
 import type {
@@ -30,8 +31,18 @@ import type {
   UserProfileImageResponse,
   UserProfileResponse,
 } from "../../src/types/profile";
+import type { FollowStatsResponse } from "../../src/types/social";
 import { announceForAccessibility } from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
+
+type StatItem = {
+  label: string;
+  value: string;
+  /** Preenchido apenas nos contadores navegaveis (seguidores/seguindo). */
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  route?: "/profile/followers" | "/profile/following";
+};
 
 type UploadTarget = "profilePicture" | "gallery";
 type ImageSource = "camera" | "gallery";
@@ -290,18 +301,37 @@ export default function Profile() {
   const [removingImageId, setRemovingImageId] = useState<string | null>(null);
   const [sourcePickerTarget, setSourcePickerTarget] = useState<UploadTarget | null>(null);
   const [imageAuthToken, setImageAuthToken] = useState<string | null>(null);
+  const [followStats, setFollowStats] = useState<FollowStatsResponse | null>(null);
 
   const galleryImages = profile?.galleryImages ?? [];
   const profilePictureUrl = profileService.resolveProfileImageUrl(profile?.profilePicture?.url);
   const displayName = buildDisplayName(profile);
   const displayAge = buildDisplayAge(profile);
   const accessibilityCards = useMemo(() => buildAccessibilityCards(profile), [profile]);
-  const statItems = useMemo(
+  const statItems = useMemo<StatItem[]>(
     () => [
       { label: "Fotos", value: String(galleryImages.length) },
       { label: "Interesses", value: String(profile?.interestTypes.length ?? 0) },
+      {
+        label: "Seguidores",
+        value: followStats ? String(followStats.followersCount) : "—",
+        accessibilityLabel: followStats
+          ? `${followStats.followersCount} seguidores`
+          : "Seguidores, carregando",
+        accessibilityHint: "Abre a lista de seguidores",
+        route: "/profile/followers",
+      },
+      {
+        label: "Seguindo",
+        value: followStats ? String(followStats.followingCount) : "—",
+        accessibilityLabel: followStats
+          ? `${followStats.followingCount} seguindo`
+          : "Seguindo, carregando",
+        accessibilityHint: "Abre a lista de quem você segue",
+        route: "/profile/following",
+      },
     ],
-    [galleryImages.length, profile?.interestTypes.length]
+    [followStats, galleryImages.length, profile?.interestTypes.length]
   );
 
   const loadProfile = useCallback(async (showLoader = false) => {
@@ -327,6 +357,33 @@ export default function Profile() {
   useEffect(() => {
     void loadProfile();
   }, [loadProfile]);
+
+  // Contadores de seguidores/seguindo: so fazem sentido depois que o id do
+  // perfil chega. Falha aqui nao derruba a tela — os tiles seguem com "—".
+  useEffect(() => {
+    const profileId = profile?.id;
+
+    if (!profileId) {
+      return;
+    }
+
+    let active = true;
+
+    void followService
+      .getFollowStats(profileId)
+      .then((stats) => {
+        if (active) {
+          setFollowStats(stats);
+        }
+      })
+      .catch(() => {
+        // Global API error toast already explains the failure.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [profile?.id]);
 
   useEffect(() => {
     let active = true;
@@ -757,12 +814,47 @@ export default function Profile() {
               </View>
             ) : (
               <View className="mt-8 flex-row overflow-hidden rounded-[26px] border border-[#68598C] bg-[#262228]">
-                {statItems.map((item, index) => (
-                  <View key={item.label} className={`flex-1 px-6 py-5 ${index === 0 ? "border-r border-[#4D4656]" : ""}`}>
-                    <Text className="text-center text-[18px] font-black text-[#D7C3FF]">{item.value}</Text>
-                    <Text className="mt-1 text-center text-[14px] font-bold text-white">{item.label}</Text>
-                  </View>
-                ))}
+                {statItems.map((item, index) => {
+                  const route = item.route;
+                  const tileClassName = `flex-1 px-3 py-5 ${
+                    index < statItems.length - 1 ? "border-r border-[#4D4656]" : ""
+                  }`;
+                  const tileContent = (
+                    <>
+                      <Text className="text-center text-[18px] font-black text-[#D7C3FF]">{item.value}</Text>
+                      <Text className="mt-1 text-center text-[14px] font-bold text-white">{item.label}</Text>
+                    </>
+                  );
+
+                  if (route) {
+                    return (
+                      <Pressable
+                        key={item.label}
+                        className={tileClassName}
+                        onPress={() => {
+                          speak(item.label);
+                          router.push(route);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={item.accessibilityLabel ?? `${item.value} ${item.label}`}
+                        accessibilityHint={item.accessibilityHint}
+                      >
+                        {tileContent}
+                      </Pressable>
+                    );
+                  }
+
+                  return (
+                    <View
+                      key={item.label}
+                      className={tileClassName}
+                      accessible
+                      accessibilityLabel={`${item.value} ${item.label}`}
+                    >
+                      {tileContent}
+                    </View>
+                  );
+                })}
               </View>
             )}
 

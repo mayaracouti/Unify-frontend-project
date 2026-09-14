@@ -8,6 +8,10 @@ import { buildActionSpeech, useTTS } from "../../src/accessibility/tts";
 import { useScreenHeadingFocus } from "../../src/hooks/use-screen-heading-focus";
 import { communityService } from "../../src/services/communityService";
 import type { CommunityRole } from "../../src/types/community";
+import {
+  accessibilityAnnouncements,
+  announceForAccessibility,
+} from "../../src/utils/accessibilityAnnouncements";
 import { showGlobalToast } from "../../src/utils/globalToast";
 
 const ROLE_LABELS: Record<CommunityRole, string> = {
@@ -123,6 +127,9 @@ export default function CommunityManageMemberScreen() {
           variant: "success",
           message: `${response.user.name} agora é ${ROLE_LABELS[response.role]}.`,
         });
+        announceForAccessibility(
+          accessibilityAnnouncements.memberRoleUpdated(ROLE_LABELS[response.role])
+        );
         handleBack();
       } catch {
         // Global API error toast already explains the failure.

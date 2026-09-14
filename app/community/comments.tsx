@@ -29,6 +29,10 @@ import { useAuth } from "../../src/context/AuthContext";
 import { useScreenHeadingFocus } from "../../src/hooks/use-screen-heading-focus";
 import { communityService } from "../../src/services/communityService";
 import type { CommunityCommentResponse } from "../../src/types/community";
+import {
+  accessibilityAnnouncements,
+  announceForAccessibility,
+} from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
 import { showGlobalToast } from "../../src/utils/globalToast";
 
@@ -110,6 +114,8 @@ function CommentCard({
   onDelete: () => void;
 }) {
   const { speak } = useTTS();
+  const truncatedBody =
+    comment.body.length > 120 ? `${comment.body.slice(0, 120)}…` : comment.body;
 
   return (
     <Pressable
@@ -117,7 +123,8 @@ function CommentCard({
       // Toque no comentario le autor e corpo reais vindos do backend.
       onPress={() => speak(buildCommunityCommentSpeech(comment))}
       accessibilityRole="button"
-      accessibilityLabel={`Comentário de ${comment.author.name}`}
+      accessibilityLabel={`Comentário de ${comment.author.name}: ${truncatedBody}`}
+      accessibilityHint="Lê o comentário em voz alta"
     >
       <View className="flex-row items-start gap-3">
         <CommentAvatar
@@ -144,6 +151,8 @@ function CommentCard({
                   disabled={deleting}
                   accessibilityRole="button"
                   accessibilityLabel={`Excluir comentário de ${comment.author.name}`}
+                  accessibilityHint="Remove este comentário da conversa"
+                  accessibilityState={{ disabled: deleting, busy: deleting }}
                 >
                   {deleting ? (
                     <ActivityIndicator color="#FFD3DD" size="small" />
@@ -308,6 +317,7 @@ export default function CommunityCommentsScreen() {
         variant: "success",
         message: "Seu comentário já apareceu na conversa.",
       });
+      announceForAccessibility(accessibilityAnnouncements.commentPublished());
     } catch {
       // Global API error toast already explains the failure.
     } finally {
@@ -340,6 +350,7 @@ export default function CommunityCommentsScreen() {
           variant: "success",
           message: "O comentário foi removido desta conversa.",
         });
+        announceForAccessibility(accessibilityAnnouncements.commentDeleted());
       } catch {
         // Global API error toast already explains the failure.
       } finally {
@@ -383,6 +394,7 @@ export default function CommunityCommentsScreen() {
                 className="mr-3 h-10 w-10 items-center justify-center rounded-full"
                 accessibilityRole="button"
                 accessibilityLabel="Voltar para a comunidade"
+                accessibilityHint="Volta para a comunidade sem salvar o comentário em edição"
                 onPress={() => {
                   speak("Voltar para a comunidade");
 
@@ -440,6 +452,7 @@ export default function CommunityCommentsScreen() {
                   }
                   accessibilityRole="button"
                   accessibilityLabel={`Publicação de ${authorName}`}
+                  accessibilityHint="Lê a publicação original em voz alta"
                 >
                   <Text className="text-[14px] font-bold uppercase tracking-[1.4px] text-[#7C4DFF]">
                     Publicação original
@@ -512,6 +525,7 @@ export default function CommunityCommentsScreen() {
                       onChangeText={setDraft}
                       onFocus={() => speak("Escreva um comentário")}
                       accessibilityLabel="Escreva um comentário"
+                      accessibilityHint="Obrigatório para publicar"
                     />
                     <View className="mt-4 flex-row items-center justify-between">
                       <Text className="text-[12px] font-semibold text-[#948EA1]">

@@ -30,6 +30,10 @@ import type {
   CommunitySummaryResponse,
 } from "../../src/types/community";
 import { formatApiErrorMessage } from "../../src/utils/auth";
+import {
+  accessibilityAnnouncements,
+  announceForAccessibility,
+} from "../../src/utils/accessibilityAnnouncements";
 import { showGlobalToast } from "../../src/utils/globalToast";
 
 const IMAGE_MEDIA_TYPES: ImagePicker.MediaType[] = ["images"];
@@ -260,6 +264,7 @@ export default function CommunitySettingsScreen() {
         variant: "success",
         message: "As novas informações já aparecem para os membros.",
       });
+      announceForAccessibility(accessibilityAnnouncements.communityUpdated());
 
       router.replace({
         pathname: "/community/[communityId]",
@@ -301,6 +306,7 @@ export default function CommunitySettingsScreen() {
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Voltar para a comunidade"
+                accessibilityHint="Volta para a comunidade sem salvar as alterações"
               >
                 <Ionicons name="arrow-back" size={24} color="#E5E2E1" />
               </Pressable>
@@ -346,6 +352,7 @@ export default function CommunitySettingsScreen() {
                   onPress={handleBack}
                   accessibilityRole="button"
                   accessibilityLabel="Voltar para a comunidade"
+                  accessibilityHint="Volta para a comunidade sem alterar as configurações"
                 >
                   <Text className="text-[14px] font-black text-white">Voltar</Text>
                 </Pressable>
@@ -465,6 +472,7 @@ export default function CommunitySettingsScreen() {
                     accessibilityLabel={
                       selectedImage ? "Trocar ícone da comunidade" : "Selecionar ícone da comunidade"
                     }
+                    accessibilityHint="Abre a galeria para escolher um novo ícone"
                     accessibilityState={{ disabled: pickingImage, busy: pickingImage }}
                   >
                     {pickingImage ? (
@@ -500,6 +508,8 @@ export default function CommunitySettingsScreen() {
                         }}
                         accessibilityRole="button"
                         accessibilityLabel="Remover o ícone selecionado"
+                        accessibilityHint="Descarta o novo ícone. O ícone atual é mantido"
+                        accessibilityState={{ disabled: saving }}
                       >
                         <Text className="text-[14px] font-bold text-[#FF8A8A]">Remover</Text>
                       </Pressable>
@@ -540,6 +550,7 @@ export default function CommunitySettingsScreen() {
                 disabled={trimmedName.length === 0 || saving}
                 accessibilityRole="button"
                 accessibilityLabel="Salvar alterações da comunidade"
+                accessibilityHint="Salva nome, descrição, privacidade, categoria e ícone da comunidade"
                 accessibilityState={{
                   disabled: trimmedName.length === 0 || saving,
                   busy: saving,

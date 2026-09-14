@@ -257,6 +257,11 @@ export function ChatComposer({
           accessible
           accessibilityRole="button"
           accessibilityLabel={editing ? "Confirmar edição" : "Enviar mensagem"}
+          accessibilityHint={
+            editing
+              ? "Salva o novo texto da mensagem"
+              : "Envia a mensagem para a conversa"
+          }
           accessibilityState={{ disabled: !canSend, busy: sending }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           className={`h-12 w-12 items-center justify-center rounded-full ${

@@ -33,6 +33,7 @@ import {
   AuthenticatedRemoteImage,
   preloadAuthenticatedRemoteImages,
 } from "../../src/components/profile/authenticated-remote-image";
+import { ReportModal } from "../../src/components/report/report-modal";
 import { ScreenEmpty } from "../../src/components/ui/screen-empty";
 import { ScreenError } from "../../src/components/ui/screen-error";
 import { ScreenLoading } from "../../src/components/ui/screen-loading";
@@ -49,6 +50,10 @@ import type {
   CommunityRole,
   CommunitySummaryResponse,
 } from "../../src/types/community";
+import {
+  accessibilityAnnouncements,
+  announceForAccessibility,
+} from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
 import { showGlobalToast } from "../../src/utils/globalToast";
 
@@ -293,6 +298,7 @@ function AuthorAvatar({
 }
 
 function PostAction({
+  accessibilityHint,
   accessibilityLabel,
   disabled,
   icon,
@@ -301,6 +307,7 @@ function PostAction({
   loading,
   onPress,
 }: {
+  accessibilityHint?: string;
   accessibilityLabel: string;
   disabled?: boolean;
   icon: ComponentProps<typeof Ionicons>["name"];
@@ -309,6 +316,8 @@ function PostAction({
   loading?: boolean;
   onPress: () => void;
 }) {
+  const busy = Boolean(loading);
+
   return (
     <Pressable
       className={`h-14 flex-1 flex-row items-center justify-center gap-2 rounded-lg ${
@@ -316,6 +325,12 @@ function PostAction({
       }`}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{
+        busy,
+        disabled: Boolean(disabled) || busy,
+        selected: Boolean(active),
+      }}
       onPress={onPress}
       disabled={disabled || loading}
     >
@@ -382,8 +397,13 @@ function MemberButton({
       accessibilityHint={
         pendingRequest
           ? "Cancela sua solicitação pendente de entrada nesta comunidade"
-          : undefined
+          : isMember
+            ? "Você deixa de ver e publicar nesta comunidade"
+            : isPrivate
+              ? "Envia um pedido de entrada para a moderação avaliar"
+              : "Você passa a publicar, curtir e comentar nesta comunidade"
       }
+      accessibilityState={{ busy, disabled: busy }}
     >
       {busy ? (
         <ActivityIndicator color={muted ? "#E5E2E1" : "#323200"} size="small" />
@@ -594,19 +614,23 @@ function CommunityHeader({
 function CommunityPostCard({
   authToken,
   canDelete,
+  canReport,
   deleting,
   likeBusy,
   onDelete,
   onOpenComments,
+  onReport,
   onToggleLike,
   post,
 }: {
   authToken: string | null;
   canDelete: boolean;
+  canReport: boolean;
   deleting: boolean;
   likeBusy: boolean;
   onDelete: () => void;
   onOpenComments: () => void;
+  onReport: () => void;
   onToggleLike: () => void;
   post: CommunityPostResponse;
 }) {
@@ -621,6 +645,7 @@ function CommunityPostCard({
       onPress={() => speak(buildCommunityPostSpeech(post))}
       accessibilityRole="button"
       accessibilityLabel={`Publicação de ${post.author.name}`}
+      accessibilityHint="Lê em voz alta o autor, o texto e os contadores desta publicação"
     >
       <View className="flex-row items-start gap-3">
         <AuthorAvatar
@@ -640,13 +665,29 @@ function CommunityPostCard({
           ) : null}
         </View>
 
-        {canDelete ? (
+        {canDelete || canReport ? (
           <View className="flex-row items-center gap-2">
+            {canReport ? (
+              <Pressable
+                className="h-10 w-10 items-center justify-center rounded-full bg-[#1E1A22]"
+                onPress={onReport}
+                accessibilityRole="button"
+                accessibilityLabel={`Denunciar publicação de ${post.author.name}`}
+                accessibilityHint="Abre o formulário de denúncia desta publicação"
+              >
+                <Ionicons name="flag-outline" size={18} color="#E5E2E1" />
+              </Pressable>
+            ) : null}
+
             {canDelete ? (
               <Pressable
                 className="h-10 w-10 items-center justify-center rounded-full bg-[#1E1A22]"
                 onPress={onDelete}
                 disabled={deleting}
+                accessibilityRole="button"
+                accessibilityLabel={`Excluir publicação de ${post.author.name}`}
+                accessibilityHint="Remove a publicação permanentemente"
+                accessibilityState={{ busy: deleting, disabled: deleting }}
               >
                 {deleting ? (
                   <ActivityIndicator color="#FFD3DD" size="small" />
@@ -684,6 +725,11 @@ function CommunityPostCard({
       <View className="mt-1 flex-row items-center justify-between">
         <PostAction
           accessibilityLabel={post.likedByCurrentUser ? "Remover curtida" : "Curtir publicação"}
+          accessibilityHint={
+            post.likedByCurrentUser
+              ? "Retira a sua curtida desta publicação"
+              : "Registra a sua curtida nesta publicação"
+          }
           disabled={likeBusy}
           icon={post.likedByCurrentUser ? "thumbs-up" : "thumbs-up-outline"}
           count={post.likesCount}
@@ -693,6 +739,7 @@ function CommunityPostCard({
         />
         <PostAction
           accessibilityLabel="Abrir comentários"
+          accessibilityHint="Abre a tela de comentários desta publicação"
           icon={post.commentedByCurrentUser ? "chatbubble" : "chatbubble-outline"}
           count={post.commentsCount}
           active={post.commentedByCurrentUser}
@@ -895,6 +942,11 @@ export default function CommunityDetailScreen() {
   const [pendingLikePostId, setPendingLikePostId] = useState<string | null>(null);
   const [pendingDeletePostId, setPendingDeletePostId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{
+    userId: string;
+    postId: string;
+    authorName: string;
+  } | null>(null);
   const spokenCommunityIdRef = useRef<string | null>(null);
   // A aba de membros e restrita a quem participa: o backend recusa a listagem
   // para nao membros, entao a aba nem chega a ser exibida.
@@ -1123,6 +1175,18 @@ export default function CommunityDetailScreen() {
               ? "Você pode solicitar entrada novamente quando quiser."
               : "Você pode entrar novamente quando quiser.",
       });
+
+      // Entrar/sair muda o que a tela permite fazer; o leitor de tela precisa
+      // saber disso sem ter que varrer a tela atras do botao.
+      if (response.isMember) {
+        announceForAccessibility(
+          accessibilityAnnouncements.communityJoined(feed.community.name)
+        );
+      } else if (!response.pendingRequest) {
+        announceForAccessibility(
+          accessibilityAnnouncements.communityLeft(feed.community.name)
+        );
+      }
     } catch {
       // Global API error toast already explains the failure.
     } finally {
@@ -1192,6 +1256,51 @@ export default function CommunityDetailScreen() {
     [currentUserId, currentUserProfileId, feed?.community]
   );
 
+  /**
+   * Denuncia e sempre sobre outra pessoa: o proprio autor nunca ve o botao.
+   * A comparacao cobre os dois ids porque o backend ora identifica o autor pelo
+   * `User`, ora pelo `UserProfile`.
+   */
+  const canReportPost = useCallback(
+    (post: CommunityPostResponse) => {
+      const postAuthorId = resolveCommunityActorId(post.author);
+      const authorUserId = post.author.id?.trim();
+
+      if (
+        postAuthorId &&
+        ((currentUserProfileId && postAuthorId === currentUserProfileId) ||
+          (currentUserId && postAuthorId === currentUserId))
+      ) {
+        return false;
+      }
+
+      if (authorUserId && currentUserId && authorUserId === currentUserId) {
+        return false;
+      }
+
+      return Boolean(authorUserId || postAuthorId);
+    },
+    [currentUserId, currentUserProfileId]
+  );
+
+  const handleReportPost = useCallback(
+    (post: CommunityPostResponse) => {
+      const reportedUserId = post.author.id?.trim() || resolveCommunityActorId(post.author);
+
+      if (!reportedUserId) {
+        return;
+      }
+
+      speak(buildActionSpeech("Denunciar publicação de", post.author.name));
+      setReportTarget({
+        authorName: post.author.name,
+        postId: post.id,
+        userId: reportedUserId,
+      });
+    },
+    [speak]
+  );
+
   const canManageMemberRole = useCallback(
     (member: CommunityMemberResponse) => {
       if (!feed?.community) {
@@ -1246,6 +1355,7 @@ export default function CommunityDetailScreen() {
           variant: "success",
           message: "A publicação foi removida da comunidade.",
         });
+        announceForAccessibility(accessibilityAnnouncements.communityPostDeleted());
       } catch {
         // Global API error toast already explains the failure.
       } finally {
@@ -1439,6 +1549,7 @@ export default function CommunityDetailScreen() {
                   }}
                   accessibilityRole="button"
                   accessibilityLabel="Voltar para comunidades"
+                  accessibilityHint="Volta para a lista de comunidades"
                 >
                   <View className="flex-row items-center gap-2">
                     <Ionicons name="arrow-back" size={16} color="#E5E2E1" />
@@ -1486,10 +1597,12 @@ export default function CommunityDetailScreen() {
                             key={post.id}
                             authToken={authToken}
                             canDelete={canDeletePost(post)}
+                            canReport={canReportPost(post)}
                             deleting={pendingDeletePostId === post.id}
                             likeBusy={pendingLikePostId === post.id}
                             onDelete={() => handleDeletePost(post)}
                             onOpenComments={() => handleOpenComments(post)}
+                            onReport={() => handleReportPost(post)}
                             onToggleLike={() => handleToggleLike(post)}
                             post={post}
                           />
@@ -1568,6 +1681,12 @@ export default function CommunityDetailScreen() {
               }`}
               accessibilityRole="button"
               accessibilityLabel="Criar publicação"
+              accessibilityHint={
+                canParticipate
+                  ? "Abre a tela para escrever uma publicação"
+                  : "Entre na comunidade para publicar"
+              }
+              accessibilityState={{ disabled: !canParticipate }}
               onPress={handleOpenCreatePost}
             >
               <Ionicons
@@ -1581,6 +1700,16 @@ export default function CommunityDetailScreen() {
 
         <GlobalBottomNav />
       </SafeAreaView>
+
+      {reportTarget ? (
+        <ReportModal
+          visible={reportTarget !== null}
+          onClose={() => setReportTarget(null)}
+          reportedUserId={reportTarget.userId}
+          reportedPostId={reportTarget.postId}
+          contextLabel={`publicação de ${reportTarget.authorName}`}
+        />
+      ) : null}
     </View>
   );
 }

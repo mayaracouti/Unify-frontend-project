@@ -84,4 +84,37 @@ export const accessibilityAnnouncements = {
 
   locationPermissionDenied: () =>
     "Permissão de localização negada. Sem ela não é possível descobrir novos perfis.",
+
+  // --- Semana 03: comunidade, denúncia, seguir, feed pessoal ---
+  communityCreated: () => "Comunidade criada com sucesso.",
+  communityUpdated: () => "Alterações da comunidade salvas.",
+  communityPostCreated: () => "Publicação criada com sucesso.",
+  commentPublished: () => "Comentário publicado.",
+  commentDeleted: () => "Comentário excluído.",
+  memberRoleUpdated: (roleLabel: string) => `Cargo atualizado para ${roleLabel}.`,
+  joinRequestApproved: (name: string) => `Entrada de ${name} aprovada.`,
+  joinRequestDeclined: (name: string) => `Entrada de ${name} recusada.`,
+  moreItemsLoaded: (count: number, noun: string) =>
+    count === 1 ? `1 ${noun} carregada.` : `${count} ${noun} carregadas.`,
+
+  reportSent: () => "Denúncia enviada. Nossa equipe irá analisar.",
+  reportDuplicate: () =>
+    "Você já denunciou este perfil ou publicação e a análise está em andamento.",
+
+  followStarted: (name: string) => `Você começou a seguir ${name}.`,
+  followStopped: (name: string) => `Você deixou de seguir ${name}.`,
+
+  personalPostCreated: () => "Publicação criada com sucesso.",
+  personalPostDeleted: () => "Publicação excluída.",
+  feedRefreshed: (newCount: number) =>
+    newCount === 1
+      ? "Feed atualizado. 1 publicação nova."
+      : `Feed atualizado. ${newCount} publicações novas.`,
+  feedEmpty: () =>
+    "Seu feed está vazio. Siga pessoas no Descobrir para ver as publicações delas aqui.",
+
+  communityJoined: (name: string) =>
+    `Você entrou na comunidade ${name}. Agora dá para publicar, curtir e comentar.`,
+  communityLeft: (name: string) => `Você saiu da comunidade ${name}.`,
+  communityPostDeleted: () => "Publicação excluída da comunidade.",
 };

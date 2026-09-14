@@ -22,6 +22,7 @@ function getInitials(name?: string | null) {
 }
 
 function FeedAction({
+  accessibilityHint,
   accessibilityLabel,
   icon,
   count,
@@ -29,6 +30,7 @@ function FeedAction({
   loading,
   onPress,
 }: {
+  accessibilityHint?: string;
   accessibilityLabel: string;
   icon: ComponentProps<typeof Ionicons>["name"];
   count?: number | null;
@@ -36,11 +38,15 @@ function FeedAction({
   loading?: boolean;
   onPress: () => void;
 }) {
+  const busy = Boolean(loading);
+
   return (
     <Pressable
       className="h-12 flex-1 flex-row items-center justify-center gap-2 rounded-lg"
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ busy, disabled: busy, selected: Boolean(active) }}
       onPress={onPress}
       disabled={loading}
     >
@@ -118,6 +124,7 @@ export function CommunityForYouPostCard({
         onPress={() => speak(buildCommunityPostSpeech(post))}
         accessibilityRole="button"
         accessibilityLabel={`Publicação de ${post.author.name} na comunidade ${item.communityName}`}
+        accessibilityHint="Lê em voz alta o autor, o texto e os contadores desta publicação"
       >
         <View className="flex-row items-center gap-3">
           <View className="h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 border-[#CDBDFF] bg-[#353534]">
@@ -190,6 +197,11 @@ export function CommunityForYouPostCard({
       <View className="mt-1 flex-row items-center justify-between">
         <FeedAction
           accessibilityLabel={post.likedByCurrentUser ? "Remover curtida" : "Curtir publicação"}
+          accessibilityHint={
+            post.likedByCurrentUser
+              ? "Retira a sua curtida desta publicação"
+              : "Registra a sua curtida nesta publicação"
+          }
           icon={post.likedByCurrentUser ? "thumbs-up" : "thumbs-up-outline"}
           count={post.likesCount}
           active={post.likedByCurrentUser}
@@ -198,6 +210,7 @@ export function CommunityForYouPostCard({
         />
         <FeedAction
           accessibilityLabel="Abrir comentários"
+          accessibilityHint="Abre a tela de comentários desta publicação"
           icon={post.commentedByCurrentUser ? "chatbubble" : "chatbubble-outline"}
           count={post.commentsCount}
           active={post.commentedByCurrentUser}

@@ -27,10 +27,17 @@ export function ImageLightbox({
       statusBarTranslucent
       visible={Boolean(uri)}
     >
-      <View className="flex-1 bg-black">
+      <View
+        accessibilityViewIsModal
+        importantForAccessibility="yes"
+        className="flex-1 bg-black"
+      >
         {/* A imagem nao e touchable: o Pressable pai e o unico alvo de toque aqui. */}
         <Pressable
-          accessible={false}
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel="Fechar imagem"
+          accessibilityHint="Fecha a visualização em tela cheia"
           className="flex-1"
           onPress={onClose}
         >

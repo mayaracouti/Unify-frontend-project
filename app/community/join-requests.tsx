@@ -24,6 +24,10 @@ import type {
   CommunityJoinRequestsResponse,
 } from "../../src/types/community";
 import { formatApiErrorMessage } from "../../src/utils/auth";
+import {
+  accessibilityAnnouncements,
+  announceForAccessibility,
+} from "../../src/utils/accessibilityAnnouncements";
 import { showGlobalToast } from "../../src/utils/globalToast";
 
 const REQUESTS_PAGE_SIZE = 20;
@@ -127,6 +131,7 @@ function JoinRequestCard({
           disabled={busy}
           accessibilityRole="button"
           accessibilityLabel={`Aceitar entrada de ${requesterName}`}
+          accessibilityHint="Aprova a entrada e adiciona a pessoa como membro"
           accessibilityState={{ disabled: busy, busy: busyAction === "approve" }}
         >
           {busyAction === "approve" ? (
@@ -145,6 +150,7 @@ function JoinRequestCard({
           disabled={busy}
           accessibilityRole="button"
           accessibilityLabel={`Recusar entrada de ${requesterName}`}
+          accessibilityHint="Recusa a solicitação de entrada na comunidade"
           accessibilityState={{ disabled: busy, busy: busyAction === "decline" }}
         >
           {busyAction === "decline" ? (
@@ -280,6 +286,9 @@ export default function CommunityJoinRequestsScreen() {
           variant: "success",
           message: `${request.name ?? "A pessoa"} agora faz parte da comunidade.`,
         });
+        announceForAccessibility(
+          accessibilityAnnouncements.joinRequestApproved(request.name ?? "A pessoa")
+        );
       } catch {
         // Global API error toast already explains the failure.
       } finally {
@@ -307,6 +316,9 @@ export default function CommunityJoinRequestsScreen() {
           variant: "success",
           message: "A pessoa pode enviar uma nova solicitação quando quiser.",
         });
+        announceForAccessibility(
+          accessibilityAnnouncements.joinRequestDeclined(request.name ?? "A pessoa")
+        );
       } catch {
         // Global API error toast already explains the failure.
       } finally {
@@ -329,6 +341,7 @@ export default function CommunityJoinRequestsScreen() {
               }}
               accessibilityRole="button"
               accessibilityLabel="Voltar"
+              accessibilityHint="Volta para a tela anterior"
             >
               <Ionicons name="arrow-back" size={24} color="#E5E2E1" />
             </Pressable>
@@ -430,6 +443,7 @@ export default function CommunityJoinRequestsScreen() {
                 disabled={loadingMore}
                 accessibilityRole="button"
                 accessibilityLabel="Carregar mais solicitações"
+                accessibilityHint="Adiciona mais solicitações de entrada à lista"
                 accessibilityState={{ disabled: loadingMore, busy: loadingMore }}
               >
                 {loadingMore ? (

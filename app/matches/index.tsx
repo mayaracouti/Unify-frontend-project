@@ -31,10 +31,15 @@ import {
 } from "../../src/accessibility/tts";
 import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-nav";
 import { GlobalTopNav } from "../../src/components/navigation/global-top-nav";
-import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
+import {
+  AuthenticatedRemoteImage,
+  preloadAuthenticatedRemoteImages,
+} from "../../src/components/profile/authenticated-remote-image";
+import { ReportModal } from "../../src/components/report/report-modal";
 import { ScreenEmpty } from "../../src/components/ui/screen-empty";
 import { ScreenError } from "../../src/components/ui/screen-error";
 import { ScreenLoading } from "../../src/components/ui/screen-loading";
+import { followService } from "../../src/services/followService";
 import { matchService } from "../../src/services/matchService";
 import { profileService } from "../../src/services/profileService";
 import {
@@ -54,7 +59,6 @@ import {
   getForegroundLocationPermissionState,
   requestForegroundLocationPermissionState,
 } from "../../src/utils/location";
-import { preloadAuthenticatedRemoteImages } from "../../src/components/profile/authenticated-remote-image";
 
 const MAX_SEEN_PROFILE_IDS = 500;
 const LOCATION_DISABLED_DISCOVERY_MESSAGE =
@@ -97,6 +101,13 @@ type MatchProfile = {
   loveLanguages: string[];
   name: string;
   photoUrls: string[];
+  /**
+   * Id do `User` dono do perfil — alvo da denuncia, que e por usuario e nao
+   * por perfil. `GET /users/{id}/public-profile` (UserPublicProfileResponse)
+   * ainda NAO devolve esse id, entao aqui ele fica `null` e a denuncia usa o
+   * `userProfileId` como fallback (ver ReportModal no render).
+   */
+  userId: string | null;
 };
 
 function ChipList({ items }: { items: string[] }) {
@@ -309,6 +320,8 @@ function toMatchProfile(profile: UserPublicProfileResponse): MatchProfile {
     occupation: "",
     photoUrls,
     pronouns: profile.pronouns?.description ?? "",
+    // O contrato publico nao expoe o id do `User`; ver comentario em MatchProfile.
+    userId: null,
   };
 }
 
@@ -448,7 +461,14 @@ export default function Matches() {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [currentUserScopeId, setCurrentUserScopeId] = useState<string | null>(null);
+  const [followState, setFollowState] = useState<{
+    following: boolean;
+    followersCount: number;
+  } | null>(null);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
   const profileCacheRef = useRef<Map<string, MatchProfile>>(new Map());
+  const followStatsLoadRef = useRef(0);
   const visibleProfileLoadRef = useRef(0);
   const contentScrollRef = useRef<ScrollView | null>(null);
   const detailsSpokenProfileIdRef = useRef<string | null>(null);
@@ -807,6 +827,89 @@ export default function Matches() {
     }
   }, [isFocused, loadDiscoveryProfiles]);
 
+  /**
+   * Estado de "seguir" do perfil visivel.
+   *
+   * O contador proprio evita que a resposta de um perfil ja trocado (swipe
+   * rapido) sobrescreva o estado do perfil que esta na tela agora.
+   */
+  useEffect(() => {
+    const profileId = currentProfile?.id;
+
+    setFollowState(null);
+    setFollowBusy(false);
+    // O perfil mudou: um formulario de denuncia aberto apontaria para a pessoa
+    // errada, entao ele fecha junto.
+    setReportModalVisible(false);
+
+    if (!profileId) {
+      return;
+    }
+
+    const requestId = ++followStatsLoadRef.current;
+
+    void followService
+      .getFollowStats(profileId)
+      .then((stats) => {
+        if (requestId !== followStatsLoadRef.current) {
+          return;
+        }
+
+        setFollowState({
+          followersCount: stats.followersCount,
+          following: stats.followedByCurrentUser,
+        });
+      })
+      .catch(() => {
+        // Global API error toast already explains the failure.
+      });
+  }, [currentProfile?.id]);
+
+  /**
+   * Seguir / deixar de seguir com atualizacao otimista: o botao troca antes da
+   * resposta e volta ao estado anterior se a requisicao falhar.
+   */
+  const toggleFollowCurrentProfile = useCallback(async () => {
+    if (!currentProfile || !followState || followBusy) {
+      return;
+    }
+
+    const profileId = currentProfile.id;
+    const profileName = currentProfile.name;
+    const previousState = followState;
+    const willFollow = !previousState.following;
+
+    setFollowBusy(true);
+    setFollowState({
+      followersCount: Math.max(
+        0,
+        previousState.followersCount + (willFollow ? 1 : -1)
+      ),
+      following: willFollow,
+    });
+
+    try {
+      const response = willFollow
+        ? await followService.follow(profileId)
+        : await followService.unfollow(profileId);
+
+      setFollowState({
+        followersCount: response.followersCount,
+        following: response.following,
+      });
+      announceForAccessibility(
+        response.following
+          ? accessibilityAnnouncements.followStarted(profileName)
+          : accessibilityAnnouncements.followStopped(profileName)
+      );
+    } catch {
+      setFollowState(previousState);
+      // Global API error toast already explains the failure.
+    } finally {
+      setFollowBusy(false);
+    }
+  }, [currentProfile, followBusy, followState]);
+
   const showNextProfile = useCallback(async () => {
     if (!currentUserScopeId || !currentProfile) {
       return;
@@ -1110,12 +1213,35 @@ export default function Matches() {
                   ) : null}
 
                   <View className="absolute bottom-32 left-7 right-7">
+                    {/* Denuncia tambem aqui, junto do nome: sem isso ela so
+                        existiria depois de rolar ate os detalhes. */}
+                    <Pressable
+                      accessible
+                      accessibilityRole="button"
+                      accessibilityLabel="Denunciar este perfil"
+                      accessibilityHint="Abre o formulário de denúncia de perfil"
+                      className="absolute right-0 top-0 z-10 h-10 w-10 items-center justify-center rounded-full bg-black/50"
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      onPress={() => {
+                        speak(buildActionSpeech("Denunciar", currentProfile.name));
+                        setReportModalVisible(true);
+                      }}
+                    >
+                      <Ionicons
+                        name="flag-outline"
+                        size={20}
+                        color="#FFFFFF"
+                        importantForAccessibility="no"
+                      />
+                    </Pressable>
+
                     {/* Nome, idade, pronomes e bio sao uma unidade semantica:
                         um unico foco de leitor de tela, nao quatro. */}
                     <View
                       accessible
                       accessibilityRole="summary"
                       accessibilityLabel={buildProfileAccessibilityLabel(currentProfile)}
+                      className="pr-12"
                     >
                       <Text className="text-[34px] font-semibold text-white">
                         {currentProfile.name}{", "}
@@ -1144,6 +1270,102 @@ export default function Matches() {
                       </Text>
                     </View>
                   </View>
+                </View>
+
+                {/* Acoes sociais do perfil visivel. Ficam no topo dos detalhes
+                    (e nao na barra de decisao) para nao se confundirem com
+                    curtir/recusar, que mudam a fila de descoberta. */}
+                <View
+                  accessibilityRole="toolbar"
+                  accessibilityLabel={`Ações sobre o perfil de ${currentProfile.name}`}
+                  className="flex-row items-center justify-between gap-3 bg-black px-4 pt-6"
+                >
+                  <Pressable
+                    accessible
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      followState?.following
+                        ? `Deixar de seguir ${currentProfile.name}`
+                        : `Seguir ${currentProfile.name}`
+                    }
+                    accessibilityHint={
+                      followState?.following
+                        ? "Remove as publicações desta pessoa do seu feed"
+                        : "Publicações desta pessoa aparecem no seu feed"
+                    }
+                    accessibilityState={{
+                      busy: followBusy,
+                      disabled: followBusy || !followState,
+                      selected: followState?.following ?? false,
+                    }}
+                    className={`flex-1 flex-row items-center justify-center rounded-full border px-4 py-2 ${
+                      followState?.following
+                        ? "border-[#CDBDFF] bg-[#2B2338]"
+                        : "border-[#494455] bg-[#1A1C1F]"
+                    }`}
+                    disabled={followBusy || !followState}
+                    onPress={() => {
+                      speak(
+                        buildActionSpeech(
+                          followState?.following ? "Deixar de seguir" : "Seguir",
+                          currentProfile.name
+                        )
+                      );
+                      void toggleFollowCurrentProfile();
+                    }}
+                  >
+                    {followBusy ? (
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                      <Ionicons
+                        name={
+                          followState?.following ? "checkmark" : "person-add-outline"
+                        }
+                        size={18}
+                        color="#FFFFFF"
+                        importantForAccessibility="no"
+                      />
+                    )}
+                    <Text className="ml-2 text-[15px] font-bold text-white">
+                      {followState?.following ? "Seguindo" : "Seguir"}
+                    </Text>
+                  </Pressable>
+
+                  {followState ? (
+                    <Text
+                      accessible
+                      accessibilityRole="text"
+                      accessibilityLabel={
+                        followState.followersCount === 1
+                          ? "1 seguidor"
+                          : `${followState.followersCount} seguidores`
+                      }
+                      className="text-[14px] font-semibold text-[#A7A6B3]"
+                    >
+                      {followState.followersCount === 1
+                        ? "1 seguidor"
+                        : `${followState.followersCount} seguidores`}
+                    </Text>
+                  ) : null}
+
+                  <Pressable
+                    accessible
+                    accessibilityRole="button"
+                    accessibilityLabel="Denunciar este perfil"
+                    accessibilityHint="Abre o formulário de denúncia de perfil"
+                    className="h-10 w-10 items-center justify-center rounded-full bg-[#1E1A22]"
+                    onPress={() => {
+                      speak(buildActionSpeech("Denunciar", currentProfile.name));
+                      setReportModalVisible(true);
+                    }}
+                  >
+                    <Ionicons
+                      name="flag-outline"
+                      size={20}
+                      color="#FFFFFF"
+                      importantForAccessibility="no"
+                    />
+                  </Pressable>
                 </View>
 
                 <ProfileDetailsContent profile={currentProfile} />
@@ -1338,6 +1560,17 @@ export default function Matches() {
 
         <GlobalBottomNav />
       </SafeAreaView>
+
+      {currentProfile ? (
+        <ReportModal
+          visible={reportModalVisible}
+          onClose={() => setReportModalVisible(false)}
+          // O contrato publico do perfil nao traz o id do `User`; enquanto ele
+          // nao existir, a denuncia vai com o `userProfileId`.
+          reportedUserId={currentProfile.userId ?? currentProfile.id}
+          contextLabel={`perfil de ${currentProfile.name}`}
+        />
+      ) : null}
     </View>
   );
 }

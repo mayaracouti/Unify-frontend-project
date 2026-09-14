@@ -9,6 +9,7 @@ import {
 } from "react-native";
 
 import { chatService } from "../../services/chatService";
+import { useAccessibility } from "../../context/AccessibilityContext";
 import type { ChatDeliveryStatus, ChatMessageResponse } from "../../types/chat";
 import { describeAudioMessage, formatTimeForSpeech } from "../../utils/chatFormatting";
 import { AuthenticatedRemoteImage } from "../profile/authenticated-remote-image";
@@ -93,6 +94,7 @@ export const MessageBubble = memo(function MessageBubble({
   onOpenImage?: (uri: string, accessibilityLabel: string) => void;
   otherName: string;
 }) {
+  const { settings } = useAccessibility();
   const mine = message.fromMe;
   const deleted = Boolean(message.deletedAt);
   const mediaUrl = deleted ? null : chatService.resolveAssetUrl(message.mediaUrl);
@@ -124,8 +126,18 @@ export const MessageBubble = memo(function MessageBubble({
   const actionHint = canAct ? "Toque e segure para editar ou apagar" : undefined;
 
   const bubbleClassName = `mb-3 max-w-[82%] rounded-[20px] px-4 py-3 ${
-    mine ? "self-end bg-[#7C4DFF]" : "self-start bg-[#1D1F24]"
+    mine
+      ? settings.highContrast
+        ? "self-end bg-hc-accent"
+        : "self-end bg-[#7C4DFF]"
+      : settings.highContrast
+        ? "self-start bg-hc-surface border border-hc-border"
+        : "self-start bg-[#1D1F24]"
   }`;
+
+  // No alto contraste o balao proprio fica com fundo amarelo (hc-accent): texto
+  // branco perderia contraste, entao usamos preto nesse caso.
+  const ownTextClass = settings.highContrast ? "text-black" : "text-white";
 
   const imageLabel = `Imagem enviada por ${mine ? "você" : otherName}${
     message.body ? `. Legenda: ${message.body}` : ""
@@ -156,7 +168,9 @@ export const MessageBubble = memo(function MessageBubble({
             importantForAccessibility="no"
           />
           <Text
-            className={`text-[15px] italic ${mine ? "text-white/80" : "text-[#9F96B8]"}`}
+            className={`text-[15px] italic ${
+              mine ? (settings.highContrast ? "text-black/80" : "text-white/80") : "text-[#9F96B8]"
+            }`}
           >
             Mensagem apagada
           </Text>
@@ -164,7 +178,7 @@ export const MessageBubble = memo(function MessageBubble({
       ) : null}
 
       {!deleted && message.type === "TEXT" ? (
-        <Text className={`text-[16px] ${mine ? "text-white" : "text-[#E5E2E1]"}`}>
+        <Text className={`text-[16px] ${mine ? ownTextClass : "text-[#E5E2E1]"}`}>
           {message.body}
         </Text>
       ) : null}
@@ -228,7 +242,11 @@ export const MessageBubble = memo(function MessageBubble({
       ) : null}
 
       {!deleted && message.body && message.type !== "TEXT" ? (
-        <Text className={`mt-2 text-[14px] ${mine ? "text-white/90" : "text-[#CAC3D8]"}`}>
+        <Text
+          className={`mt-2 text-[14px] ${
+            mine ? (settings.highContrast ? "text-black/90" : "text-white/90") : "text-[#CAC3D8]"
+          }`}
+        >
           {message.body}
         </Text>
       ) : null}
@@ -239,11 +257,19 @@ export const MessageBubble = memo(function MessageBubble({
         importantForAccessibility="no-hide-descendants"
       >
         {message.editedAt && !deleted ? (
-          <Text className={`text-[11px] italic ${mine ? "text-white/70" : "text-[#9F96B8]"}`}>
+          <Text
+            className={`text-[11px] italic ${
+              mine ? (settings.highContrast ? "text-black/70" : "text-white/70") : "text-[#9F96B8]"
+            }`}
+          >
             editada ·
           </Text>
         ) : null}
-        <Text className={`text-[11px] ${mine ? "text-white/70" : "text-[#9F96B8]"}`}>
+        <Text
+          className={`text-[11px] ${
+            mine ? (settings.highContrast ? "text-black/70" : "text-white/70") : "text-[#9F96B8]"
+          }`}
+        >
           {new Date(message.createdAt).toLocaleTimeString("pt-BR", {
             hour: "2-digit",
             minute: "2-digit",

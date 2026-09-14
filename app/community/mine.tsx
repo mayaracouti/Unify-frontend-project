@@ -27,6 +27,10 @@ import type {
   CommunitySummaryResponse,
 } from "../../src/types/community";
 import { formatApiErrorMessage } from "../../src/utils/auth";
+import {
+  accessibilityAnnouncements,
+  announceForAccessibility,
+} from "../../src/utils/accessibilityAnnouncements";
 
 const DIRECTORY_PAGE_SIZE = 12;
 
@@ -198,6 +202,9 @@ export default function MyCommunitiesScreen() {
       }
 
       setDirectory((currentDirectory) => buildMergedDirectory(currentDirectory, response, true));
+      announceForAccessibility(
+        accessibilityAnnouncements.moreItemsLoaded(response.communities.length, "comunidades")
+      );
 
       const assetUrls = collectDirectoryAssetUrls(response);
 
@@ -323,6 +330,7 @@ export default function MyCommunitiesScreen() {
                   disabled={loadingMore}
                   accessibilityRole="button"
                   accessibilityLabel="Carregar mais comunidades"
+                  accessibilityHint="Adiciona mais comunidades à lista"
                   accessibilityState={{ disabled: loadingMore, busy: loadingMore }}
                 >
                   {loadingMore ? (

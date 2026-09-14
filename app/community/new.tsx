@@ -24,6 +24,10 @@ import type {
   CommunityCategoryResponse,
   CommunityPrivacy,
 } from "../../src/types/community";
+import {
+  accessibilityAnnouncements,
+  announceForAccessibility,
+} from "../../src/utils/accessibilityAnnouncements";
 import { showGlobalToast } from "../../src/utils/globalToast";
 
 const IMAGE_MEDIA_TYPES: ImagePicker.MediaType[] = ["images"];
@@ -185,6 +189,7 @@ export default function CommunityCreateScreen() {
         variant: "success",
         message: "Sua comunidade já está pronta para receber membros e publicações.",
       });
+      announceForAccessibility(accessibilityAnnouncements.communityCreated());
 
       router.replace({
         pathname: "/community/[communityId]",
@@ -235,6 +240,7 @@ export default function CommunityCreateScreen() {
               accessibilityLabel={
                 trimmedName ? `Criar comunidade ${trimmedName}` : "Criar comunidade"
               }
+              accessibilityHint="Cria a comunidade e abre a página dela"
               accessibilityState={{
                 disabled: trimmedName.length === 0 || submitting,
                 busy: submitting,
@@ -278,6 +284,7 @@ export default function CommunityCreateScreen() {
                 onChangeText={setName}
                 onFocus={() => speak("Nome da comunidade")}
                 accessibilityLabel="Nome da comunidade"
+                accessibilityHint="Obrigatório. Máximo de 80 caracteres"
               />
               <Text className="mt-2 text-right text-[12px] font-semibold text-[#948EA1]">
                 {name.length} / 80
@@ -297,6 +304,7 @@ export default function CommunityCreateScreen() {
                 onChangeText={setDescription}
                 onFocus={() => speak("Descrição da comunidade")}
                 accessibilityLabel="Descrição da comunidade"
+                accessibilityHint="Opcional. Máximo de 400 caracteres"
               />
               <Text className="mt-2 text-right text-[12px] font-semibold text-[#948EA1]">
                 {description.length} / 400
@@ -348,6 +356,8 @@ export default function CommunityCreateScreen() {
                   accessibilityLabel={
                     selectedImage ? "Trocar ícone" : "Selecionar ícone"
                   }
+                  accessibilityHint="Abre a galeria para escolher um ícone para a comunidade"
+                  accessibilityState={{ disabled: pickingImage, busy: pickingImage }}
                 >
                   {pickingImage ? (
                     <ActivityIndicator color="#EAEA00" size="small" />
@@ -381,6 +391,7 @@ export default function CommunityCreateScreen() {
                       accessibilityRole="button"
                       accessibilityLabel="Remover ícone"
                       accessibilityHint="Descarta a imagem escolhida. A comunidade fica sem ícone."
+                      accessibilityState={{ disabled: submitting }}
                     >
                       <Text className="text-[14px] font-bold text-[#FF8A8A]">Remover</Text>
                     </Pressable>

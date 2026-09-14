@@ -107,8 +107,18 @@ function CommunityHomeTabs({
   return (
     <View className="flex-row rounded-2xl border border-[#3A3246] bg-[#1A1C1F] p-1.5">
       {[
-        { key: "forYou" as const, label: "Para você", icon: "sparkles-outline" as const },
-        { key: "discover" as const, label: "Descubra comunidades", icon: "compass-outline" as const },
+        {
+          key: "forYou" as const,
+          label: "Para você",
+          icon: "sparkles-outline" as const,
+          hint: "Mostra as publicações das comunidades em que você participa",
+        },
+        {
+          key: "discover" as const,
+          label: "Descubra comunidades",
+          icon: "compass-outline" as const,
+          hint: "Mostra o diretório de comunidades para buscar e entrar",
+        },
       ].map((tab) => {
         const isActive = activeTab === tab.key;
 
@@ -120,6 +130,7 @@ function CommunityHomeTabs({
             }`}
             accessibilityRole="tab"
             accessibilityLabel={tab.label}
+            accessibilityHint={tab.hint}
             accessibilityState={{ selected: isActive }}
             onPress={() => {
               speak(tab.label);
@@ -667,6 +678,7 @@ export default function CommunityDirectoryScreen() {
                     disabled={forYouLoadingMore}
                     accessibilityRole="button"
                     accessibilityLabel="Carregar mais publicações"
+                    accessibilityHint="Acrescenta as próximas publicações ao fim da lista"
                     accessibilityState={{
                       disabled: forYouLoadingMore,
                       busy: forYouLoadingMore,
@@ -720,6 +732,8 @@ export default function CommunityDirectoryScreen() {
                       placeholderTextColor="#948EA1"
                       value={searchQuery}
                       onChangeText={setSearchQuery}
+                      accessibilityLabel="Buscar comunidades"
+                      accessibilityHint="Filtra a lista pelo nome"
                     />
                     {searchQuery.trim().length > 0 ? (
                       <Pressable
@@ -730,6 +744,7 @@ export default function CommunityDirectoryScreen() {
                         }}
                         accessibilityRole="button"
                         accessibilityLabel="Limpar busca"
+                        accessibilityHint="Apaga o texto e mostra todas as comunidades"
                       >
                         <Ionicons name="close" size={16} color="#E5E2E1" />
                       </Pressable>
@@ -820,6 +835,7 @@ export default function CommunityDirectoryScreen() {
                   disabled={loadingMore}
                   accessibilityRole="button"
                   accessibilityLabel="Carregar mais comunidades"
+                  accessibilityHint="Acrescenta as próximas comunidades ao fim da lista"
                   accessibilityState={{ disabled: loadingMore, busy: loadingMore }}
                 >
                   {loadingMore ? (
@@ -836,6 +852,7 @@ export default function CommunityDirectoryScreen() {
             className="absolute bottom-6 right-6 h-16 w-16 items-center justify-center rounded-full border-2 border-[#CDBDFF] bg-[#7C4DFF]"
             accessibilityRole="button"
             accessibilityLabel="Criar comunidade"
+            accessibilityHint="Abre a tela de criação de comunidade"
             onPress={() => {
               speak("Criar comunidade");
               router.push("/community/new");
