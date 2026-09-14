@@ -88,3 +88,65 @@ describe("tts-service speak()", () => {
     expect(Speech.speak).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("tts-service speakSequence()", () => {
+  beforeEach(() => {
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  it("interrompe a fala corrente uma vez e enfileira cada parte em ordem", async () => {
+    const RN = require("react-native");
+    (RN.AccessibilityInfo.isScreenReaderEnabled as jest.Mock).mockResolvedValue(false);
+
+    const Speech = require("expo-speech");
+    const { initializeTtsService, speakSequence } = require("../tts-service");
+
+    await initializeTtsService();
+    await flushMicrotasks();
+
+    speakSequence(["Conversas", null, "  ", "2 conversas com mensagens não lidas", "Marina: oi"]);
+    await flushMicrotasks();
+
+    expect(Speech.stop).toHaveBeenCalledTimes(1);
+    expect((Speech.speak as jest.Mock).mock.calls.map((call) => call[0])).toEqual([
+      "Conversas",
+      "2 conversas com mensagens não lidas",
+      "Marina: oi",
+    ]);
+  });
+
+  it("fica mudo com o leitor de tela nativo ativo", async () => {
+    const RN = require("react-native");
+    (RN.AccessibilityInfo.isScreenReaderEnabled as jest.Mock).mockResolvedValue(true);
+
+    const Speech = require("expo-speech");
+    const { initializeTtsService, speakSequence } = require("../tts-service");
+
+    await initializeTtsService();
+    await flushMicrotasks();
+
+    speakSequence(["Conversas", "Marina: oi"]);
+    await flushMicrotasks();
+
+    expect(Speech.speak).not.toHaveBeenCalled();
+  });
+
+  it("suprime a mesma sequencia repetida dentro da janela", async () => {
+    const RN = require("react-native");
+    (RN.AccessibilityInfo.isScreenReaderEnabled as jest.Mock).mockResolvedValue(false);
+
+    const Speech = require("expo-speech");
+    const { initializeTtsService, speakSequence } = require("../tts-service");
+
+    await initializeTtsService();
+    await flushMicrotasks();
+
+    speakSequence(["Conversas", "Marina: oi"]);
+    await flushMicrotasks();
+    speakSequence(["Conversas", "Marina: oi"]);
+    await flushMicrotasks();
+
+    expect(Speech.speak).toHaveBeenCalledTimes(2);
+  });
+});

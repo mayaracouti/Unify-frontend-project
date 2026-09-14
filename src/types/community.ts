@@ -5,7 +5,9 @@ export type CommunityRole = "ADMIN" | "MEMBER" | "MODERATOR";
 export type CommunityPrivacy = "PUBLIC" | "PRIVATE";
 
 export interface CommunityUserSummaryResponse {
+  /** Id do `User` (alvo de denúncia e de `/communities/users/{id}/avatar`). */
   id?: string | null;
+  /** Id do `UserProfile`: abre o perfil público em `/users/[userProfileId]`. */
   userProfileId?: string | null;
   name: string;
   avatarData?: string | null;
@@ -65,6 +67,8 @@ export interface CommunityPostResponse {
   publishedAt?: string | null;
   body: string;
   mediaData?: string | null;
+  /** Preenchido quando o autor alterou o texto depois de publicar. */
+  editedAt?: string | null;
   likesCount?: number | null;
   commentsCount?: number | null;
   likedByCurrentUser?: boolean | null;
@@ -112,6 +116,10 @@ export interface CommunityCommentResponse {
 export type CommunityCommentsResponse = PageResponse<CommunityCommentResponse>;
 
 export interface CommunityCreateCommentRequest {
+  body: string;
+}
+
+export interface CommunityPostUpdateRequest {
   body: string;
 }
 

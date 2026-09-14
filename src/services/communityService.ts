@@ -16,6 +16,7 @@ import type {
   CommunityMemberResponse,
   CommunityMembershipResponse,
   CommunityPostResponse,
+  CommunityPostUpdateRequest,
   CommunitySummaryResponse,
 } from "../types/community";
 
@@ -250,6 +251,15 @@ export const communityService = {
     return customApiCall.post<CommunityPostResponse, FormData>(
       appendQueryParams(COMMUNITY_POSTS_ENDPOINT, { communityId }),
       formData,
+      { requiresAuth: true }
+    );
+  },
+
+  /** Só o autor edita, e só o texto. Devolve o post com `editedAt`. */
+  updatePost(postId: string, payload: CommunityPostUpdateRequest) {
+    return customApiCall.put<CommunityPostResponse, CommunityPostUpdateRequest>(
+      `${COMMUNITY_POSTS_ENDPOINT}/${encodePathSegment(postId)}`,
+      payload,
       { requiresAuth: true }
     );
   },

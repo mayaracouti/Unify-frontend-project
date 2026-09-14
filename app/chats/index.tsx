@@ -4,6 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, RefreshControl, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import {
+  CONVERSATIONS_SCREEN_NAME,
+  buildActionSpeech,
+  buildConversationListEntrySpeech,
+  conversationPartnerName,
+  speak,
+  speakSequence,
+} from "../../src/accessibility/tts";
 import { ConversationRow } from "../../src/components/chat/conversation-row";
 import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-nav";
 import { GlobalTopNav } from "../../src/components/navigation/global-top-nav";
@@ -14,6 +22,7 @@ import { chatService } from "../../src/services/chatService";
 import type { ConversationSummaryResponse } from "../../src/types/chat";
 import { announceForAccessibility } from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
+import { buildUserProfileHref } from "../../src/utils/userProfileRoute";
 
 const LIST_POLL_INTERVAL_MS = 15000;
 
@@ -50,20 +59,29 @@ export default function ChatsScreen() {
       setError(null);
 
       if (mode === "initial") {
-        announceForAccessibility(
-          response.conversations.length === 0
-            ? "Você ainda não tem conversas."
-            : `${response.conversations.length} ${
-                response.conversations.length === 1 ? "conversa" : "conversas"
-              }. ${response.totalUnread} não ${
-                response.totalUnread === 1 ? "lida" : "lidas"
-              }.`
-        );
+        // Sequencia de entrada: nome da tela, conversas com pendencia e, para
+        // cada uma, pessoa + ultima mensagem. Dois canais que nunca soam
+        // juntos: `speakSequence` cala com o leitor nativo ligado e
+        // `announceForAccessibility` so soa com ele ligado.
+        const entrySpeech = buildConversationListEntrySpeech(response.conversations);
+        speakSequence(entrySpeech);
+        announceForAccessibility(`${entrySpeech.join(". ")}.`);
       }
     } catch (nextError) {
       // Falha de polling e silenciosa: so erro de carga/refresh aparece.
       if (mode !== "poll") {
-        setError(formatApiErrorMessage(nextError, "Não foi possível carregar suas conversas."));
+        const message = formatApiErrorMessage(
+          nextError,
+          "Não foi possível carregar suas conversas."
+        );
+        setError(message);
+
+        if (mode === "initial") {
+          // A rota nao e anunciada pelo `ScreenReaderAnnouncer` (a tela fala a
+          // propria entrada), entao o erro precisa vir com o nome da tela.
+          speakSequence([CONVERSATIONS_SCREEN_NAME, message]);
+          announceForAccessibility(`${CONVERSATIONS_SCREEN_NAME}. ${message}`);
+        }
       }
     } finally {
       inFlightRef.current = false;
@@ -159,15 +177,35 @@ export default function ChatsScreen() {
                 <ConversationRow
                   authToken={authToken}
                   conversation={item}
-                  onPress={(conversation) =>
+                  onOpenProfile={(conversation) => {
+                    if (!conversation.otherUserProfileId) {
+                      return;
+                    }
+
+                    const partnerName = conversationPartnerName(conversation);
+                    speak(buildActionSpeech("Abrir perfil de", partnerName));
+                    router.push(
+                      buildUserProfileHref(conversation.otherUserProfileId, partnerName)
+                    );
+                  }}
+                  onPress={(conversation) => {
+                    // Toque interrompe a sequencia de entrada e confirma o
+                    // destino; a tela da conversa fala o resto ao carregar.
+                    speak(
+                      buildActionSpeech("Abrir conversa com", conversationPartnerName(conversation))
+                    );
                     router.push({
                       pathname: "/chats/[conversationId]",
                       params: {
                         conversationId: conversation.conversationId,
                         name: conversation.otherUserName ?? "",
+                        otherUserProfileId: conversation.otherUserProfileId ?? "",
+                        otherUserPhotoUrl:
+                          chatService.resolveAssetUrl(conversation.otherUserPhoto?.url ?? null) ??
+                          "",
                       },
-                    })
-                  }
+                    });
+                  }}
                 />
               )}
               showsVerticalScrollIndicator={false}

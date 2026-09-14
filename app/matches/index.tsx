@@ -1272,65 +1272,13 @@ export default function Matches() {
                   </View>
                 </View>
 
-                {/* Acoes sociais do perfil visivel. Ficam no topo dos detalhes
-                    (e nao na barra de decisao) para nao se confundirem com
-                    curtir/recusar, que mudam a fila de descoberta. */}
+                {/* Contagem de seguidores e denuncia do perfil visivel. O
+                    seguir rapido fica na barra de decisao (botao do meio). */}
                 <View
                   accessibilityRole="toolbar"
                   accessibilityLabel={`Ações sobre o perfil de ${currentProfile.name}`}
                   className="flex-row items-center justify-between gap-3 bg-black px-4 pt-6"
                 >
-                  <Pressable
-                    accessible
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      followState?.following
-                        ? `Deixar de seguir ${currentProfile.name}`
-                        : `Seguir ${currentProfile.name}`
-                    }
-                    accessibilityHint={
-                      followState?.following
-                        ? "Remove as publicações desta pessoa do seu feed"
-                        : "Publicações desta pessoa aparecem no seu feed"
-                    }
-                    accessibilityState={{
-                      busy: followBusy,
-                      disabled: followBusy || !followState,
-                      selected: followState?.following ?? false,
-                    }}
-                    className={`flex-1 flex-row items-center justify-center rounded-full border px-4 py-2 ${
-                      followState?.following
-                        ? "border-[#CDBDFF] bg-[#2B2338]"
-                        : "border-[#494455] bg-[#1A1C1F]"
-                    }`}
-                    disabled={followBusy || !followState}
-                    onPress={() => {
-                      speak(
-                        buildActionSpeech(
-                          followState?.following ? "Deixar de seguir" : "Seguir",
-                          currentProfile.name
-                        )
-                      );
-                      void toggleFollowCurrentProfile();
-                    }}
-                  >
-                    {followBusy ? (
-                      <ActivityIndicator color="#FFFFFF" size="small" />
-                    ) : (
-                      <Ionicons
-                        name={
-                          followState?.following ? "checkmark" : "person-add-outline"
-                        }
-                        size={18}
-                        color="#FFFFFF"
-                        importantForAccessibility="no"
-                      />
-                    )}
-                    <Text className="ml-2 text-[15px] font-bold text-white">
-                      {followState?.following ? "Seguindo" : "Seguir"}
-                    </Text>
-                  </Pressable>
-
                   {followState ? (
                     <Text
                       accessible
@@ -1340,13 +1288,15 @@ export default function Matches() {
                           ? "1 seguidor"
                           : `${followState.followersCount} seguidores`
                       }
-                      className="text-[14px] font-semibold text-[#A7A6B3]"
+                      className="flex-1 text-[14px] font-semibold text-[#A7A6B3]"
                     >
                       {followState.followersCount === 1
                         ? "1 seguidor"
                         : `${followState.followersCount} seguidores`}
                     </Text>
-                  ) : null}
+                  ) : (
+                    <View className="flex-1" />
+                  )}
 
                   <Pressable
                     accessible
@@ -1388,7 +1338,7 @@ export default function Matches() {
                 <View
                   accessibilityRole="toolbar"
                   accessibilityLabel="Decisão sobre este perfil"
-                  className="absolute bottom-8 left-0 right-0 flex-row items-center justify-center gap-11"
+                  className="absolute bottom-8 left-0 right-0 flex-row items-center justify-center gap-6"
                 >
                   <Pressable
                     accessible
@@ -1409,6 +1359,50 @@ export default function Matches() {
                       color="#FF2D73"
                       importantForAccessibility="no"
                     />
+                  </Pressable>
+                  {/* Seguir rapido: nao mexe na fila de descoberta, so no feed.
+                      Desabilitado ate as estatisticas de follow do perfil chegarem. */}
+                  <Pressable
+                    accessible
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      followState?.following
+                        ? `Deixar de seguir ${currentProfile.name}`
+                        : `Seguir ${currentProfile.name}`
+                    }
+                    accessibilityHint={
+                      followState?.following
+                        ? "Remove as publicações desta pessoa do seu feed"
+                        : "Publicações desta pessoa aparecem no seu feed"
+                    }
+                    accessibilityState={{
+                      selected: followState?.following ?? false,
+                      busy: followBusy,
+                      disabled: followBusy || !followState,
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    className="h-[72px] w-[72px] items-center justify-center rounded-full bg-[#26282B]"
+                    disabled={followBusy || !followState}
+                    onPress={() => {
+                      speak(
+                        buildActionSpeech(
+                          followState?.following ? "Deixar de seguir" : "Seguir",
+                          currentProfile.name
+                        )
+                      );
+                      void toggleFollowCurrentProfile();
+                    }}
+                  >
+                    {followBusy ? (
+                      <ActivityIndicator color="#CDBDFF" size="small" />
+                    ) : (
+                      <Ionicons
+                        name={followState?.following ? "person-remove" : "person-add"}
+                        size={32}
+                        color={followState?.following ? "#FF8A8A" : "#CDBDFF"}
+                        importantForAccessibility="no"
+                      />
+                    )}
                   </Pressable>
                   <Pressable
                     accessible

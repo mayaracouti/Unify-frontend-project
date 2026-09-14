@@ -266,6 +266,48 @@ function ensurePreferredVoiceLookup(): void {
 let lastSpokenText = "";
 let lastSpokenAt = 0;
 
+/** Entrega uma frase ja normalizada ao motor de fala (enfileira, nao interrompe). */
+function speakUtterance(message: string): void {
+  try {
+    Speech.speak(message, {
+      language: SPEECH_LANGUAGE,
+      voice: preferredVoiceIdentifier,
+      rate: SPEECH_RATE,
+      pitch: SPEECH_PITCH,
+    });
+  } catch {
+    // Falha do motor de fala nunca propaga para a acao de negocio.
+  }
+}
+
+/**
+ * Guardas comuns a `speak` e `speakSequence`: leitor nativo, preferencia e
+ * duplicata imediata. Devolve `false` quando nada deve ser falado.
+ */
+function shouldSpeak(dedupeKey: string, options: TtsSpeakOptions): boolean {
+  if (isSystemScreenReaderEnabled()) {
+    return false;
+  }
+
+  if (options.force !== true && !state.enabled) {
+    return false;
+  }
+
+  const now = Date.now();
+
+  // Duplicata imediata (ex.: toque na aba + anuncio da mesma rota).
+  if (dedupeKey === lastSpokenText && now - lastSpokenAt < DUPLICATE_SUPPRESSION_MS) {
+    return false;
+  }
+
+  lastSpokenText = dedupeKey;
+  lastSpokenAt = now;
+
+  ensurePreferredVoiceLookup();
+
+  return true;
+}
+
 /**
  * Fala `text` respeitando a preferencia do usuario e a politica de fila.
  * Aceita `null`/`undefined` para permitir `speak(builder(data))` direto,
@@ -278,53 +320,63 @@ export function speak(
   try {
     const message = normalizeSpeechText(text ?? null);
 
-    if (!message) {
+    if (!message || !shouldSpeak(message, options)) {
       return;
     }
-
-    if (isSystemScreenReaderEnabled()) {
-      return;
-    }
-
-    if (options.force !== true && !state.enabled) {
-      return;
-    }
-
-    const now = Date.now();
-
-    // Duplicata imediata (ex.: toque na aba + anuncio da mesma rota).
-    if (
-      message === lastSpokenText &&
-      now - lastSpokenAt < DUPLICATE_SUPPRESSION_MS
-    ) {
-      return;
-    }
-
-    lastSpokenText = message;
-    lastSpokenAt = now;
-
-    ensurePreferredVoiceLookup();
-
-    const speakNow = () => {
-      try {
-        Speech.speak(message, {
-          language: SPEECH_LANGUAGE,
-          voice: preferredVoiceIdentifier,
-          rate: SPEECH_RATE,
-          pitch: SPEECH_PITCH,
-        });
-      } catch {
-        // Falha do motor de fala nunca propaga para a acao de negocio.
-      }
-    };
 
     if (options.interrupt === false) {
-      speakNow();
+      speakUtterance(message);
       return;
     }
 
     // Politica anti-fila: interrompe a fala corrente antes de falar a nova.
-    void Speech.stop().catch(() => undefined).then(speakNow);
+    void Speech.stop()
+      .catch(() => undefined)
+      .then(() => speakUtterance(message));
+  } catch {
+    // Nenhum erro de acessibilidade pode quebrar o app.
+  }
+}
+
+/**
+ * Fala uma SEQUENCIA de frases como um unico bloco (ex.: entrada na lista de
+ * conversas: nome da tela, total pendente e uma frase por conversa).
+ *
+ * Cada parte vira uma utterance propria: assim a leitura nao esbarra no
+ * limite de `MAX_SPEECH_LENGTH` de uma frase unica e o motor faz a pausa
+ * natural entre elas. As partes sao enfileiradas no motor (Android
+ * `QUEUE_ADD`, iOS/web enfileiram por padrao); qualquer `speak()` posterior
+ * interrompe o bloco inteiro, mantendo a politica "toque novo vence".
+ *
+ * A supressao de duplicata considera a sequencia completa.
+ */
+export function speakSequence(
+  parts: (string | null | undefined)[],
+  options: TtsSpeakOptions = {}
+): void {
+  try {
+    const messages = parts
+      .map((part) => normalizeSpeechText(part ?? null))
+      .filter((part): part is string => Boolean(part));
+
+    if (messages.length === 0 || !shouldSpeak(messages.join("\n"), options)) {
+      return;
+    }
+
+    const speakAll = () => {
+      messages.forEach(speakUtterance);
+    };
+
+    if (options.interrupt === false) {
+      speakAll();
+      return;
+    }
+
+    // `Speech.stop()` tambem esvazia a fila: por isso todas as partes entram
+    // so DEPOIS do stop resolver, senao a primeira seria cortada pelas demais.
+    void Speech.stop()
+      .catch(() => undefined)
+      .then(speakAll);
   } catch {
     // Nenhum erro de acessibilidade pode quebrar o app.
   }

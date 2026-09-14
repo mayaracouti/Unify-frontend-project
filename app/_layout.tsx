@@ -147,8 +147,8 @@ function RootNavigator() {
 
           <Stack.Protected guard={hasCompletedOnboarding}>
             <Stack.Screen name="home/index" />
-            <Stack.Screen name="home/new-post" />
-            <Stack.Screen name="explore/index" />
+            <Stack.Screen name="posts/comments" />
+            <Stack.Screen name="users/[userProfileId]" />
             <Stack.Screen name="chats/index" />
             <Stack.Screen name="chats/[conversationId]" />
             <Stack.Screen name="community/index" />
@@ -165,6 +165,8 @@ function RootNavigator() {
             <Stack.Screen name="matches/my-profile" />
             <Stack.Screen name="matches/success" />
             <Stack.Screen name="profile/index" />
+            <Stack.Screen name="profile/new-post" />
+            <Stack.Screen name="profile/posts" />
             <Stack.Screen name="profile/followers" />
             <Stack.Screen name="profile/following" />
             <Stack.Screen name="profile/edit" />

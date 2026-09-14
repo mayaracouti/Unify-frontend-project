@@ -3,6 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
 
+import { useTTS } from "../../accessibility/tts";
 import { MAX_AUDIO_DURATION_SECONDS, useAudioRecorder } from "../../hooks/useAudioRecorder";
 import type { ChatMediaUpload } from "../../types/chat";
 import { formatAudioClock, formatAudioDuration } from "../../utils/chatFormatting";
@@ -35,6 +36,10 @@ export function ChatComposer({
   const [draft, setDraft] = useState("");
   const [imageSourceVisible, setImageSourceVisible] = useState(false);
   const recorder = useAudioRecorder({ onRecorded: onSendMedia });
+  // TTS in-app: cada controle fala o proprio nome ao ser tocado/focado. O
+  // gravador ja anuncia inicio/fim pelo canal do leitor nativo
+  // (`announceForAccessibility`); os dois canais nunca soam juntos.
+  const { speak } = useTTS();
 
   // Entrar em edicao carrega o texto atual; sair limpa o rascunho.
   useEffect(() => {
@@ -124,6 +129,7 @@ export function ChatComposer({
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           className="h-12 w-12 items-center justify-center rounded-full bg-[#1D1F24]"
           onPress={() => {
+            speak("Descartar gravação");
             void recorder.cancel();
           }}
         >
@@ -156,6 +162,7 @@ export function ChatComposer({
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           className="h-12 w-12 items-center justify-center rounded-full bg-[#EAEA00]"
           onPress={() => {
+            speak("Parar e enviar áudio");
             void recorder.stop();
           }}
         >
@@ -215,7 +222,10 @@ export function ChatComposer({
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               className="h-12 w-12 items-center justify-center rounded-full bg-[#1D1F24]"
               disabled={sending}
-              onPress={() => setImageSourceVisible(true)}
+              onPress={() => {
+                speak("Enviar imagem");
+                setImageSourceVisible(true);
+              }}
             >
               <Ionicons name="image" size={24} color="#CAC3D8" importantForAccessibility="no" />
             </Pressable>
@@ -230,6 +240,7 @@ export function ChatComposer({
               className="h-12 w-12 items-center justify-center rounded-full bg-[#1D1F24]"
               disabled={sending}
               onPress={() => {
+                speak("Gravar mensagem de áudio");
                 void recorder.start();
               }}
             >
@@ -248,6 +259,7 @@ export function ChatComposer({
           editable={!sending}
           multiline
           onChangeText={setDraft}
+          onFocus={() => speak(editing ? "Editar mensagem" : "Escrever mensagem")}
           placeholder={editing ? "Edite a mensagem..." : "Escreva uma mensagem..."}
           placeholderTextColor="#8B8C98"
           value={draft}
@@ -268,7 +280,10 @@ export function ChatComposer({
             canSend ? "bg-[#EAEA00]" : "bg-[#2A2B30]"
           }`}
           disabled={!canSend}
-          onPress={handleSubmit}
+          onPress={() => {
+            speak(editing ? "Confirmar edição" : "Enviar mensagem");
+            handleSubmit();
+          }}
         >
           {sending ? (
             <ActivityIndicator color="#686800" size="small" />
@@ -292,6 +307,7 @@ export function ChatComposer({
             hint: "Abre a câmera do celular",
             icon: "camera-outline",
             onPress: () => {
+              speak("Tirar foto");
               void pickImage("camera");
             },
           },
@@ -301,6 +317,7 @@ export function ChatComposer({
             hint: "Abre as fotos salvas no celular",
             icon: "images-outline",
             onPress: () => {
+              speak("Escolher da galeria");
               void pickImage("library");
             },
           },

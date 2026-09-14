@@ -1,4 +1,6 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -23,6 +25,7 @@ import {
   announceForAccessibility,
 } from "../../utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../utils/auth";
+import { buildUserProfileHref } from "../../utils/userProfileRoute";
 import { GlobalTopNav } from "../navigation/global-top-nav";
 import { AuthenticatedRemoteImage } from "../profile/authenticated-remote-image";
 import { ScreenEmpty } from "../ui/screen-empty";
@@ -66,6 +69,7 @@ type FollowRowProps = {
   busy: boolean;
   highContrast: boolean;
   isCurrentUser: boolean;
+  onOpenProfile: (profile: FollowedProfileSummaryResponse) => void;
   onToggleFollow: (profile: FollowedProfileSummaryResponse) => void;
   profile: FollowedProfileSummaryResponse;
 };
@@ -75,6 +79,7 @@ function FollowRow({
   busy,
   highContrast,
   isCurrentUser,
+  onOpenProfile,
   onToggleFollow,
   profile,
 }: FollowRowProps) {
@@ -89,9 +94,7 @@ function FollowRow({
       end={{ x: 1, y: 1 }}
       className="h-full w-full items-center justify-center"
     >
-      <Text className="text-[16px] font-black text-white">
-        {getInitial(profile.name)}
-      </Text>
+      <Text className="text-[16px] font-black text-white">{getInitial(profile.name)}</Text>
     </LinearGradient>
   );
 
@@ -101,14 +104,21 @@ function FollowRow({
         highContrast ? "border border-hc-border bg-hc-surface" : "bg-[#2A2A2A]"
       }`}
     >
-      <View
-        accessible
-        accessibilityLabel={`${profile.name}, ${
-          following ? "você segue" : "você não segue"
-        }`}
-        className="flex-1 flex-row items-center"
-      >
-        <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-[#CDBDFF] bg-[#353534]">
+      <View className="flex-1 flex-row items-center">
+        {/* A foto e um botao proprio (fora do rotulo da linha): o leitor de
+            tela chega nela como "Abrir perfil de X" sem repetir o nome. */}
+        <Pressable
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={`Abrir perfil de ${profile.name}`}
+          accessibilityHint="Abre o perfil desta pessoa"
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          className="h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-[#CDBDFF] bg-[#353534]"
+          onPress={() => {
+            speak(buildActionSpeech("Abrir perfil", profile.name));
+            onOpenProfile(profile);
+          }}
+        >
           {avatarUri ? (
             <AuthenticatedRemoteImage
               authToken={authToken}
@@ -120,9 +130,13 @@ function FollowRow({
           ) : (
             avatarFallback
           )}
-        </View>
+        </Pressable>
 
         <Text
+          accessible
+          accessibilityLabel={`${profile.name}, ${
+            following ? "você segue" : "você não segue"
+          }`}
           className={`ml-3 flex-1 text-[16px] font-black ${
             highContrast ? "text-hc-text" : "text-white"
           }`}
@@ -138,19 +152,14 @@ function FollowRow({
           }`}
           onPress={() => {
             speak(
-              buildActionSpeech(
-                following ? "Deixar de seguir" : "Seguir",
-                profile.name
-              )
+              buildActionSpeech(following ? "Deixar de seguir" : "Seguir", profile.name)
             );
             onToggleFollow(profile);
           }}
           disabled={busy}
           accessibilityRole="button"
           accessibilityLabel={
-            following
-              ? `Deixar de seguir ${profile.name}`
-              : `Seguir ${profile.name}`
+            following ? `Deixar de seguir ${profile.name}` : `Seguir ${profile.name}`
           }
           accessibilityHint={
             following
@@ -160,10 +169,7 @@ function FollowRow({
           accessibilityState={{ selected: following, busy, disabled: busy }}
         >
           {busy ? (
-            <ActivityIndicator
-              color={following ? "#EAEA00" : "#1D1D00"}
-              size="small"
-            />
+            <ActivityIndicator color={following ? "#EAEA00" : "#1D1D00"} size="small" />
           ) : (
             <Text
               className={`text-[14px] font-black ${
@@ -182,6 +188,8 @@ function FollowRow({
 export function FollowListScreen({ mode }: { mode: FollowListMode }) {
   const copy = COPY[mode];
   const headingRef = useScreenHeadingFocus<Text>();
+  const router = useRouter();
+  const { speak } = useTTS();
   const { session } = useAuth();
   const authToken = session?.accessToken ?? null;
   const { currentUserProfileId } = useAppShell();
@@ -224,19 +232,14 @@ export function FollowListScreen({ mode }: { mode: FollowListMode }) {
         }
 
         setProfiles((previous) => {
-          const knownIds = new Set(
-            previous.map((profile) => profile.userProfileId)
-          );
+          const knownIds = new Set(previous.map((profile) => profile.userProfileId));
           const appended = response.profiles.filter(
             (profile) => !knownIds.has(profile.userProfileId)
           );
 
           if (appended.length > 0) {
             announceForAccessibility(
-              accessibilityAnnouncements.moreItemsLoaded(
-                appended.length,
-                "pessoas"
-              )
+              accessibilityAnnouncements.moreItemsLoaded(appended.length, "pessoas")
             );
           }
 
@@ -285,6 +288,14 @@ export function FollowListScreen({ mode }: { mode: FollowListMode }) {
       )
     );
   }, []);
+
+  const handleOpenProfile = useCallback(
+    (profile: FollowedProfileSummaryResponse) => {
+      // O proprio usuario cai em `/users/[id]`, que redireciona para `/profile`.
+      router.push(buildUserProfileHref(profile.userProfileId, profile.name));
+    },
+    [router]
+  );
 
   const handleToggleFollow = useCallback(
     (profile: FollowedProfileSummaryResponse) => {
@@ -339,10 +350,7 @@ export function FollowListScreen({ mode }: { mode: FollowListMode }) {
 
     if (profiles.length === 0) {
       return (
-        <ScreenEmpty
-          title="Ninguém por aqui ainda"
-          description={copy.emptyDescription}
-        />
+        <ScreenEmpty title="Ninguém por aqui ainda" description={copy.emptyDescription} />
       );
     }
 
@@ -375,9 +383,9 @@ export function FollowListScreen({ mode }: { mode: FollowListMode }) {
             busy={pendingProfileId === item.userProfileId}
             highContrast={highContrast}
             isCurrentUser={
-              currentUserProfileId !== null &&
-              item.userProfileId === currentUserProfileId
+              currentUserProfileId !== null && item.userProfileId === currentUserProfileId
             }
+            onOpenProfile={handleOpenProfile}
             onToggleFollow={handleToggleFollow}
             profile={item}
           />
@@ -389,19 +397,44 @@ export function FollowListScreen({ mode }: { mode: FollowListMode }) {
   return (
     <View className={`flex-1 ${highContrast ? "bg-hc-bg" : "bg-[#1F2023]"}`}>
       <SafeAreaView className="flex-1">
-        <GlobalTopNav backRoute="/profile" backLabel="Voltar para o perfil" />
+        <GlobalTopNav />
 
         <View className="flex-1 px-6 pt-6">
           <View className="mb-6">
-            <Text
-              ref={headingRef}
-              accessibilityRole="header"
-              className={`text-[32px] font-extrabold ${
-                highContrast ? "text-hc-text" : "text-white"
-              }`}
-            >
-              {copy.heading}
-            </Text>
+            <View className="flex-row items-center gap-3">
+              {/* Voltar fica dentro da tela (e nao na barra superior, junto
+                  do menu): o titulo e o proximo foco do leitor de tela. */}
+              <Pressable
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel="Voltar para o perfil"
+                accessibilityHint="Volta para a tela do seu perfil"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                className="h-11 w-11 items-center justify-center rounded-full bg-[#17181C]"
+                onPress={() => {
+                  speak("Voltar para o perfil");
+                  // `replace` (e nao `back`): a tela pode ser aberta por deep
+                  // link, quando nao existe historico para voltar.
+                  router.replace("/profile");
+                }}
+              >
+                <Ionicons
+                  name="arrow-back"
+                  size={22}
+                  color="#A270FF"
+                  importantForAccessibility="no"
+                />
+              </Pressable>
+              <Text
+                ref={headingRef}
+                accessibilityRole="header"
+                className={`flex-1 text-[32px] font-extrabold ${
+                  highContrast ? "text-hc-text" : "text-white"
+                }`}
+              >
+                {copy.heading}
+              </Text>
+            </View>
             <Text
               className={`mt-2 text-[15px] font-semibold leading-6 ${
                 highContrast ? "text-hc-text" : "text-[#CAC3D8]"

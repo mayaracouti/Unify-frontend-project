@@ -75,13 +75,15 @@ export function GlobalBottomNav() {
                 className="relative h-8 w-8 items-center justify-center"
                 importantForAccessibility="no-hide-descendants"
               >
-                <Ionicons name={active && tab.iconActive ? tab.iconActive : tab.icon} size={26} color={active ? "#7C4DFF" : "#CAC3D8"} />
+                <Ionicons
+                  name={active && tab.iconActive ? tab.iconActive : tab.icon}
+                  size={26}
+                  color={active ? "#7C4DFF" : "#CAC3D8"}
+                />
 
                 {badgeValue ? (
                   <View className="absolute -right-4 -top-1 rounded-full bg-[#814DFF] px-1.5 py-0.5">
-                    <Text className="text-[7px] font-black text-white">
-                      {badgeValue}
-                    </Text>
+                    <Text className="text-[7px] font-black text-white">{badgeValue}</Text>
                   </View>
                 ) : null}
               </View>

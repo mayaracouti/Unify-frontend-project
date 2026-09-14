@@ -3,10 +3,13 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import type { ComponentProps } from "react";
 
-import { buildCommunityPostSpeech, useTTS } from "../../accessibility/tts";
+import { useRouter } from "expo-router";
+
+import { buildActionSpeech, buildCommunityPostSpeech, useTTS } from "../../accessibility/tts";
 import { AuthenticatedRemoteImage } from "../profile/authenticated-remote-image";
 import { communityService } from "../../services/communityService";
 import type { CommunityForYouPostResponse } from "../../types/community";
+import { buildUserProfileHref } from "../../utils/userProfileRoute";
 
 function getInitials(name?: string | null) {
   if (!name) {
@@ -82,10 +85,44 @@ export function CommunityForYouPostCard({
   onToggleLike: () => void;
 }) {
   const { speak } = useTTS();
+  const router = useRouter();
   const post = item.post;
   const communityIconUrl = communityService.resolveAssetUrl(item.communityIconData);
   const avatarUrl = communityService.resolveAssetUrl(post.author.avatarData);
   const mediaUrl = communityService.resolveAssetUrl(post.mediaData);
+  const authorProfileId = post.author.userProfileId?.trim() || null;
+
+  const avatarFallback = (
+    <LinearGradient
+      colors={["#CDBDFF", "#7C4DFF"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      className="h-full w-full items-center justify-center"
+    >
+      <Text className="text-[13px] font-black text-white">
+        {getInitials(post.author.name) || "?"}
+      </Text>
+    </LinearGradient>
+  );
+
+  const avatar = (
+    <View
+      className="h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 border-[#CDBDFF] bg-[#353534]"
+      importantForAccessibility={authorProfileId ? "no-hide-descendants" : "auto"}
+    >
+      {avatarUrl ? (
+        <AuthenticatedRemoteImage
+          uri={avatarUrl}
+          authToken={authToken}
+          className="h-full w-full"
+          resizeMode="cover"
+          fallback={avatarFallback}
+        />
+      ) : (
+        avatarFallback
+      )}
+    </View>
+  );
 
   return (
     <View className="rounded-[24px] border border-[#353534] bg-surface-alt p-4">
@@ -119,58 +156,49 @@ export function CommunityForYouPostCard({
         <Ionicons name="chevron-forward" size={16} color="#948EA1" />
       </Pressable>
 
+      {/* Avatar e um botao irmao do card de texto: abre o perfil publico do
+          autor sem aninhar Pressable dentro de Pressable. */}
+      <View className="mt-4 flex-row items-center gap-3">
+        {authorProfileId ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Abrir perfil de ${post.author.name}`}
+            accessibilityHint="Abre o perfil público desta pessoa"
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            onPress={() => {
+              speak(buildActionSpeech("Abrir perfil de", post.author.name));
+              router.push(buildUserProfileHref(authorProfileId, post.author.name));
+            }}
+          >
+            {avatar}
+          </Pressable>
+        ) : (
+          avatar
+        )}
+
+        <Pressable
+          className="flex-1"
+          onPress={() => speak(buildCommunityPostSpeech(post))}
+          accessibilityRole="button"
+          accessibilityLabel={`Publicação de ${post.author.name} na comunidade ${item.communityName}`}
+          accessibilityHint="Lê em voz alta o autor, o texto e os contadores desta publicação"
+        >
+          <Text className="text-[16px] font-black text-[#E5E2E1]">{post.author.name}</Text>
+          {post.publishedAt || post.editedAt ? (
+            <Text className="mt-0.5 text-[13px] font-semibold text-[#948EA1]">
+              {post.publishedAt ?? ""}
+              {post.editedAt ? (post.publishedAt ? " · editada" : "editada") : ""}
+            </Text>
+          ) : null}
+        </Pressable>
+      </View>
+
       <Pressable
-        className="mt-4"
         onPress={() => speak(buildCommunityPostSpeech(post))}
         accessibilityRole="button"
-        accessibilityLabel={`Publicação de ${post.author.name} na comunidade ${item.communityName}`}
-        accessibilityHint="Lê em voz alta o autor, o texto e os contadores desta publicação"
+        accessibilityLabel={`Texto da publicação de ${post.author.name}`}
+        accessibilityHint="Lê a publicação em voz alta"
       >
-        <View className="flex-row items-center gap-3">
-          <View className="h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 border-[#CDBDFF] bg-[#353534]">
-            {avatarUrl ? (
-              <AuthenticatedRemoteImage
-                uri={avatarUrl}
-                authToken={authToken}
-                className="h-full w-full"
-                resizeMode="cover"
-                fallback={
-                  <LinearGradient
-                    colors={["#CDBDFF", "#7C4DFF"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    className="h-full w-full items-center justify-center"
-                  >
-                    <Text className="text-[13px] font-black text-white">
-                      {getInitials(post.author.name) || "?"}
-                    </Text>
-                  </LinearGradient>
-                }
-              />
-            ) : (
-              <LinearGradient
-                colors={["#CDBDFF", "#7C4DFF"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                className="h-full w-full items-center justify-center"
-              >
-                <Text className="text-[13px] font-black text-white">
-                  {getInitials(post.author.name) || "?"}
-                </Text>
-              </LinearGradient>
-            )}
-          </View>
-
-          <View className="flex-1">
-            <Text className="text-[16px] font-black text-[#E5E2E1]">{post.author.name}</Text>
-            {post.publishedAt ? (
-              <Text className="mt-0.5 text-[13px] font-semibold text-[#948EA1]">
-                {post.publishedAt}
-              </Text>
-            ) : null}
-          </View>
-        </View>
-
         <Text className="mt-4 text-[17px] font-semibold leading-7 text-[#E5E2E1]">
           {post.body}
         </Text>

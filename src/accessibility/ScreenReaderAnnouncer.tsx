@@ -15,7 +15,6 @@ const ROUTE_LABELS: Record<string, string> = {
   // Mantidos iguais aos rotulos das abas: o toque na aba e o anuncio de rota
   // produzem o mesmo texto e a supressao de duplicata evita fala dupla.
   "/home": "Início",
-  "/explore": "Explorar",
   "/matches": "Encontros",
   "/matches/mutual": "Matches mútuos",
   "/matches/my-profile": "Meu perfil de match",
@@ -25,9 +24,15 @@ const ROUTE_LABELS: Record<string, string> = {
   "/community/new": "Novas comunidades",
   "/community/create": "Criar comunidade",
   "/community/comments": "Comentários da publicação",
+  "/posts/comments": "Comentários da publicação",
   "/community/settings": "Configurações da comunidade",
   "/community/manage-member": "Gerenciar membro da comunidade",
+  "/chats": "Conversas",
   "/profile": "Seu perfil",
+  "/profile/new-post": "Nova publicação",
+  "/profile/posts": "Postagens",
+  "/profile/followers": "Seguidores",
+  "/profile/following": "Seguindo",
   "/profile/edit": "Editar perfil",
   "/profile/edit-match-preferences": "Editar preferências de match",
   "/profile/accessibility-settings": "Configurações de acessibilidade",
@@ -51,8 +56,19 @@ const ROUTE_LABELS: Record<string, string> = {
  */
 const DUPLICATE_SUPPRESSION_MS = 1500;
 
-/** `/community/<id>` e a unica rota dinamica do app. */
+/** Rotas dinamicas do app: o id nunca deve ser falado. */
 const COMMUNITY_DETAIL_PATTERN = /^\/community\/[^/]+$/;
+const CHAT_DETAIL_PATTERN = /^\/chats\/[^/]+$/;
+const USER_PROFILE_PATTERN = /^\/users\/[^/]+$/;
+
+/**
+ * Telas que falam a propria sequencia de entrada assim que os dados chegam
+ * (ex.: chat: nome da tela, pendencias, pessoa e ultima mensagem). Anunciar
+ * so o nome da rota aqui seria cortado no meio pela sequencia da tela.
+ */
+function isSelfAnnouncingRoute(normalizedPathname: string): boolean {
+  return normalizedPathname === "/chats" || CHAT_DETAIL_PATTERN.test(normalizedPathname);
+}
 
 function normalizePathname(pathname: string): string {
   const withoutQuery = pathname.split("?")[0];
@@ -83,6 +99,14 @@ export function getRouteAnnouncement(pathname: string): string {
     return "Comunidade";
   }
 
+  if (CHAT_DETAIL_PATTERN.test(normalized)) {
+    return "Conversa";
+  }
+
+  if (USER_PROFILE_PATTERN.test(normalized)) {
+    return "Perfil";
+  }
+
   const segments = normalized.split("/").filter((segment) => segment.length > 0);
   const lastSegment = segments[segments.length - 1];
 
@@ -104,7 +128,9 @@ export function ScreenReaderAnnouncer() {
 
     // O onboarding de acessibilidade fala a propria introducao completa;
     // anunciar o nome da rota por cima interromperia essa fala.
-    if (normalizePathname(pathname) === "/accessibility-onboarding") {
+    const normalized = normalizePathname(pathname);
+
+    if (normalized === "/accessibility-onboarding" || isSelfAnnouncingRoute(normalized)) {
       return;
     }
 

@@ -17,6 +17,19 @@ type UseChatMessagesArgs = {
 };
 
 /**
+ * Foto da carga inicial de uma conversa: o que estava pendente de leitura no
+ * momento em que a tela abriu. Um objeto NOVO a cada carga (inclusive ao
+ * voltar para a tela), para que os efeitos da tela reajam por identidade.
+ */
+export type ChatInitialLoad = {
+  conversationId: string;
+  /** Total de nao lidas segundo o backend (pode passar do que esta carregado). */
+  unreadCount: number;
+  /** Mensagens do outro participante ainda nao lidas, na ordem da lista (mais recente primeiro). */
+  unreadMessages: ChatMessageResponse[];
+};
+
+/**
  * Carrega o historico paginado e mantem a conversa atualizada por polling.
  *
  * Regras (C12 do plano):
@@ -40,6 +53,13 @@ export function useChatMessages({
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasNext, setHasNext] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Preenchido so quando a primeira pagina chega. A tela marca a conversa como
+   * lida DEPOIS disso: se `markAsRead` corresse em paralelo com a carga, o
+   * backend poderia zerar `unreadCount`/`readAt` antes da resposta e a leitura
+   * das mensagens pendentes ficaria muda.
+   */
+  const [initialLoad, setInitialLoad] = useState<ChatInitialLoad | null>(null);
 
   const pageRef = useRef(0);
   const sinceRef = useRef<string | null>(null);
@@ -100,6 +120,7 @@ export function useChatMessages({
     let active = true;
     setLoading(true);
     setError(null);
+    setInitialLoad(null);
     pageRef.current = 0;
     // Conversa nova: o cursor da conversa anterior nao vale mais. Sem esse
     // reset o primeiro tick de polling buscaria "desde" o serverTime da outra
@@ -116,6 +137,15 @@ export function useChatMessages({
         mergeMessages(response.messages, "replace");
         setHasNext(response.hasNext);
         sinceRef.current = response.serverTime;
+        setInitialLoad({
+          conversationId,
+          unreadCount: response.unreadCount,
+          // `readAt` de uma mensagem recebida = quando EU a li. Apagada nao
+          // tem conteudo para ler, entao fica de fora.
+          unreadMessages: response.messages.filter(
+            (message) => !message.fromMe && !message.readAt && !message.deletedAt
+          ),
+        });
       })
       .catch((nextError) => {
         if (active) {
@@ -246,6 +276,7 @@ export function useChatMessages({
   return {
     error,
     hasNext,
+    initialLoad,
     loadOlderMessages,
     loading,
     loadingMore,

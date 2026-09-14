@@ -11,7 +11,6 @@ export type NavigationTab = {
 
 export const navigationTabs: NavigationTab[] = [
   { label: "Início", icon: "home-outline", iconActive: "home", route: "/home" },
-  { label: "Explorar", icon: "search-outline", iconActive: "search", route: "/explore" },
   {
     label: "Encontros",
     icon: "heart-outline",

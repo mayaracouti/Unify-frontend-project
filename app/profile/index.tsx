@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -10,10 +10,11 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { joinSpeechParts, useTTS } from "../../src/accessibility/tts";
+import { ProfilePostsSection } from "../../src/components/feed/profile-posts-section";
 import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-nav";
 import { GlobalTopNav } from "../../src/components/navigation/global-top-nav";
 import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
@@ -32,7 +33,10 @@ import type {
   UserProfileResponse,
 } from "../../src/types/profile";
 import type { FollowStatsResponse } from "../../src/types/social";
-import { announceForAccessibility } from "../../src/utils/accessibilityAnnouncements";
+import {
+  accessibilityAnnouncements,
+  announceForAccessibility,
+} from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
 
 type StatItem = {
@@ -288,6 +292,12 @@ export default function Profile() {
   const { syncProfileSummary } = useAppShell();
   const { settings } = useAccessibility();
   const reduceMotion = settings.reduceMotion;
+  const highContrast = settings.highContrast;
+  const params = useLocalSearchParams<{ created?: string | string[] }>();
+  const createdParam = Array.isArray(params.created) ? params.created[0] : params.created;
+  // O anúncio de "publicação criada" vale uma vez, senão o leitor de tela
+  // repete a cada re-render/refoco da tela.
+  const announcedCreationRef = useRef(false);
 
   const {
     data: profile,
@@ -308,10 +318,9 @@ export default function Profile() {
   const displayName = buildDisplayName(profile);
   const displayAge = buildDisplayAge(profile);
   const accessibilityCards = useMemo(() => buildAccessibilityCards(profile), [profile]);
+  // Só seguidores e seguindo: fotos e interesses já aparecem nas próprias seções.
   const statItems = useMemo<StatItem[]>(
     () => [
-      { label: "Fotos", value: String(galleryImages.length) },
-      { label: "Interesses", value: String(profile?.interestTypes.length ?? 0) },
       {
         label: "Seguidores",
         value: followStats ? String(followStats.followersCount) : "—",
@@ -331,7 +340,7 @@ export default function Profile() {
         route: "/profile/following",
       },
     ],
-    [followStats, galleryImages.length, profile?.interestTypes.length]
+    [followStats]
   );
 
   const loadProfile = useCallback(async (showLoader = false) => {
@@ -357,6 +366,15 @@ export default function Profile() {
   useEffect(() => {
     void loadProfile();
   }, [loadProfile]);
+
+  useEffect(() => {
+    if (createdParam !== "1" || announcedCreationRef.current) {
+      return;
+    }
+
+    announcedCreationRef.current = true;
+    announceForAccessibility(accessibilityAnnouncements.personalPostCreated());
+  }, [createdParam]);
 
   // Contadores de seguidores/seguindo: so fazem sentido depois que o id do
   // perfil chega. Falha aqui nao derruba a tela — os tiles seguem com "—".
@@ -870,6 +888,18 @@ export default function Profile() {
                 />
               ))}
             </View>
+
+            {profile?.id ? (
+              <ProfilePostsSection
+                authToken={imageAuthToken}
+                highContrast={highContrast}
+                isOwnProfile
+                onCreatePost={() => router.push("/profile/new-post")}
+                onSeeAll={() => router.push("/profile/posts")}
+                ownerName={displayName}
+                userProfileId={profile.id}
+              />
+            ) : null}
 
             {actionError ? (
               <View accessibilityRole="alert">

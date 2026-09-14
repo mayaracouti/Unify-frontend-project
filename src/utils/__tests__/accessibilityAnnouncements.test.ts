@@ -17,18 +17,31 @@ import {
 describe("getRouteAnnouncement", () => {
   it("mapeia rotas conhecidas para o rotulo em pt-BR", () => {
     expect(getRouteAnnouncement("/home")).toBe("Início");
-    expect(getRouteAnnouncement("/explore")).toBe("Explorar");
     expect(getRouteAnnouncement("/matches")).toBe("Encontros");
+    expect(getRouteAnnouncement("/profile/new-post")).toBe("Nova publicação");
     expect(getRouteAnnouncement("/auth/login")).toBe("Entrar na Unify");
   });
 
   it("ignora barra final e query string ao normalizar", () => {
     expect(getRouteAnnouncement("/home/")).toBe("Início");
-    expect(getRouteAnnouncement("/explore?tab=nearby")).toBe("Explorar");
+    expect(getRouteAnnouncement("/matches?tab=nearby")).toBe("Encontros");
   });
 
   it("reconhece a rota dinamica de detalhe de comunidade", () => {
     expect(getRouteAnnouncement("/community/abc-123")).toBe("Comunidade");
+  });
+
+  it("nunca fala o id da conversa nas rotas de chat", () => {
+    expect(getRouteAnnouncement("/chats")).toBe("Conversas");
+    expect(getRouteAnnouncement("/chats/3f2a9c1e-0000-4000-8000-000000000000")).toBe(
+      "Conversa"
+    );
+  });
+
+  it("nunca fala o id do perfil publico", () => {
+    expect(getRouteAnnouncement("/users/3f2a9c1e-0000-4000-8000-000000000000")).toBe(
+      "Perfil"
+    );
   });
 
   it("cai para o ultimo segmento formatado quando a rota e desconhecida", () => {

@@ -1,22 +1,12 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { LinearGradient } from "expo-linear-gradient";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  Text,
-  View,
-} from "react-native";
+import { useRouter } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, FlatList, RefreshControl, View } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 
-import { buildActionSpeech, useTTS } from "../../src/accessibility/tts";
+import { FeedPostCard } from "../../src/components/feed/feed-post-card";
+import { usePostListActions } from "../../src/components/feed/use-post-list-actions";
 import { AppTabScreen } from "../../src/components/navigation/app-tab-screen";
-import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
-import { ReportModal } from "../../src/components/report/report-modal";
 import { ScreenEmpty } from "../../src/components/ui/screen-empty";
 import { ScreenError } from "../../src/components/ui/screen-error";
 import { ScreenLoading } from "../../src/components/ui/screen-loading";
@@ -33,210 +23,22 @@ import { formatApiErrorMessage } from "../../src/utils/auth";
 
 const PAGE_SIZE = 10;
 
-const MINUTE_MS = 60 * 1000;
-const HOUR_MS = 60 * MINUTE_MS;
-const DAY_MS = 24 * HOUR_MS;
-
 /**
- * Data relativa em pt-BR. Falar "há 5 min" situa melhor do que um timestamp
- * cru quando o leitor de tela anuncia o cartão inteiro de uma vez.
+ * Aba Inicio: feed RANQUEADO (`GET /users/feed`). Mistura publicacoes de
+ * quem eu sigo e das comunidades em que participo com sugestoes — perfis
+ * com interesses parecidos e comunidades PUBLICAS afins — para descobrir
+ * gente e comunidades sem sair do feed. Cada post traz `feedSource`; as
+ * sugestoes ganham selo e acao rapida (seguir / entrar) no `FeedPostCard`.
+ * As MINHAS publicacoes pessoais nao entram aqui: ficam na aba Perfil.
  */
-function formatRelativeDate(isoDate: string) {
-  const timestamp = Date.parse(isoDate);
-
-  if (Number.isNaN(timestamp)) {
-    return "";
-  }
-
-  const elapsed = Date.now() - timestamp;
-
-  if (elapsed < MINUTE_MS) {
-    return "agora mesmo";
-  }
-
-  if (elapsed < HOUR_MS) {
-    return `há ${Math.floor(elapsed / MINUTE_MS)} min`;
-  }
-
-  if (elapsed < DAY_MS) {
-    return `há ${Math.floor(elapsed / HOUR_MS)} h`;
-  }
-
-  if (elapsed < 2 * DAY_MS) {
-    return "ontem";
-  }
-
-  const date = new Date(timestamp);
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-
-  return `${day}/${month}`;
-}
-
-function getInitial(name: string) {
-  return (name.trim()[0] ?? "?").toUpperCase();
-}
-
-type PersonalPostCardProps = {
-  authToken: string | null;
-  deleting: boolean;
-  highContrast: boolean;
-  isOwnPost: boolean;
-  onDelete: (post: UserPostResponse) => void;
-  onReport: (post: UserPostResponse) => void;
-  post: UserPostResponse;
-};
-
-function PersonalPostCard({
-  authToken,
-  deleting,
-  highContrast,
-  isOwnPost,
-  onDelete,
-  onReport,
-  post,
-}: PersonalPostCardProps) {
-  const { speak } = useTTS();
-  const formattedDate = useMemo(
-    () => formatRelativeDate(post.createdAt),
-    [post.createdAt]
-  );
-  const avatarUri = feedService.resolveAssetUrl(post.author.avatarUrl);
-  const mediaUri = feedService.resolveAssetUrl(post.mediaUrl);
-
-  const avatarFallback = (
-    <LinearGradient
-      colors={["#CDBDFF", "#7C4DFF"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      className="h-full w-full items-center justify-center"
-    >
-      <Text className="text-[16px] font-black text-white">
-        {getInitial(post.author.name)}
-      </Text>
-    </LinearGradient>
-  );
-
-  return (
-    <View
-      className={`mb-4 rounded-[28px] p-6 ${
-        highContrast ? "border border-hc-border bg-hc-surface" : "bg-[#111214]"
-      }`}
-    >
-      <View
-        accessible
-        accessibilityRole="summary"
-        accessibilityLabel={`Publicação de ${post.author.name}, ${formattedDate}: ${post.body.slice(0, 120)}`}
-      >
-        <View className="flex-row items-center">
-          <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-[#CDBDFF] bg-[#353534]">
-            {avatarUri ? (
-              <AuthenticatedRemoteImage
-                authToken={authToken}
-                className="h-full w-full"
-                fallback={avatarFallback}
-                resizeMode="cover"
-                uri={avatarUri}
-              />
-            ) : (
-              avatarFallback
-            )}
-          </View>
-
-          <View className="ml-3 flex-1">
-            <Text
-              className={`text-[17px] font-black ${
-                highContrast ? "text-hc-text" : "text-white"
-              }`}
-            >
-              {post.author.name}
-            </Text>
-            <Text
-              className={`mt-1 text-[13px] font-semibold ${
-                highContrast ? "text-hc-text" : "text-[#CAC3D8]"
-              }`}
-            >
-              {formattedDate}
-            </Text>
-          </View>
-        </View>
-
-        <Text
-          className={`mt-4 text-[15px] font-semibold leading-6 ${
-            highContrast ? "text-hc-text" : "text-white"
-          }`}
-        >
-          {post.body}
-        </Text>
-
-        {mediaUri ? (
-          <AuthenticatedRemoteImage
-            accessibilityLabel={`Imagem da publicação de ${post.author.name}`}
-            authToken={authToken}
-            className="mt-3 h-56 w-full rounded-2xl"
-            fallback={
-              <View className="mt-3 h-56 w-full items-center justify-center rounded-2xl bg-[#2A2A2A]">
-                <Ionicons name="image-outline" size={28} color="#948EA1" />
-              </View>
-            }
-            resizeMode="cover"
-            uri={mediaUri}
-          />
-        ) : null}
-      </View>
-
-      <View className="mt-4 flex-row justify-end">
-        {isOwnPost ? (
-          <Pressable
-            className="h-11 w-11 items-center justify-center rounded-full border border-[#494455]"
-            onPress={() => {
-              speak(buildActionSpeech("Excluir publicação"));
-              onDelete(post);
-            }}
-            disabled={deleting}
-            accessibilityRole="button"
-            accessibilityLabel="Excluir publicação"
-            accessibilityHint="Remove esta publicação do seu feed"
-            accessibilityState={{ disabled: deleting, busy: deleting }}
-          >
-            {deleting ? (
-              <ActivityIndicator color="#FF8A8A" size="small" />
-            ) : (
-              <Ionicons name="trash-outline" size={20} color="#FF8A8A" />
-            )}
-          </Pressable>
-        ) : (
-          <Pressable
-            className="h-11 w-11 items-center justify-center rounded-full border border-[#494455]"
-            onPress={() => {
-              speak(buildActionSpeech("Denunciar publicação"));
-              onReport(post);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Denunciar publicação"
-            accessibilityHint="Abre o formulário de denúncia"
-          >
-            <Ionicons name="flag-outline" size={20} color="#CAC3D8" />
-          </Pressable>
-        )}
-      </View>
-    </View>
-  );
-}
-
 export default function Home() {
   const router = useRouter();
   const isFocused = useIsFocused();
-  const { speak } = useTTS();
   const { session } = useAuth();
   const authToken = session?.accessToken ?? null;
   const { currentUserId, currentUserProfileId } = useAppShell();
   const { settings } = useAccessibility();
   const highContrast = settings.highContrast;
-  const params = useLocalSearchParams<{ created?: string | string[] }>();
-  const createdParam = Array.isArray(params.created)
-    ? params.created[0]
-    : params.created;
 
   const [posts, setPosts] = useState<UserPostResponse[]>([]);
   const [page, setPage] = useState(0);
@@ -245,12 +47,12 @@ export default function Home() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState("");
-  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
-  const [reportedPost, setReportedPost] = useState<UserPostResponse | null>(null);
 
-  // O anúncio de "publicação criada" e o de feed vazio valem uma vez cada,
-  // senão o leitor de tela repete a cada re-render/refoco da tela.
-  const announcedCreationRef = useRef(false);
+  const { deletingPostId, dialogs, handlers, likeBusyPostId, suggestionBusyPostId } =
+    usePostListActions(setPosts);
+
+  // O anúncio de feed vazio vale uma vez, senão o leitor de tela repete a
+  // cada re-render/refoco da tela.
   const announcedEmptyRef = useRef(false);
 
   const loadFeed = useCallback(
@@ -330,8 +132,8 @@ export default function Home() {
     [page]
   );
 
-  // Recarrega ao focar a tela: o feed muda quando o usuário publica, segue
-  // alguém ou apaga um post em outra tela.
+  // Recarrega ao focar a tela: o feed muda quando o usuário segue alguém,
+  // entra em uma comunidade ou edita/apaga um post em outra tela.
   useEffect(() => {
     if (!isFocused) {
       return;
@@ -342,15 +144,6 @@ export default function Home() {
     // o feed durante a paginação.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFocused]);
-
-  useEffect(() => {
-    if (createdParam !== "1" || announcedCreationRef.current) {
-      return;
-    }
-
-    announcedCreationRef.current = true;
-    announceForAccessibility(accessibilityAnnouncements.personalPostCreated());
-  }, [createdParam]);
 
   const isEmpty = !loading && !loadError && posts.length === 0;
 
@@ -381,39 +174,6 @@ export default function Home() {
     void loadFeed(false);
   }, [hasNext, loadFeed, loading, loadingMore, refreshing]);
 
-  const handleDelete = useCallback((post: UserPostResponse) => {
-    Alert.alert(
-      "Excluir publicação",
-      "Esta publicação será removida do seu feed. Não dá para desfazer.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Excluir",
-          style: "destructive",
-          onPress: () => {
-            setDeletingPostId(post.id);
-
-            void (async () => {
-              try {
-                await feedService.deletePost(post.id);
-                setPosts((previous) =>
-                  previous.filter((item) => item.id !== post.id)
-                );
-                announceForAccessibility(
-                  accessibilityAnnouncements.personalPostDeleted()
-                );
-              } catch {
-                // Global API error toast already explains the failure.
-              } finally {
-                setDeletingPostId(null);
-              }
-            })();
-          },
-        },
-      ]
-    );
-  }, []);
-
   const renderContent = () => {
     if (loading) {
       return <ScreenLoading label="Carregando seu feed" />;
@@ -435,10 +195,10 @@ export default function Home() {
     if (isEmpty) {
       return (
         <ScreenEmpty
-          title="Seu feed está vazio"
-          description="Você ainda não segue ninguém. Explore o Descobrir para encontrar pessoas e siga para ver as publicações delas aqui."
+          title="Ainda não há publicações"
+          description="O feed mostra publicações de quem você segue, das suas comunidades e sugestões de pessoas e comunidades. Assim que alguém publicar, aparece aqui."
           action={{
-            label: "Ir para o Descobrir",
+            label: "Ir para o Encontros",
             onPress: () => {
               router.push("/matches");
             },
@@ -460,11 +220,11 @@ export default function Home() {
     // sem limite via paginação infinita e precisa reciclar as linhas.
     return (
       <FlatList
-        accessibilityLabel="Feed pessoal"
+        accessibilityLabel="Feed do Início"
         data={posts}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
-        contentContainerClassName="pb-28"
+        contentContainerClassName="pb-10"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -482,7 +242,7 @@ export default function Home() {
           ) : null
         }
         renderItem={({ item }) => (
-          <PersonalPostCard
+          <FeedPostCard
             authToken={authToken}
             deleting={deletingPostId === item.id}
             highContrast={highContrast}
@@ -491,9 +251,10 @@ export default function Home() {
               (currentUserProfileId !== null &&
                 item.author.userProfileId === currentUserProfileId)
             }
-            onDelete={handleDelete}
-            onReport={setReportedPost}
+            likeBusy={likeBusyPostId === item.id}
             post={item}
+            suggestionBusy={suggestionBusyPostId === item.id}
+            {...handlers}
           />
         )}
       />
@@ -503,37 +264,13 @@ export default function Home() {
   return (
     <AppTabScreen
       title="Início"
-      subtitle="Publicações de quem você segue e as suas."
+      subtitle="Quem você segue, suas comunidades e sugestões para você."
     >
       <View className={`flex-1 ${highContrast ? "bg-hc-bg" : "bg-[#1F2023]"}`}>
         {renderContent()}
       </View>
 
-      <Pressable
-        className="absolute bottom-6 right-6 h-16 w-16 items-center justify-center rounded-full border-2 border-[#CDBDFF] bg-[#7C4DFF]"
-        onPress={() => {
-          speak(buildActionSpeech("Criar publicação"));
-          router.push("/home/new-post");
-        }}
-        accessibilityRole="button"
-        accessibilityLabel="Criar publicação"
-        accessibilityHint="Abre a tela para escrever uma nova publicação"
-      >
-        <Ionicons name="add" size={38} color="#FCF6FF" />
-      </Pressable>
-
-      {/*
-        Posts pessoais e de comunidade vivem na mesma tabela no backend
-        (`posts`, coluna origin), então a denúncia aponta para a
-        própria publicação; o autor vai junto como usuário denunciado.
-      */}
-      <ReportModal
-        visible={reportedPost !== null}
-        onClose={() => setReportedPost(null)}
-        reportedUserId={reportedPost?.author.userId ?? ""}
-        reportedPostId={reportedPost?.id ?? null}
-        contextLabel={`publicação de ${reportedPost?.author.name ?? ""}`}
-      />
+      {dialogs}
     </AppTabScreen>
   );
 }

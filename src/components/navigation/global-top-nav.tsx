@@ -3,7 +3,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePathname, useRouter } from "expo-router";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 
-import { joinSpeechParts, useTTS } from "../../accessibility/tts";
+import { buildActionSpeech, joinSpeechParts, useTTS } from "../../accessibility/tts";
 import { useAppShell } from "../../context/AppShellContext";
 import { useAuth } from "../../context/AuthContext";
 import { AuthenticatedRemoteImage } from "../profile/authenticated-remote-image";
@@ -21,6 +21,8 @@ function getInitials(name: string) {
 }
 
 const PROFILE_ROUTE = "/profile";
+const HOME_ROUTE = "/home";
+const CREATE_POST_ROUTE = "/profile/new-post";
 
 type GlobalTopNavProps = {
   settingsRoute?: string | null;
@@ -43,6 +45,9 @@ export function GlobalTopNav({
   const [menuOpen, setMenuOpen] = useState(false);
   const initials = useMemo(() => getInitials(currentUserName || "Perfil"), [currentUserName]);
   const shouldShowMutualMatchesShortcut = pathname === "/matches";
+  // Nova publicacao pessoal vive no topo do Inicio (e nao na barra inferior):
+  // a barra inferior fica so com abas, e o "+" aparece no contexto do feed.
+  const shouldShowCreatePostShortcut = pathname === HOME_ROUTE;
   // O cartao do usuario ja leva ao perfil: manter o item "Perfil" duplicaria a rota no menu.
   const menuTabs = useMemo(
     () => navigationTabs.filter((tab) => tab.route !== PROFILE_ROUTE),
@@ -109,7 +114,21 @@ export function GlobalTopNav({
 
         <Text className="text-[26px] font-black tracking-[2px] text-[#7C4DFF]">UNIFY</Text>
 
-        {shouldShowMutualMatchesShortcut ? (
+        {shouldShowCreatePostShortcut ? (
+          <Pressable
+            className="h-10 w-10 items-center justify-center rounded-full border-2 border-[#CDBDFF] bg-[#7C4DFF]"
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            onPress={() => {
+              speak(buildActionSpeech("Criar publicação"));
+              router.push(CREATE_POST_ROUTE);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Criar publicação"
+            accessibilityHint="Abre a tela para escrever uma nova publicação no seu perfil"
+          >
+            <Ionicons name="add" size={26} color="#FCF6FF" importantForAccessibility="no" />
+          </Pressable>
+        ) : shouldShowMutualMatchesShortcut ? (
           <Pressable
             className="h-10 w-10 items-center justify-center rounded-full"
             onPress={() => {

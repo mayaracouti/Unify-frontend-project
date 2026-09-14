@@ -11,20 +11,27 @@ import { AuthenticatedRemoteImage } from "../profile/authenticated-remote-image"
  * Linha da lista de conversas. `memo` com comparacao rasa padrao: em listas
  * longas o re-render do container so precisa repintar as linhas cujo
  * `conversation` mudou de identidade.
+ *
+ * Dois alvos irmaos (nunca aninhados): o avatar abre o perfil publico e o
+ * conteudo abre a conversa.
  */
 export const ConversationRow = memo(function ConversationRow({
   authToken,
   conversation,
+  onOpenProfile,
   onPress,
 }: {
   authToken: string | null;
   conversation: ConversationSummaryResponse;
+  /** Abre o perfil publico da outra pessoa (avatar). */
+  onOpenProfile?: (conversation: ConversationSummaryResponse) => void;
   onPress: (conversation: ConversationSummaryResponse) => void;
 }) {
   const displayName = conversation.otherUserName?.trim() || "Pessoa sem nome";
   const photoUrl = chatService.resolveAssetUrl(conversation.otherUserPhoto?.url ?? null);
   const preview = conversation.lastMessage?.preview ?? "Ainda sem mensagens";
   const unread = conversation.unreadCount;
+  const canOpenProfile = Boolean(conversation.otherUserProfileId && onOpenProfile);
 
   /**
    * Rotulo unico e completo: nome, previa, horario e nao lidas.
@@ -43,68 +50,88 @@ export const ConversationRow = memo(function ConversationRow({
     .filter(Boolean)
     .join(". ");
 
-  return (
-    <Pressable
-      accessible
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityHint="Abre a conversa"
-      className="flex-row items-center gap-4 rounded-[24px] border border-[#353534] bg-[#111214] p-4"
-      onPress={() => onPress(conversation)}
-    >
-      <View className="h-16 w-16 overflow-hidden rounded-full border border-[#CDBDFF] bg-[#2D2A33]">
-        {photoUrl ? (
-          <AuthenticatedRemoteImage
-            authToken={authToken}
-            className="h-full w-full"
-            fallback={
-              <View className="flex-1 items-center justify-center bg-[#2D2A33]">
-                <Ionicons name="person" size={28} color="#CDBDFF" />
-              </View>
-            }
-            resizeMode="cover"
-            uri={photoUrl}
-          />
-        ) : (
-          <View className="flex-1 items-center justify-center bg-[#2D2A33]">
-            <Ionicons name="person" size={28} color="#CDBDFF" />
-          </View>
-        )}
-      </View>
-
-      {/* Conteudo visual: ja descrito pelo rotulo do Pressable. */}
-      <View className="flex-1" importantForAccessibility="no-hide-descendants">
-        <View className="flex-row items-center justify-between">
-          <Text className="flex-1 text-[18px] font-black text-white" numberOfLines={1}>
-            {displayName}
-          </Text>
-          {conversation.lastMessageAt ? (
-            <Text className="ml-2 text-[12px] font-semibold text-[#9F96B8]">
-              {formatRelativeDateTime(conversation.lastMessageAt)}
-            </Text>
-          ) : null}
-        </View>
-
-        <View className="mt-1 flex-row items-center justify-between gap-2">
-          <Text
-            className={`flex-1 text-[14px] ${
-              unread > 0 ? "font-bold text-white" : "font-semibold text-[#CAC3D8]"
-            }`}
-            numberOfLines={1}
-          >
-            {conversation.lastMessage?.fromMe ? "Você: " : ""}
-            {preview}
-          </Text>
-
-          {unread > 0 ? (
-            <View className="min-w-[24px] items-center justify-center rounded-full bg-[#7C4DFF] px-2 py-1">
-              <Text className="text-[11px] font-black text-white">
-                {unread > 99 ? "99+" : unread}
-              </Text>
+  const avatar = (
+    <View className="h-16 w-16 overflow-hidden rounded-full border border-[#CDBDFF] bg-[#2D2A33]">
+      {photoUrl ? (
+        <AuthenticatedRemoteImage
+          authToken={authToken}
+          className="h-full w-full"
+          fallback={
+            <View className="flex-1 items-center justify-center bg-[#2D2A33]">
+              <Ionicons name="person" size={28} color="#CDBDFF" />
             </View>
-          ) : null}
+          }
+          resizeMode="cover"
+          uri={photoUrl}
+        />
+      ) : (
+        <View className="flex-1 items-center justify-center bg-[#2D2A33]">
+          <Ionicons name="person" size={28} color="#CDBDFF" />
         </View>
-      </View>
-    </Pressable>
+      )}
+    </View>
+  );
+
+  return (
+    <View className="flex-row items-center gap-4 rounded-[24px] border border-[#353534] bg-[#111214] p-4">
+      {canOpenProfile ? (
+        <Pressable
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={`Abrir perfil de ${displayName}`}
+          accessibilityHint="Abre o perfil público desta pessoa"
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          onPress={() => onOpenProfile?.(conversation)}
+        >
+          {avatar}
+        </Pressable>
+      ) : (
+        // Sem id de perfil o avatar e decorativo: a linha ja diz o nome.
+        <View importantForAccessibility="no-hide-descendants">{avatar}</View>
+      )}
+
+      <Pressable
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint="Abre a conversa"
+        className="flex-1"
+        onPress={() => onPress(conversation)}
+      >
+        {/* Conteudo visual: ja descrito pelo rotulo do Pressable. */}
+        <View importantForAccessibility="no-hide-descendants">
+          <View className="flex-row items-center justify-between">
+            <Text className="flex-1 text-[18px] font-black text-white" numberOfLines={1}>
+              {displayName}
+            </Text>
+            {conversation.lastMessageAt ? (
+              <Text className="ml-2 text-[12px] font-semibold text-[#9F96B8]">
+                {formatRelativeDateTime(conversation.lastMessageAt)}
+              </Text>
+            ) : null}
+          </View>
+
+          <View className="mt-1 flex-row items-center justify-between gap-2">
+            <Text
+              className={`flex-1 text-[14px] ${
+                unread > 0 ? "font-bold text-white" : "font-semibold text-[#CAC3D8]"
+              }`}
+              numberOfLines={1}
+            >
+              {conversation.lastMessage?.fromMe ? "Você: " : ""}
+              {preview}
+            </Text>
+
+            {unread > 0 ? (
+              <View className="min-w-[24px] items-center justify-center rounded-full bg-[#7C4DFF] px-2 py-1">
+                <Text className="text-[11px] font-black text-white">
+                  {unread > 99 ? "99+" : unread}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </Pressable>
+    </View>
   );
 });

@@ -13,15 +13,24 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import {
+  buildActionSpeech,
+  buildConversationEntrySpeech,
+  buildIncomingMessagesSpeech,
+  speak,
+  speakSequence,
+} from "../../src/accessibility/tts";
 import { ChatComposer } from "../../src/components/chat/chat-composer";
 import { ImageLightbox } from "../../src/components/chat/image-lightbox";
 import { MessageBubble, type MessageAction } from "../../src/components/chat/message-bubble";
+import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
 import { ActionSheet, type ActionSheetOption } from "../../src/components/ui/action-sheet";
 import { useAppShell } from "../../src/context/AppShellContext";
 import { useAuth } from "../../src/context/AuthContext";
 import { useChatMessages } from "../../src/hooks/useChatMessages";
 import { useScreenHeadingFocus } from "../../src/hooks/use-screen-heading-focus";
 import { chatService } from "../../src/services/chatService";
+import { followService } from "../../src/services/followService";
 import type { ChatMediaUpload, ChatMessageResponse } from "../../src/types/chat";
 import {
   accessibilityAnnouncements,
@@ -29,8 +38,53 @@ import {
 } from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
 import { showGlobalToast } from "../../src/utils/globalToast";
+import { buildUserProfileHref } from "../../src/utils/userProfileRoute";
 
 type Lightbox = { uri: string; label: string };
+
+/** Quem esta do outro lado: vem por params da lista ou, em deep link, da API. */
+type Partner = {
+  userProfileId: string | null;
+  name: string | null;
+  photoUrl: string | null;
+};
+
+function readParam(value?: string | string[]): string | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const trimmed = typeof raw === "string" ? raw.trim() : "";
+
+  return trimmed ? trimmed : null;
+}
+
+function PartnerAvatar({
+  authToken,
+  photoUrl,
+}: {
+  authToken: string | null;
+  photoUrl: string | null;
+}) {
+  const fallback = (
+    <View className="flex-1 items-center justify-center bg-[#2D2A33]">
+      <Ionicons name="person" size={20} color="#CDBDFF" />
+    </View>
+  );
+
+  return (
+    <View className="h-11 w-11 overflow-hidden rounded-full border border-[#CDBDFF] bg-[#2D2A33]">
+      {photoUrl ? (
+        <AuthenticatedRemoteImage
+          authToken={authToken}
+          className="h-full w-full"
+          fallback={fallback}
+          resizeMode="cover"
+          uri={photoUrl}
+        />
+      ) : (
+        fallback
+      )}
+    </View>
+  );
+}
 
 export default function ConversationScreen() {
   // Ao entrar na tela, o leitor de tela do sistema comeca pelo titulo.
@@ -40,17 +94,130 @@ export default function ConversationScreen() {
   const isFocused = useIsFocused();
   const { session } = useAuth();
   const { refreshUnreadChatCount } = useAppShell();
-  const { conversationId, name } = useLocalSearchParams<{
-    conversationId?: string;
-    name?: string;
-  }>();
+  const { conversationId, name, otherUserProfileId, otherUserPhotoUrl } =
+    useLocalSearchParams<{
+      conversationId?: string;
+      name?: string;
+      otherUserProfileId?: string;
+      otherUserPhotoUrl?: string;
+    }>();
 
-  const resolvedConversationId =
-    typeof conversationId === "string" && conversationId.trim()
-      ? conversationId.trim()
-      : null;
-  const otherName = typeof name === "string" && name.trim() ? name.trim() : "essa pessoa";
+  const resolvedConversationId = readParam(conversationId);
   const authToken = session?.accessToken ?? null;
+
+  const [partner, setPartner] = useState<Partner>(() => ({
+    userProfileId: readParam(otherUserProfileId),
+    name: readParam(name),
+    photoUrl: readParam(otherUserPhotoUrl),
+  }));
+  const otherName = partner.name ?? "essa pessoa";
+  const partnerProfileId = partner.userProfileId;
+
+  // Deep link sem params: nao ha "get conversation", entao a lista de
+  // conversas (uma chamada, silenciosa) resolve quem esta do outro lado.
+  useEffect(() => {
+    if (!resolvedConversationId || partnerProfileId) {
+      return;
+    }
+
+    let active = true;
+
+    void chatService
+      .pollConversations()
+      .then((response) => {
+        if (!active) {
+          return;
+        }
+
+        const found = response.conversations.find(
+          (item) => item.conversationId === resolvedConversationId
+        );
+
+        if (!found) {
+          return;
+        }
+
+        setPartner((current) => ({
+          userProfileId: found.otherUserProfileId ?? current.userProfileId,
+          name: found.otherUserName?.trim() || current.name,
+          photoUrl:
+            chatService.resolveAssetUrl(found.otherUserPhoto?.url ?? null) ?? current.photoUrl,
+        }));
+      })
+      .catch(() => {
+        // Silencioso: o cabecalho segue com "essa pessoa" e sem botao de seguir.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [partnerProfileId, resolvedConversationId]);
+
+  // ---- seguir / deixar de seguir a pessoa da conversa --------------------
+  const [followState, setFollowState] = useState<{ following: boolean } | null>(null);
+  const [followBusy, setFollowBusy] = useState(false);
+  const followStatsRequestRef = useRef(0);
+
+  useEffect(() => {
+    setFollowState(null);
+
+    if (!partnerProfileId) {
+      return;
+    }
+
+    const requestId = ++followStatsRequestRef.current;
+
+    void followService
+      .getFollowStats(partnerProfileId)
+      .then((stats) => {
+        if (requestId === followStatsRequestRef.current) {
+          setFollowState({ following: stats.followedByCurrentUser });
+        }
+      })
+      .catch(() => {
+        // Global API error toast already explains the failure.
+      });
+  }, [partnerProfileId]);
+
+  const toggleFollow = useCallback(async () => {
+    if (!partnerProfileId || !followState || followBusy) {
+      return;
+    }
+
+    const willFollow = !followState.following;
+    speak(buildActionSpeech(willFollow ? "Seguir" : "Deixar de seguir", otherName));
+
+    setFollowBusy(true);
+    // Otimista: o botao responde na hora e volta se a requisicao falhar.
+    setFollowState({ following: willFollow });
+
+    try {
+      const response = willFollow
+        ? await followService.follow(partnerProfileId)
+        : await followService.unfollow(partnerProfileId);
+
+      setFollowState({ following: response.following });
+      announceForAccessibility(
+        response.following
+          ? accessibilityAnnouncements.followStarted(otherName)
+          : accessibilityAnnouncements.followStopped(otherName)
+      );
+    } catch {
+      setFollowState({ following: !willFollow });
+      // Global API error toast already explains the failure.
+    } finally {
+      setFollowBusy(false);
+    }
+  }, [followBusy, followState, otherName, partnerProfileId]);
+
+  const openPartnerProfile = useCallback(() => {
+    if (!partnerProfileId) {
+      return;
+    }
+
+    speak(buildActionSpeech("Abrir perfil de", otherName));
+    router.push(buildUserProfileHref(partnerProfileId, otherName));
+  }, [otherName, partnerProfileId, router]);
 
   const [sending, setSending] = useState(false);
   /** Mensagem minha com o menu de acoes (toque longo) aberto. */
@@ -64,8 +231,14 @@ export default function ConversationScreen() {
 
   const handleNewIncomingMessages = useCallback(
     (incoming: ChatMessageResponse[]) => {
+      // Mensagem que chega com a tela aberta tambem e "nao lida" para quem
+      // ouve: aviso + leitura (tipo quando nao e texto, horario e conteudo).
+      const incomingSpeech = buildIncomingMessagesSpeech(incoming, otherName);
+      speakSequence(incomingSpeech);
       announceForAccessibility(
-        accessibilityAnnouncements.newMessages(incoming.length, otherName)
+        incomingSpeech.length > 0
+          ? `${incomingSpeech.join(". ")}.`
+          : accessibilityAnnouncements.newMessages(incoming.length, otherName)
       );
       // Auto-scroll: a lista e `inverted`, entao o fim da conversa e o offset 0.
       listRef.current?.scrollToOffset({ offset: 0, animated: true });
@@ -80,6 +253,7 @@ export default function ConversationScreen() {
   const {
     error,
     hasNext,
+    initialLoad,
     loadOlderMessages,
     loading,
     loadingMore,
@@ -91,15 +265,49 @@ export default function ConversationScreen() {
     onNewIncomingMessages: handleNewIncomingMessages,
   });
 
-  // Marcar como lida ao abrir e ao sair (garante o badge correto).
+  // Sequencia de entrada: pessoa, total de nao lidas e cada mensagem pendente
+  // (tipo quando nao e texto, horario e conteudo). Reage a identidade de
+  // `initialLoad`: um objeto novo a cada abertura da conversa.
+  const spokenInitialLoadRef = useRef<typeof initialLoad>(null);
+
+  useEffect(() => {
+    if (!initialLoad || initialLoad.conversationId !== resolvedConversationId) {
+      return;
+    }
+
+    if (spokenInitialLoadRef.current === initialLoad) {
+      return;
+    }
+    spokenInitialLoadRef.current = initialLoad;
+
+    const entrySpeech = buildConversationEntrySpeech(
+      otherName,
+      initialLoad.unreadMessages,
+      initialLoad.unreadCount
+    );
+    // Dois canais que nunca soam juntos: `speakSequence` cala com o leitor
+    // nativo ligado e `announceForAccessibility` so soa com ele ligado.
+    speakSequence(entrySpeech);
+    announceForAccessibility(`${entrySpeech.join(". ")}.`);
+  }, [initialLoad, otherName, resolvedConversationId]);
+
+  // Marcar como lida SO depois da carga inicial: assim a resposta ainda traz
+  // as pendencias (`unreadCount`, `readAt` nulo) que a sequencia acima le.
+  useEffect(() => {
+    if (!initialLoad || initialLoad.conversationId !== resolvedConversationId) {
+      return;
+    }
+
+    void chatService.markAsRead(initialLoad.conversationId).finally(() => {
+      void refreshUnreadChatCount();
+    });
+  }, [initialLoad, refreshUnreadChatCount, resolvedConversationId]);
+
+  // Ao sair da tela o badge de nao lidas precisa refletir o que foi lido aqui.
   useEffect(() => {
     if (!resolvedConversationId || !isFocused) {
       return;
     }
-
-    void chatService.markAsRead(resolvedConversationId).finally(() => {
-      void refreshUnreadChatCount();
-    });
 
     return () => {
       void refreshUnreadChatCount();
@@ -272,6 +480,24 @@ export default function ConversationScreen() {
             />
           </Pressable>
 
+          {partnerProfileId ? (
+            <Pressable
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={`Abrir perfil de ${otherName}`}
+              accessibilityHint="Abre o perfil público desta pessoa"
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              onPress={openPartnerProfile}
+            >
+              <PartnerAvatar authToken={authToken} photoUrl={partner.photoUrl} />
+            </Pressable>
+          ) : (
+            // Sem id de perfil o avatar e decorativo: o titulo ja diz o nome.
+            <View importantForAccessibility="no-hide-descendants">
+              <PartnerAvatar authToken={authToken} photoUrl={partner.photoUrl} />
+            </View>
+          )}
+
           <Text
             ref={headingRef}
             accessibilityRole="header"
@@ -280,6 +506,51 @@ export default function ConversationScreen() {
           >
             {otherName}
           </Text>
+
+          {partnerProfileId ? (
+            <Pressable
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={
+                followState?.following
+                  ? `Deixar de seguir ${otherName}`
+                  : `Seguir ${otherName}`
+              }
+              accessibilityHint={
+                followState?.following
+                  ? "Remove as publicações desta pessoa do seu feed"
+                  : "Publicações desta pessoa aparecem no seu feed"
+              }
+              accessibilityState={{
+                busy: followBusy,
+                disabled: followBusy || !followState,
+                selected: followState?.following ?? false,
+              }}
+              className={`h-10 flex-row items-center justify-center rounded-full border px-3 ${
+                followState?.following
+                  ? "border-[#CDBDFF] bg-[#2B2338]"
+                  : "border-[#494455] bg-[#1A1C1F]"
+              }`}
+              disabled={followBusy || !followState}
+              onPress={() => {
+                void toggleFollow();
+              }}
+            >
+              {followBusy ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Ionicons
+                  name={followState?.following ? "checkmark" : "person-add-outline"}
+                  size={16}
+                  color="#FFFFFF"
+                  importantForAccessibility="no"
+                />
+              )}
+              <Text className="ml-1.5 text-[13px] font-bold text-white">
+                {followState?.following ? "Seguindo" : "Seguir"}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
 
         <KeyboardAvoidingView

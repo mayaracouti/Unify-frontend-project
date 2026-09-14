@@ -35,6 +35,7 @@ import {
 } from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
 import { showGlobalToast } from "../../src/utils/globalToast";
+import { buildUserProfileHref } from "../../src/utils/userProfileRoute";
 
 function getInitials(name?: string | null) {
   return (name ?? "")
@@ -55,20 +56,33 @@ function normalizeRouteParam(value?: string | string[]) {
   return value ?? "";
 }
 
+/**
+ * Avatar do comentario. Com `userProfileId` + `onOpenProfile` vira um botao
+ * que abre o perfil publico da pessoa; sem eles e decorativo.
+ */
 function CommentAvatar({
   authToken,
   avatarData,
   name,
+  userProfileId,
+  onOpenProfile,
 }: {
   authToken: string | null;
   avatarData?: string | null;
   name?: string | null;
+  userProfileId?: string | null;
+  onOpenProfile?: (userProfileId: string, name?: string | null) => void;
 }) {
   const initials = getInitials(name);
   const avatarUrl = communityService.resolveAssetUrl(avatarData);
+  const resolvedProfileId = userProfileId?.trim() || null;
+  const canOpenProfile = Boolean(resolvedProfileId && onOpenProfile);
 
-  return (
-    <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-[#494455] bg-[#353534]">
+  const content = (
+    <View
+      className="h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-[#494455] bg-[#353534]"
+      importantForAccessibility={canOpenProfile ? "no-hide-descendants" : "auto"}
+    >
       {avatarUrl ? (
         <AuthenticatedRemoteImage
           uri={avatarUrl}
@@ -98,6 +112,22 @@ function CommentAvatar({
       )}
     </View>
   );
+
+  if (!canOpenProfile || !resolvedProfileId) {
+    return content;
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Abrir perfil de ${name?.trim() || "pessoa sem nome"}`}
+      accessibilityHint="Abre o perfil público desta pessoa"
+      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+      onPress={() => onOpenProfile?.(resolvedProfileId, name)}
+    >
+      {content}
+    </Pressable>
+  );
 }
 
 function CommentCard({
@@ -106,34 +136,40 @@ function CommentCard({
   comment,
   deleting,
   onDelete,
+  onOpenProfile,
 }: {
   authToken: string | null;
   canDelete: boolean;
   comment: CommunityCommentResponse;
   deleting: boolean;
   onDelete: () => void;
+  onOpenProfile: (userProfileId: string, name?: string | null) => void;
 }) {
   const { speak } = useTTS();
   const truncatedBody =
     comment.body.length > 120 ? `${comment.body.slice(0, 120)}…` : comment.body;
 
+  // O avatar e um botao irmao (abre o perfil); a area de texto e a dona da
+  // fala do comentario. Sem Pressable aninhado.
   return (
-    <Pressable
-      className="rounded-2xl border border-[#353534] bg-[#17181C] p-4"
-      // Toque no comentario le autor e corpo reais vindos do backend.
-      onPress={() => speak(buildCommunityCommentSpeech(comment))}
-      accessibilityRole="button"
-      accessibilityLabel={`Comentário de ${comment.author.name}: ${truncatedBody}`}
-      accessibilityHint="Lê o comentário em voz alta"
-    >
+    <View className="rounded-2xl border border-[#353534] bg-[#17181C] p-4">
       <View className="flex-row items-start gap-3">
         <CommentAvatar
           authToken={authToken}
           avatarData={comment.author.avatarData}
           name={comment.author.name}
+          userProfileId={comment.author.userProfileId}
+          onOpenProfile={onOpenProfile}
         />
 
-        <View className="flex-1">
+        <Pressable
+          className="flex-1"
+          // Toque no comentario le autor e corpo reais vindos do backend.
+          onPress={() => speak(buildCommunityCommentSpeech(comment))}
+          accessibilityRole="button"
+          accessibilityLabel={`Comentário de ${comment.author.name}: ${truncatedBody}`}
+          accessibilityHint="Lê o comentário em voz alta"
+        >
           <View className="flex-row items-center justify-between gap-3">
             <Text className="flex-1 text-[16px] font-black text-white">
               {comment.author.name}
@@ -167,9 +203,9 @@ function CommentCard({
           <Text className="mt-3 text-[15px] font-semibold leading-7 text-[#E5E2E1]">
             {comment.body}
           </Text>
-        </View>
+        </Pressable>
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -360,6 +396,14 @@ export default function CommunityCommentsScreen() {
     [pendingDeleteCommentId, postId]
   );
 
+  const handleOpenProfile = useCallback(
+    (userProfileId: string, name?: string | null) => {
+      speak(buildActionSpeech("Abrir perfil de", name?.trim() || null));
+      router.push(buildUserProfileHref(userProfileId, name));
+    },
+    [router, speak]
+  );
+
   const handleDeleteComment = useCallback(
     (comment: CommunityCommentResponse) => {
       speak(buildActionSpeech("Excluir comentário de", comment.author.name));
@@ -494,6 +538,7 @@ export default function CommunityCommentsScreen() {
                         comment={comment}
                         deleting={pendingDeleteCommentId === comment.id}
                         onDelete={() => handleDeleteComment(comment)}
+                        onOpenProfile={handleOpenProfile}
                       />
                     ))
                   ) : (

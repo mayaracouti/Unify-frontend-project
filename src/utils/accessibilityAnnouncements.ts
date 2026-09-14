@@ -105,13 +105,16 @@ export const accessibilityAnnouncements = {
   followStopped: (name: string) => `Você deixou de seguir ${name}.`,
 
   personalPostCreated: () => "Publicação criada com sucesso.",
+  personalPostUpdated: () => "Publicação atualizada.",
   personalPostDeleted: () => "Publicação excluída.",
+  postLiked: () => "Publicação curtida.",
+  postUnliked: () => "Curtida removida.",
   feedRefreshed: (newCount: number) =>
     newCount === 1
       ? "Feed atualizado. 1 publicação nova."
       : `Feed atualizado. ${newCount} publicações novas.`,
   feedEmpty: () =>
-    "Seu feed está vazio. Siga pessoas no Descobrir para ver as publicações delas aqui.",
+    "Ainda não há publicações para mostrar. Assim que alguém publicar, elas aparecem aqui.",
 
   communityJoined: (name: string) =>
     `Você entrou na comunidade ${name}. Agora dá para publicar, curtir e comentar.`,

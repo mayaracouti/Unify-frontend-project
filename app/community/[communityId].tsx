@@ -34,6 +34,7 @@ import {
   preloadAuthenticatedRemoteImages,
 } from "../../src/components/profile/authenticated-remote-image";
 import { ReportModal } from "../../src/components/report/report-modal";
+import { ActionSheet, type ActionSheetOption } from "../../src/components/ui/action-sheet";
 import { ScreenEmpty } from "../../src/components/ui/screen-empty";
 import { ScreenError } from "../../src/components/ui/screen-error";
 import { ScreenLoading } from "../../src/components/ui/screen-loading";
@@ -56,6 +57,7 @@ import {
 } from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
 import { showGlobalToast } from "../../src/utils/globalToast";
+import { buildUserProfileHref } from "../../src/utils/userProfileRoute";
 
 function normalizeRouteParam(value?: string | string[]) {
   if (Array.isArray(value)) {
@@ -252,20 +254,34 @@ function CommunityBadge({
   );
 }
 
+/**
+ * Avatar do autor/membro. Com `userProfileId` + `onOpenProfile` vira um botao
+ * que abre o perfil publico da pessoa; sem eles e decorativo. O toque fala o
+ * destino antes de navegar (padrao `buildActionSpeech`).
+ */
 function AuthorAvatar({
   authToken,
   name,
   avatarData,
+  userProfileId,
+  onOpenProfile,
 }: {
   authToken: string | null;
   name?: string | null;
   avatarData?: string | null;
+  userProfileId?: string | null;
+  onOpenProfile?: (userProfileId: string, name?: string | null) => void;
 }) {
   const initials = getInitials(name);
   const avatarUrl = communityService.resolveAssetUrl(avatarData);
+  const resolvedProfileId = userProfileId?.trim() || null;
+  const canOpenProfile = Boolean(resolvedProfileId && onOpenProfile);
 
-  return (
-    <View className="h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-[#CDBDFF] bg-[#353534]">
+  const content = (
+    <View
+      className="h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-[#CDBDFF] bg-[#353534]"
+      importantForAccessibility={canOpenProfile ? "no-hide-descendants" : "auto"}
+    >
       {avatarUrl ? (
         <AuthenticatedRemoteImage
           uri={avatarUrl}
@@ -294,6 +310,22 @@ function AuthorAvatar({
         </LinearGradient>
       )}
     </View>
+  );
+
+  if (!canOpenProfile || !resolvedProfileId) {
+    return content;
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Abrir perfil de ${name?.trim() || "pessoa sem nome"}`}
+      accessibilityHint="Abre o perfil público desta pessoa"
+      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+      onPress={() => onOpenProfile?.(resolvedProfileId, name)}
+    >
+      {content}
+    </Pressable>
   );
 }
 
@@ -614,111 +646,169 @@ function CommunityHeader({
 function CommunityPostCard({
   authToken,
   canDelete,
+  canEdit,
   canReport,
   deleting,
   likeBusy,
   onDelete,
+  onEdit,
   onOpenComments,
+  onOpenProfile,
   onReport,
   onToggleLike,
   post,
 }: {
   authToken: string | null;
   canDelete: boolean;
+  canEdit: boolean;
   canReport: boolean;
   deleting: boolean;
   likeBusy: boolean;
   onDelete: () => void;
+  onEdit: () => void;
   onOpenComments: () => void;
+  onOpenProfile: (userProfileId: string, name?: string | null) => void;
   onReport: () => void;
   onToggleLike: () => void;
   post: CommunityPostResponse;
 }) {
   const { speak } = useTTS();
   const mediaUrl = communityService.resolveAssetUrl(post.mediaData);
+  const [menuVisible, setMenuVisible] = useState(false);
+
+  // Editar/excluir/denunciar saem dos botoes grandes e vao para um unico
+  // menu discreto de reticencias: menos ruido visual e um so alvo de foco.
+  const menuOptions: ActionSheetOption[] = [
+    ...(canEdit
+      ? [
+          {
+            key: "edit",
+            label: "Editar publicação",
+            hint: "Abre o texto da publicação para alterar",
+            icon: "pencil-outline" as const,
+            onPress: () => {
+              setMenuVisible(false);
+              speak("Editar publicação");
+              onEdit();
+            },
+          },
+        ]
+      : []),
+    ...(canDelete
+      ? [
+          {
+            key: "delete",
+            label: "Excluir publicação",
+            hint: "Pede confirmação antes de remover a publicação",
+            icon: "trash-outline" as const,
+            destructive: true,
+            onPress: () => {
+              setMenuVisible(false);
+              onDelete();
+            },
+          },
+        ]
+      : []),
+    ...(canReport
+      ? [
+          {
+            key: "report",
+            label: "Denunciar publicação",
+            hint: "Abre o formulário de denúncia desta publicação",
+            icon: "flag-outline" as const,
+            onPress: () => {
+              setMenuVisible(false);
+              onReport();
+            },
+          },
+        ]
+      : []),
+  ];
 
   return (
-    <Pressable
-      className="rounded-xl bg-[#2A2A2A] p-4"
-      // O card e o dono da fala da publicacao: toque le autor, corpo e
-      // contadores reais vindos do backend.
-      onPress={() => speak(buildCommunityPostSpeech(post))}
-      accessibilityRole="button"
-      accessibilityLabel={`Publicação de ${post.author.name}`}
-      accessibilityHint="Lê em voz alta o autor, o texto e os contadores desta publicação"
-    >
+    <View className="rounded-xl bg-[#2A2A2A] p-4">
       <View className="flex-row items-start gap-3">
         <AuthorAvatar
           authToken={authToken}
           name={post.author.name}
           avatarData={post.author.avatarData}
+          userProfileId={post.author.userProfileId}
+          onOpenProfile={onOpenProfile}
         />
 
-        <View className="flex-1">
+        <Pressable
+          className="flex-1"
+          // A area de texto e a dona da fala da publicacao: toque le autor,
+          // corpo e contadores reais vindos do backend.
+          onPress={() => speak(buildCommunityPostSpeech(post))}
+          accessibilityRole="button"
+          accessibilityLabel={`Publicação de ${post.author.name}`}
+          accessibilityHint="Lê em voz alta o autor, o texto e os contadores desta publicação"
+        >
           <Text className="text-[17px] font-black text-[#E5E2E1]">
             {post.author.name}
           </Text>
-          {post.publishedAt ? (
+          {post.publishedAt || post.editedAt ? (
             <Text className="mt-0.5 text-[14px] font-semibold text-[#E5E2E1]">
-              {post.publishedAt}
+              {post.publishedAt ?? ""}
+              {post.editedAt ? (
+                <Text className="text-[12px] italic text-[#B5AFC4]">
+                  {post.publishedAt ? " · editada" : "editada"}
+                </Text>
+              ) : null}
             </Text>
           ) : null}
-        </View>
+        </Pressable>
 
-        {canDelete || canReport ? (
-          <View className="flex-row items-center gap-2">
-            {canReport ? (
-              <Pressable
-                className="h-10 w-10 items-center justify-center rounded-full bg-[#1E1A22]"
-                onPress={onReport}
-                accessibilityRole="button"
-                accessibilityLabel={`Denunciar publicação de ${post.author.name}`}
-                accessibilityHint="Abre o formulário de denúncia desta publicação"
-              >
-                <Ionicons name="flag-outline" size={18} color="#E5E2E1" />
-              </Pressable>
-            ) : null}
-
-            {canDelete ? (
-              <Pressable
-                className="h-10 w-10 items-center justify-center rounded-full bg-[#1E1A22]"
-                onPress={onDelete}
-                disabled={deleting}
-                accessibilityRole="button"
-                accessibilityLabel={`Excluir publicação de ${post.author.name}`}
-                accessibilityHint="Remove a publicação permanentemente"
-                accessibilityState={{ busy: deleting, disabled: deleting }}
-              >
-                {deleting ? (
-                  <ActivityIndicator color="#FFD3DD" size="small" />
-                ) : (
-                  <Ionicons name="trash-outline" size={18} color="#FFD3DD" />
-                )}
-              </Pressable>
-            ) : null}
-          </View>
+        {menuOptions.length > 0 ? (
+          <Pressable
+            className="h-9 w-9 items-center justify-center rounded-full"
+            onPress={() => {
+              speak("Mais opções da publicação");
+              setMenuVisible(true);
+            }}
+            disabled={deleting}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            accessibilityRole="button"
+            accessibilityLabel="Mais opções da publicação"
+            accessibilityHint="Abre editar, excluir ou denunciar"
+            accessibilityState={{ busy: deleting, disabled: deleting }}
+          >
+            {deleting ? (
+              <ActivityIndicator color="#CAC3D8" size="small" />
+            ) : (
+              <Ionicons name="ellipsis-horizontal" size={20} color="#CAC3D8" />
+            )}
+          </Pressable>
         ) : null}
       </View>
 
-      <Text className="mt-5 text-[19px] font-semibold leading-8 text-[#E5E2E1]">
-        {post.body}
-      </Text>
+      <Pressable
+        onPress={() => speak(buildCommunityPostSpeech(post))}
+        accessibilityRole="button"
+        accessibilityLabel={`Texto da publicação de ${post.author.name}`}
+        accessibilityHint="Lê a publicação em voz alta"
+      >
+        <Text className="mt-5 text-[19px] font-semibold leading-8 text-[#E5E2E1]">
+          {post.body}
+        </Text>
 
-      {mediaUrl ? (
-        <View className="mt-4 aspect-video w-full overflow-hidden rounded-lg border-2 border-[#494455]">
-          <AuthenticatedRemoteImage
-            uri={mediaUrl}
-            authToken={authToken}
-            className="h-full w-full"
-            resizeMode="cover"
-            fallback={
-              <View className="flex-1 items-center justify-center bg-[#1F1F23]">
-                <Ionicons name="image-outline" size={30} color="#CAC3D8" />
-              </View>
-            }
-          />
-        </View>
-      ) : null}
+        {mediaUrl ? (
+          <View className="mt-4 aspect-video w-full overflow-hidden rounded-lg border-2 border-[#494455]">
+            <AuthenticatedRemoteImage
+              uri={mediaUrl}
+              authToken={authToken}
+              className="h-full w-full"
+              resizeMode="cover"
+              fallback={
+                <View className="flex-1 items-center justify-center bg-[#1F1F23]">
+                  <Ionicons name="image-outline" size={30} color="#CAC3D8" />
+                </View>
+              }
+            />
+          </View>
+        ) : null}
+      </Pressable>
 
       <View className="mt-4 h-0.5 bg-[#494455]" />
 
@@ -746,7 +836,14 @@ function CommunityPostCard({
           onPress={onOpenComments}
         />
       </View>
-    </Pressable>
+
+      <ActionSheet
+        onClose={() => setMenuVisible(false)}
+        options={menuOptions}
+        title={`Publicação de ${post.author.name}`}
+        visible={menuVisible}
+      />
+    </View>
   );
 }
 
@@ -764,7 +861,40 @@ function EmptyCommunityState({
   );
 }
 
-function EmptyPostState({ canParticipate }: { canParticipate: boolean }) {
+function EmptyPostState({
+  canParticipate,
+  isPrivate,
+  hasPendingRequest,
+}: {
+  canParticipate: boolean;
+  isPrivate: boolean;
+  hasPendingRequest: boolean;
+}) {
+  // Privada e nao participo: o backend devolve so o cabecalho (nome, descricao,
+  // membros, visibilidade); as publicacoes e os membros nominais ficam ocultos
+  // ate a entrada ser aprovada.
+  if (isPrivate && !canParticipate) {
+    return (
+      <ScreenEmpty
+        className="mx-6 mt-7 rounded-2xl border border-[#3A3246] bg-[#1A1C1F] px-6 py-8"
+        title="Comunidade privada"
+        description={
+          hasPendingRequest
+            ? "Seu pedido de entrada está aguardando aprovação. As publicações aparecem aqui assim que você for aceito."
+            : "As publicações e a lista de membros são visíveis só para quem participa. Toque em Solicitar entrada para enviar um pedido de participação."
+        }
+        icon={
+          <Ionicons
+            name="lock-closed-outline"
+            size={36}
+            color="#CDBDFF"
+            importantForAccessibility="no"
+          />
+        }
+      />
+    );
+  }
+
   return (
     <ScreenEmpty
       className="mx-6 mt-7 rounded-2xl border border-[#3A3246] bg-[#1A1C1F] px-6 py-8"
@@ -843,31 +973,36 @@ function CommunityMemberCard({
   community,
   member,
   onManageRole,
+  onOpenProfile,
 }: {
   authToken: string | null;
   canManageRole: boolean;
   community: CommunitySummaryResponse;
   member: CommunityMemberResponse;
   onManageRole: () => void;
+  onOpenProfile: (userProfileId: string, name?: string | null) => void;
 }) {
   const { speak } = useTTS();
 
   return (
-    <Pressable
-      className="rounded-2xl border border-[#353534] bg-[#17181C] p-4"
-      // Toque no membro fala nome e papel reais vindos do backend.
-      onPress={() => speak(buildCommunityMemberSpeech(member))}
-      accessibilityRole="button"
-      accessibilityLabel={member.name}
-    >
+    <View className="rounded-2xl border border-[#353534] bg-[#17181C] p-4">
       <View className="flex-row items-center gap-3">
         <AuthorAvatar
           authToken={authToken}
           name={member.name}
           avatarData={member.avatarData}
+          userProfileId={member.userProfileId}
+          onOpenProfile={onOpenProfile}
         />
 
-        <View className="flex-1">
+        <Pressable
+          className="flex-1"
+          // Toque no membro fala nome e papel reais vindos do backend.
+          onPress={() => speak(buildCommunityMemberSpeech(member))}
+          accessibilityRole="button"
+          accessibilityLabel={member.name}
+          accessibilityHint="Lê o nome e o cargo em voz alta"
+        >
           <Text className="text-[17px] font-black text-[#E5E2E1]">{member.name}</Text>
           {member.joinedAt ? (
             <Text className="mt-1 text-[12px] font-semibold text-[#948EA1]">
@@ -880,7 +1015,7 @@ function CommunityMemberCard({
               role={member.role}
             />
           </View>
-        </View>
+        </Pressable>
 
         {canManageRole ? (
           <Pressable
@@ -899,7 +1034,7 @@ function CommunityMemberCard({
           </Pressable>
         ) : null}
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -1256,6 +1391,50 @@ export default function CommunityDetailScreen() {
     [currentUserId, currentUserProfileId, feed?.community]
   );
 
+  /** Editar e so do autor: moderadores excluem, mas nao reescrevem o texto alheio. */
+  const canEditPost = useCallback(
+    (post: CommunityPostResponse) => {
+      const postAuthorId = resolveCommunityActorId(post.author);
+      const authorUserId = post.author.id?.trim();
+
+      return Boolean(
+        (authorUserId && currentUserId && authorUserId === currentUserId) ||
+          (postAuthorId &&
+            ((currentUserProfileId && postAuthorId === currentUserProfileId) ||
+              (currentUserId && postAuthorId === currentUserId)))
+      );
+    },
+    [currentUserId, currentUserProfileId]
+  );
+
+  const handleEditPost = useCallback(
+    (post: CommunityPostResponse) => {
+      if (!feed?.community) {
+        return;
+      }
+
+      // `create.tsx` em modo edicao (params postId/body): ao voltar, o efeito
+      // de foco recarrega o feed e o texto novo aparece.
+      router.push({
+        pathname: "/community/create",
+        params: {
+          communityId: feed.community.id,
+          postId: post.id,
+          body: post.body,
+        },
+      });
+    },
+    [feed?.community, router]
+  );
+
+  const handleOpenProfile = useCallback(
+    (userProfileId: string, name?: string | null) => {
+      speak(buildActionSpeech("Abrir perfil de", name?.trim() || null));
+      router.push(buildUserProfileHref(userProfileId, name));
+    },
+    [router, speak]
+  );
+
   /**
    * Denuncia e sempre sobre outra pessoa: o proprio autor nunca ve o botao.
    * A comparacao cobre os dois ids porque o backend ora identifica o autor pelo
@@ -1597,11 +1776,14 @@ export default function CommunityDetailScreen() {
                             key={post.id}
                             authToken={authToken}
                             canDelete={canDeletePost(post)}
+                            canEdit={canEditPost(post)}
                             canReport={canReportPost(post)}
                             deleting={pendingDeletePostId === post.id}
                             likeBusy={pendingLikePostId === post.id}
                             onDelete={() => handleDeletePost(post)}
+                            onEdit={() => handleEditPost(post)}
                             onOpenComments={() => handleOpenComments(post)}
+                            onOpenProfile={handleOpenProfile}
                             onReport={() => handleReportPost(post)}
                             onToggleLike={() => handleToggleLike(post)}
                             post={post}
@@ -1609,7 +1791,11 @@ export default function CommunityDetailScreen() {
                         ))}
                       </View>
                     ) : (
-                      <EmptyPostState canParticipate={canParticipate} />
+                      <EmptyPostState
+                        canParticipate={canParticipate}
+                        hasPendingRequest={Boolean(community.hasPendingRequest)}
+                        isPrivate={community.privacy === "PRIVATE"}
+                      />
                     )
                   ) : (
                     <>
@@ -1646,6 +1832,7 @@ export default function CommunityDetailScreen() {
                               community={community}
                               member={member}
                               onManageRole={() => handleManageMember(member)}
+                              onOpenProfile={handleOpenProfile}
                             />
                           ))}
                         </View>
