@@ -23,19 +23,36 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { FollowPendingIcon } from "../../src/components/social/follow-pending-icon";
 
 import {
   buildActionSpeech,
   buildPublicProfileSpeech,
+  buildVisibleProfilePartsSpeech,
+  LOCKED_PROFILE_NOTICE,
+  LOCKED_PROFILE_PARTIAL_NOTICE,
+  PRIVATE_PROFILE_FIELDS_NOTICE,
+  stopSpeaking,
   useTTS,
 } from "../../src/accessibility/tts";
+import {
+  AuthenticatedAudioPlayer,
+  type AuthenticatedAudioPlayerHandle,
+} from "../../src/components/media/authenticated-audio-player";
 import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-nav";
+import { BlockUserSheet, type BlockUserTarget } from "../../src/components/privacy/block-user-sheet";
 import { GlobalTopNav } from "../../src/components/navigation/global-top-nav";
 import {
   AuthenticatedRemoteImage,
   preloadAuthenticatedRemoteImages,
 } from "../../src/components/profile/authenticated-remote-image";
+import {
+  LOCKED_PROFILE_MESSAGE,
+  LOCKED_PROFILE_TITLE,
+  LockedProfileNotice,
+} from "../../src/components/profile/locked-profile-notice";
 import { ReportModal } from "../../src/components/report/report-modal";
+import { useProfileFollowToggle } from "../../src/components/social/use-profile-follow-toggle";
 import { ScreenEmpty } from "../../src/components/ui/screen-empty";
 import { ScreenError } from "../../src/components/ui/screen-error";
 import { ScreenLoading } from "../../src/components/ui/screen-loading";
@@ -48,13 +65,20 @@ import {
   saveStoredMatchDiscoveryState,
 } from "../../src/storage/matchDiscoveryStorage";
 import { getAuthSnapshot } from "../../src/storage/tokenStorage";
-import type { UserPublicProfileResponse } from "../../src/types/profile";
+import type { ProfileField } from "../../src/types/privacy";
+import type {
+  UserProfileAudioPublicResponse,
+  UserPublicProfileResponse,
+} from "../../src/types/profile";
 import {
   accessibilityAnnouncements,
   announceForAccessibility,
 } from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
+import { formatAudioDuration } from "../../src/utils/chatFormatting";
 import { showGlobalToast } from "../../src/utils/globalToast";
+import { followStateFromStats, type FollowState } from "../../src/utils/followRelation";
+import { getHiddenFields } from "../../src/utils/profileFieldVisibility";
 import {
   getForegroundLocationPermissionState,
   requestForegroundLocationPermissionState,
@@ -83,13 +107,18 @@ const PHOTO_NAVIGATION_FALLBACK = (
 
 type MatchProfile = {
   accessibilityNeeds: string[];
-  age: number;
+  /** Nula quando a pessoa ocultou a idade (privacidade): omitir, nunca "0". */
+  age: number | null;
   id: string;
   autonomyLevel: string;
   bio: string;
   communicationPreferences: string[];
   connectionPreferences: string[];
   disabilities: string[];
+  /**
+   * Calculada pelo backend. Nula quando a pessoa ocultou a distancia ou um dos
+   * lados nao tem localizacao: a linha some.
+   */
   distanceKm: number | null;
   energyLevel: string;
   gender: string;
@@ -101,11 +130,25 @@ type MatchProfile = {
   loveLanguages: string[];
   name: string;
   photoUrls: string[];
+  /** Audio de apresentacao (sem autoplay; o botao Ouvir apresentacao toca). */
+  presentationAudio: UserProfileAudioPublicResponse | null;
+  /**
+   * Partes que o dono escondeu deste visitante. Os valores dessas partes ja
+   * chegam vazios aqui (`toMatchProfile`): nao renderizam nem entram na fala.
+   */
+  hiddenFields: ProfileField[];
+  /**
+   * Conta privada que eu nao sigo: o card mostra a foto de perfil, o nome, o
+   * aviso de conta privada e so as partes que ainda vem visiveis (match
+   * mutuo). Nunca bio, galeria nem audio.
+   */
+  locked: boolean;
+  /** Partes visiveis de um perfil travado, ja em frases (fala e rotulos). */
+  visibleParts: string[];
   /**
    * Id do `User` dono do perfil — alvo da denuncia, que e por usuario e nao
-   * por perfil. `GET /users/{id}/public-profile` (UserPublicProfileResponse)
-   * ainda NAO devolve esse id, entao aqui ele fica `null` e a denuncia usa o
-   * `userProfileId` como fallback (ver ReportModal no render).
+   * por perfil. Backend antigo nao manda: a denuncia cai no `userProfileId`
+   * (ver ReportModal no render).
    */
   userId: string | null;
 };
@@ -190,69 +233,105 @@ function DetailCard({
   );
 }
 
+function hasText(value: string | null | undefined) {
+  return Boolean(value?.trim());
+}
+
+/**
+ * Detalhes do card. Partes vazias ou escondidas pelo dono (ja chegam vazias)
+ * nao renderizam, e um card sem nada visivel some inteiro — sem cabecalho
+ * orfao nem "Não informado".
+ */
 function ProfileDetailsContent({ profile }: { profile: MatchProfile }) {
+  const distanceLabel =
+    profile.distanceKm !== null ? `A ${Math.round(profile.distanceKm)} km de você` : null;
+  const disabilitiesLabel = profile.disabilities.filter(hasText).join(", ");
+  const hasBasicInfo = [
+    distanceLabel,
+    profile.occupation,
+    profile.location,
+    profile.pronouns,
+    profile.gender,
+    disabilitiesLabel,
+  ].some(hasText);
+
   return (
     <View className="bg-black px-4 pb-40 pt-8">
       <Text
         accessibilityRole="header"
         className="mb-5 px-1 text-[36px] font-semibold text-white"
       >
-        {profile.name}, {profile.age}
+        {profile.name}
+        {profile.age !== null ? `, ${profile.age}` : ""}
       </Text>
 
-      <DetailCard title="Sobre mim" icon="chatbubble-ellipses-outline">
-        <Text className="mt-4 text-[20px] font-semibold leading-8 text-white">
-          {profile.bio}
-        </Text>
-      </DetailCard>
+      {/* Travado: aviso primeiro; abaixo so o que ainda vem visivel. */}
+      {profile.locked ? <LockedProfileNotice className="mb-4" /> : null}
 
-      <DetailCard title="Informações básicas" icon="id-card-outline">
-        <InfoRow
-          icon="location-outline"
-          label={
-            typeof profile.distanceKm === "number"
-              ? `${profile.distanceKm} km de distância`
-              : null
-          }
-        />
-        <InfoRow icon="briefcase-outline" label={profile.occupation} />
-        <InfoRow icon="home-outline" label={profile.location} />
-        <InfoRow icon="person-circle-outline" label={profile.pronouns} />
-        <InfoRow icon="male-female-outline" label={profile.gender} />
-        <InfoRow icon="accessibility-outline" label={profile.disabilities.join(", ")} />
-      </DetailCard>
+      {!profile.locked && hasText(profile.bio) ? (
+        <DetailCard title="Sobre mim" icon="chatbubble-ellipses-outline">
+          <Text className="mt-4 text-[20px] font-semibold leading-8 text-white">
+            {profile.bio}
+          </Text>
+        </DetailCard>
+      ) : null}
 
-      <DetailCard title="Tô procurando" icon="search-outline">
-        <ChipList items={profile.connectionPreferences} />
-      </DetailCard>
+      {hasBasicInfo ? (
+        <DetailCard title="Informações básicas" icon="id-card-outline">
+          <InfoRow icon="location-outline" label={distanceLabel} />
+          <InfoRow icon="briefcase-outline" label={profile.occupation} />
+          <InfoRow icon="home-outline" label={profile.location} />
+          <InfoRow icon="person-circle-outline" label={profile.pronouns} />
+          <InfoRow icon="male-female-outline" label={profile.gender} />
+          <InfoRow icon="accessibility-outline" label={disabilitiesLabel} />
+        </DetailCard>
+      ) : null}
 
-      <DetailCard title="Interesses" icon="sparkles-outline">
-        <ChipList items={profile.interests} />
-      </DetailCard>
+      {profile.connectionPreferences.length > 0 ? (
+        <DetailCard title="Tô procurando" icon="search-outline">
+          <ChipList items={profile.connectionPreferences} />
+        </DetailCard>
+      ) : null}
 
-      <DetailCard title="Acessibilidade e autonomia" icon="body-outline">
-        <InfoRow icon="walk-outline" label={profile.autonomyLevel} />
-        <ChipList items={profile.accessibilityNeeds} />
-      </DetailCard>
+      {profile.interests.length > 0 ? (
+        <DetailCard title="Interesses" icon="sparkles-outline">
+          <ChipList items={profile.interests} />
+        </DetailCard>
+      ) : null}
 
-      <DetailCard title="Comunicação" icon="chatbubbles-outline">
-        <ChipList items={profile.communicationPreferences} />
-      </DetailCard>
+      {hasText(profile.autonomyLevel) || profile.accessibilityNeeds.length > 0 ? (
+        <DetailCard title="Acessibilidade e autonomia" icon="body-outline">
+          <InfoRow icon="walk-outline" label={profile.autonomyLevel} />
+          <ChipList items={profile.accessibilityNeeds} />
+        </DetailCard>
+      ) : null}
 
-      <DetailCard title="Estilo de vida" icon="leaf-outline">
-        <InfoRow icon="flash-outline" label={profile.energyLevel} />
-        <ChipList items={profile.lifestyleTypes} />
-      </DetailCard>
+      {profile.communicationPreferences.length > 0 ? (
+        <DetailCard title="Comunicação" icon="chatbubbles-outline">
+          <ChipList items={profile.communicationPreferences} />
+        </DetailCard>
+      ) : null}
 
-      <DetailCard title="Linguagem do amor" icon="heart-outline">
-        <ChipList items={profile.loveLanguages} />
-      </DetailCard>
+      {hasText(profile.energyLevel) || profile.lifestyleTypes.length > 0 ? (
+        <DetailCard title="Estilo de vida" icon="leaf-outline">
+          <InfoRow icon="flash-outline" label={profile.energyLevel} />
+          <ChipList items={profile.lifestyleTypes} />
+        </DetailCard>
+      ) : null}
+
+      {profile.loveLanguages.length > 0 ? (
+        <DetailCard title="Linguagem do amor" icon="heart-outline">
+          <ChipList items={profile.loveLanguages} />
+        </DetailCard>
+      ) : null}
     </View>
   );
 }
 
 function descriptions(items: { description: string }[] | null | undefined) {
-  return (items ?? []).map((item) => item.description);
+  return (items ?? [])
+    .map((item) => item?.description)
+    .filter((description): description is string => hasText(description));
 }
 
 function resolvePublicProfilePhotoUrls(
@@ -293,35 +372,60 @@ function getActiveProfilePhotoUrl(profile: MatchProfile | null, photoIndex: numb
   return profile.photoUrls[photoIndex] ?? profile.photoUrls[0] ?? null;
 }
 
+/**
+ * Converte o perfil publico no modelo do card. Partes em `hiddenFields` saem
+ * vazias mesmo que algum valor venha preenchido: nao renderizam, nao entram na
+ * fala e a galeria/audio escondidos nao geram requisicao (seriam 404).
+ */
 function toMatchProfile(profile: UserPublicProfileResponse): MatchProfile {
   const displayName = profile.name?.trim() || "Perfil";
-  const photoUrls = resolvePublicProfilePhotoUrls(
-    profile.userProfileId,
-    profile.galleryImageIds
-  );
+  const locked = profile.locked === true;
+  const hiddenFields = getHiddenFields(profile);
+  const isHidden = (field: ProfileField) => hiddenFields.includes(field);
+  const visibleList = (field: ProfileField, items: { description: string }[] | null | undefined) =>
+    isHidden(field) ? [] : descriptions(items);
+  const visibleText = (field: ProfileField, value: string | null | undefined) =>
+    isHidden(field) ? "" : value?.trim() || "";
+  // Travado: galeria e audio respondem 404 — nem pedir. A foto e a de perfil
+  // (`avatarUrl` vem mesmo travado).
+  const lockedAvatarUrl = locked ? profileService.resolveProfileImageUrl(profile.avatarUrl) : null;
+  const photoUrls = locked
+    ? lockedAvatarUrl
+      ? [lockedAvatarUrl]
+      : []
+    : isHidden("GALLERY")
+      ? []
+      : resolvePublicProfilePhotoUrls(profile.userProfileId, profile.galleryImageIds);
 
   return {
-    accessibilityNeeds: descriptions(profile.accessibilityNeeds),
-    age: profile.age ?? 0,
-    autonomyLevel: profile.autonomyLevel?.description ?? "",
-    bio: profile.bio?.trim() || "",
-    communicationPreferences: descriptions(profile.communicationForms),
+    accessibilityNeeds: visibleList("ACCESSIBILITY_NEEDS", profile.accessibilityNeeds),
+    age: typeof profile.age === "number" && profile.age > 0 ? profile.age : null,
+    autonomyLevel: visibleText("AUTONOMY_LEVEL", profile.autonomyLevel?.description),
+    bio: locked ? "" : visibleText("BIO", profile.bio),
+    communicationPreferences: visibleList("COMMUNICATION_FORMS", profile.communicationForms),
     connectionPreferences: [],
-    disabilities: descriptions(profile.disabilities),
-    distanceKm: null,
-    energyLevel: profile.energyLevel?.description ?? "",
-    gender: profile.gender?.description ?? "",
+    disabilities: visibleList("DISABILITIES", profile.disabilities),
+    distanceKm:
+      typeof profile.distanceKm === "number" && Number.isFinite(profile.distanceKm)
+        ? profile.distanceKm
+        : null,
+    energyLevel: visibleText("ENERGY_LEVEL", profile.energyLevel?.description),
+    gender: visibleText("GENDER", profile.gender?.description),
+    hiddenFields,
     id: profile.userProfileId,
-    interests: descriptions(profile.interestTypes),
-    lifestyleTypes: descriptions(profile.lifestyleTypes),
+    interests: visibleList("INTEREST_TYPES", profile.interestTypes),
+    lifestyleTypes: visibleList("LIFESTYLE_TYPES", profile.lifestyleTypes),
     location: "",
-    loveLanguages: descriptions(profile.loveLanguages),
+    locked,
+    visibleParts: locked ? buildVisibleProfilePartsSpeech(profile) : [],
+    loveLanguages: visibleList("LOVE_LANGUAGES", profile.loveLanguages),
     name: displayName,
     occupation: "",
     photoUrls,
-    pronouns: profile.pronouns?.description ?? "",
-    // O contrato publico nao expoe o id do `User`; ver comentario em MatchProfile.
-    userId: null,
+    presentationAudio:
+      locked || isHidden("PRESENTATION_AUDIO") ? null : profile.presentationAudio ?? null,
+    pronouns: visibleText("PRONOUNS", profile.pronouns?.description),
+    userId: profile.userId?.trim() || null,
   };
 }
 
@@ -333,7 +437,7 @@ function toMatchProfile(profile: UserPublicProfileResponse): MatchProfile {
 function buildProfileAccessibilityLabel(profile: MatchProfile): string {
   const parts: string[] = [profile.name];
 
-  if (profile.age > 0) {
+  if (profile.age !== null) {
     parts.push(`${profile.age} anos`);
   }
 
@@ -345,6 +449,19 @@ function buildProfileAccessibilityLabel(profile: MatchProfile): string {
     parts.push(`a ${Math.round(profile.distanceKm)} quilômetros de você`);
   }
 
+  // Conta privada: sem bio, fotos nem audio; fecha com o aviso ("perfil
+  // completo" quando ainda ha partes visiveis, detalhadas abaixo do card).
+  if (profile.locked) {
+    parts.push(
+      (profile.visibleParts.length > 0
+        ? LOCKED_PROFILE_PARTIAL_NOTICE
+        : LOCKED_PROFILE_NOTICE
+      ).replace(/\.$/, "")
+    );
+
+    return `${parts.join(". ")}.`;
+  }
+
   const summary = summarizeBio(profile.bio);
 
   if (summary) {
@@ -353,6 +470,18 @@ function buildProfileAccessibilityLabel(profile: MatchProfile): string {
 
   if (profile.photoUrls.length > 1) {
     parts.push(`${profile.photoUrls.length} fotos disponíveis`);
+  }
+
+  if (profile.presentationAudio) {
+    parts.push(
+      `Tem áudio de apresentação de ${formatAudioDuration(
+        profile.presentationAudio.durationSeconds
+      )}`
+    );
+  }
+
+  if (profile.hiddenFields.length > 0) {
+    parts.push(PRIVATE_PROFILE_FIELDS_NOTICE.replace(/\.$/, ""));
   }
 
   return `${parts.join(". ")}.`;
@@ -461,12 +590,10 @@ export default function Matches() {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [currentUserScopeId, setCurrentUserScopeId] = useState<string | null>(null);
-  const [followState, setFollowState] = useState<{
-    following: boolean;
-    followersCount: number;
-  } | null>(null);
-  const [followBusy, setFollowBusy] = useState(false);
+  const [followState, setFollowState] = useState<FollowState | null>(null);
   const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [blockTarget, setBlockTarget] = useState<BlockUserTarget | null>(null);
+  const audioPlayerRef = useRef<AuthenticatedAudioPlayerHandle>(null);
   const profileCacheRef = useRef<Map<string, MatchProfile>>(new Map());
   const followStatsLoadRef = useRef(0);
   const visibleProfileLoadRef = useRef(0);
@@ -565,17 +692,41 @@ export default function Matches() {
     }
 
     spokenProfileIdRef.current = currentProfile.id;
-    speak(buildPublicProfileSpeech(currentProfile));
+    // Projecao explicita: o card guarda as partes em outro formato, e as de
+    // perfil travado ja vem prontas em `visibleParts`.
+    speak(
+      buildPublicProfileSpeech({
+        name: currentProfile.name,
+        age: currentProfile.age,
+        bio: currentProfile.bio,
+        distanceKm: currentProfile.distanceKm,
+        presentationAudio: currentProfile.presentationAudio,
+        hiddenFields: currentProfile.hiddenFields,
+        locked: currentProfile.locked,
+        visibleParts: currentProfile.visibleParts,
+      })
+    );
     // Canal do leitor de tela do sistema: o `speak` acima fica mudo quando o
     // TalkBack/VoiceOver esta ligado, entao os dois nunca falam juntos.
     announceForAccessibility(
       accessibilityAnnouncements.profileShown(
         currentProfile.name,
         currentProfile.age,
-        currentProfile.distanceKm
+        currentProfile.distanceKm,
+        currentProfile.presentationAudio?.durationSeconds ?? null,
+        currentProfile.locked,
+        currentProfile.visibleParts.length > 0
       )
     );
   }, [currentProfile, isFocused, speak]);
+
+  // Audio de apresentacao: nunca toca sozinho e para ao sair da aba. A troca
+  // de card remonta o player (chave = id do perfil), o que ja encerra o som.
+  useEffect(() => {
+    if (!isFocused) {
+      audioPlayerRef.current?.stop();
+    }
+  }, [isFocused]);
 
   // Fim da fila: nada muda visualmente sob o foco do usuario, entao o aviso
   // precisa ser anunciado. O estado de carregamento ja e coberto pela
@@ -837,10 +988,11 @@ export default function Matches() {
     const profileId = currentProfile?.id;
 
     setFollowState(null);
-    setFollowBusy(false);
-    // O perfil mudou: um formulario de denuncia aberto apontaria para a pessoa
-    // errada, entao ele fecha junto.
+    // O perfil mudou: um formulario de denuncia (ou a confirmacao de
+    // bloqueio) aberto apontaria para a pessoa errada, entao fecha junto.
     setReportModalVisible(false);
+    setBlockTarget(null);
+    audioPlayerRef.current?.stop();
 
     if (!profileId) {
       return;
@@ -855,10 +1007,7 @@ export default function Matches() {
           return;
         }
 
-        setFollowState({
-          followersCount: stats.followersCount,
-          following: stats.followedByCurrentUser,
-        });
+        setFollowState(followStateFromStats(stats));
       })
       .catch(() => {
         // Global API error toast already explains the failure.
@@ -866,49 +1015,20 @@ export default function Matches() {
   }, [currentProfile?.id]);
 
   /**
-   * Seguir / deixar de seguir com atualizacao otimista: o botao troca antes da
-   * resposta e volta ao estado anterior se a requisicao falhar.
+   * Seguir rapido do perfil visivel (tres estados: seguir / pedir para seguir,
+   * solicitado, seguindo). Otimista; a resposta do backend decide o estado.
    */
-  const toggleFollowCurrentProfile = useCallback(async () => {
-    if (!currentProfile || !followState || followBusy) {
-      return;
-    }
-
-    const profileId = currentProfile.id;
-    const profileName = currentProfile.name;
-    const previousState = followState;
-    const willFollow = !previousState.following;
-
-    setFollowBusy(true);
-    setFollowState({
-      followersCount: Math.max(
-        0,
-        previousState.followersCount + (willFollow ? 1 : -1)
-      ),
-      following: willFollow,
-    });
-
-    try {
-      const response = willFollow
-        ? await followService.follow(profileId)
-        : await followService.unfollow(profileId);
-
-      setFollowState({
-        followersCount: response.followersCount,
-        following: response.following,
-      });
-      announceForAccessibility(
-        response.following
-          ? accessibilityAnnouncements.followStarted(profileName)
-          : accessibilityAnnouncements.followStopped(profileName)
-      );
-    } catch {
-      setFollowState(previousState);
-      // Global API error toast already explains the failure.
-    } finally {
-      setFollowBusy(false);
-    }
-  }, [currentProfile, followBusy, followState]);
+  const {
+    busy: followBusy,
+    button: followButton,
+    confirmSheet: cancelFollowRequestSheet,
+    press: pressFollowCurrentProfile,
+  } = useProfileFollowToggle({
+    setState: setFollowState,
+    state: followState,
+    targetName: currentProfile?.name ?? "",
+    targetProfileId: currentProfile?.id ?? null,
+  });
 
   const showNextProfile = useCallback(async () => {
     if (!currentUserScopeId || !currentProfile) {
@@ -1034,6 +1154,7 @@ export default function Matches() {
 
     const declinedName = currentProfile.name;
 
+    audioPlayerRef.current?.stop();
     // Acao sobre entidade dinamica: "Recusar" + nome vindo do backend.
     speak(buildActionSpeech("Recusar", declinedName));
     setSubmitting(true);
@@ -1060,6 +1181,7 @@ export default function Matches() {
       return;
     }
 
+    audioPlayerRef.current?.stop();
     speak(buildActionSpeech("Curtir", currentProfile.name));
     setSubmitting(true);
 
@@ -1244,31 +1366,51 @@ export default function Matches() {
                       className="pr-12"
                     >
                       <Text className="text-[34px] font-semibold text-white">
-                        {currentProfile.name}{", "}
-                        <Text className="text-[34px] font-normal text-white/75">
-                          {currentProfile.age}
-                        </Text>
+                        {currentProfile.name}
+                        {currentProfile.age !== null ? (
+                          <Text className="text-[34px] font-normal text-white/75">
+                            {`, ${currentProfile.age}`}
+                          </Text>
+                        ) : null}
                         <Text className="text-[18px] font-normal text-white/75">
                           {currentProfile.pronouns && !currentProfile.pronouns.startsWith("Prefiro") ? ` (${currentProfile.pronouns})` : ""}
                         </Text>
                       </Text>
 
-                      <Text className="mt-2 text-[16px] font-normal leading-2 text-white">
-                        {currentProfile.bio}
-                      </Text>
+                      {currentProfile.bio ? (
+                        <Text className="mt-2 text-[16px] font-normal leading-2 text-white">
+                          {currentProfile.bio}
+                        </Text>
+                      ) : null}
                     </View>
 
-                    <View
-                      accessible
-                      accessibilityRole="text"
-                      accessibilityLabel="Role a tela para baixo para ver mais detalhes do perfil"
-                      className="mt-4 flex-row items-center"
-                    >
-                      <Ionicons name="chevron-down" size={18} color="#FFFFFF" />
-                      <Text className="ml-2 text-[14px] font-semibold text-white/75">
-                        Role para ver mais detalhes
-                      </Text>
-                    </View>
+                    {currentProfile.locked ? (
+                      // O aviso ja esta no rotulo do resumo acima: aqui e so visual.
+                      <View
+                        importantForAccessibility="no-hide-descendants"
+                        accessibilityElementsHidden
+                        className="mt-4 flex-row items-center"
+                      >
+                        <Ionicons name="lock-closed" size={18} color="#F1EF00" />
+                        <Text className="ml-2 flex-1 text-[15px] font-bold text-white">
+                          {LOCKED_PROFILE_TITLE}. {LOCKED_PROFILE_MESSAGE}
+                        </Text>
+                      </View>
+                    ) : null}
+
+                    {!currentProfile.locked || currentProfile.visibleParts.length > 0 ? (
+                      <View
+                        accessible
+                        accessibilityRole="text"
+                        accessibilityLabel="Role a tela para baixo para ver mais detalhes do perfil"
+                        className="mt-4 flex-row items-center"
+                      >
+                        <Ionicons name="chevron-down" size={18} color="#FFFFFF" />
+                        <Text className="ml-2 text-[14px] font-semibold text-white/75">
+                          Role para ver mais detalhes
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                 </View>
 
@@ -1303,7 +1445,7 @@ export default function Matches() {
                     accessibilityRole="button"
                     accessibilityLabel="Denunciar este perfil"
                     accessibilityHint="Abre o formulário de denúncia de perfil"
-                    className="h-10 w-10 items-center justify-center rounded-full bg-[#1E1A22]"
+                    className="h-11 w-11 items-center justify-center rounded-full bg-[#1E1A22]"
                     onPress={() => {
                       speak(buildActionSpeech("Denunciar", currentProfile.name));
                       setReportModalVisible(true);
@@ -1316,7 +1458,57 @@ export default function Matches() {
                       importantForAccessibility="no"
                     />
                   </Pressable>
+
+                  <Pressable
+                    accessible
+                    accessibilityRole="button"
+                    accessibilityLabel={`Bloquear ${currentProfile.name}`}
+                    accessibilityHint="Pede confirmação. O perfil sai da fila e vocês deixam de se ver"
+                    className="h-11 w-11 items-center justify-center rounded-full bg-[#2A1C24]"
+                    onPress={() => {
+                      speak(buildActionSpeech("Bloquear", currentProfile.name));
+                      setBlockTarget({
+                        userProfileId: currentProfile.id,
+                        name: currentProfile.name,
+                      });
+                    }}
+                  >
+                    <Ionicons
+                      name="ban-outline"
+                      size={20}
+                      color="#FF8FAB"
+                      importantForAccessibility="no"
+                    />
+                  </Pressable>
                 </View>
+
+                {currentProfile.presentationAudio ? (
+                  // Sem autoplay (WCAG 1.4.2): a fala do card avisa que existe
+                  // audio; tocar cala o TTS para nao falar por cima.
+                  <View className="bg-black px-4 pt-4">
+                    <AuthenticatedAudioPlayer
+                      key={currentProfile.id}
+                      ref={audioPlayerRef}
+                      accessibilityHint="Toque para ouvir ou pausar a apresentação em voz"
+                      accessibilityLabel={`Ouvir apresentação de ${currentProfile.name}, ${formatAudioDuration(
+                        currentProfile.presentationAudio.durationSeconds
+                      )}`}
+                      authToken={authToken}
+                      cacheKey={`presentation-${currentProfile.presentationAudio.id}`}
+                      durationSeconds={currentProfile.presentationAudio.durationSeconds}
+                      onPlaybackStart={stopSpeaking}
+                      playingAccessibilityLabel={`Pausar apresentação de ${currentProfile.name}`}
+                      title="Ouvir apresentação"
+                      uri={
+                        profileService.resolvePublicPresentationAudioUrl(
+                          currentProfile.id,
+                          currentProfile.presentationAudio.id
+                        ) ?? ""
+                      }
+                      variant="profile"
+                    />
+                  </View>
+                ) : null}
 
                 <ProfileDetailsContent profile={currentProfile} />
               </ScrollView>
@@ -1366,40 +1558,31 @@ export default function Matches() {
                     accessible
                     accessibilityRole="button"
                     accessibilityLabel={
-                      followState?.following
-                        ? `Deixar de seguir ${currentProfile.name}`
-                        : `Seguir ${currentProfile.name}`
+                      followButton?.accessibilityLabel ?? `Seguir ${currentProfile.name}`
                     }
                     accessibilityHint={
-                      followState?.following
-                        ? "Remove as publicações desta pessoa do seu feed"
-                        : "Publicações desta pessoa aparecem no seu feed"
+                      followButton?.accessibilityHint ??
+                      "Publicações desta pessoa aparecem no seu feed"
                     }
                     accessibilityState={{
-                      selected: followState?.following ?? false,
+                      selected: followButton?.selected ?? false,
                       busy: followBusy,
-                      disabled: followBusy || !followState,
+                      disabled: followBusy || !followButton,
                     }}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     className="h-[72px] w-[72px] items-center justify-center rounded-full bg-[#26282B]"
-                    disabled={followBusy || !followState}
-                    onPress={() => {
-                      speak(
-                        buildActionSpeech(
-                          followState?.following ? "Deixar de seguir" : "Seguir",
-                          currentProfile.name
-                        )
-                      );
-                      void toggleFollowCurrentProfile();
-                    }}
+                    disabled={followBusy || !followButton}
+                    onPress={pressFollowCurrentProfile}
                   >
                     {followBusy ? (
                       <ActivityIndicator color="#CDBDFF" size="small" />
+                    ) : followButton?.relation === "REQUESTED" ? (
+                      <FollowPendingIcon size={30} badgeBackground="#26282B" />
                     ) : (
                       <Ionicons
-                        name={followState?.following ? "person-remove" : "person-add"}
+                        name={followButton?.relation === "FOLLOWING" ? "person-remove" : "person-add"}
                         size={32}
-                        color={followState?.following ? "#FF8A8A" : "#CDBDFF"}
+                        color={followButton?.relation === "FOLLOWING" ? "#FF8A8A" : "#CDBDFF"}
                         importantForAccessibility="no"
                       />
                     )}
@@ -1565,6 +1748,21 @@ export default function Matches() {
           contextLabel={`perfil de ${currentProfile.name}`}
         />
       ) : null}
+
+      {cancelFollowRequestSheet}
+
+      <BlockUserSheet
+        target={blockTarget}
+        onClose={() => setBlockTarget(null)}
+        onBlocked={(blocked) => {
+          profileCacheRef.current.delete(blocked.userProfileId);
+          // Bloqueou quem esta na tela: avanca para o proximo perfil.
+          if (currentProfile?.id === blocked.userProfileId) {
+            audioPlayerRef.current?.stop();
+            void showNextProfile();
+          }
+        }}
+      />
     </View>
   );
 }

@@ -8,6 +8,29 @@ import type {
   SimilarityPreference,
 } from "../../types/profile";
 
+const SINGLE_CHOICE_HINT = "Toque duas vezes para selecionar esta opção única";
+
+/**
+ * Dica lida pelo leitor de tela conforme a semantica da opcao: radio seleciona
+ * uma unica opcao do grupo; checkbox diz se o toque adiciona ou remove.
+ */
+function optionAccessibilityHint(
+  role: "button" | "radio" | "checkbox",
+  selected: boolean
+): string | undefined {
+  if (role === "radio") {
+    return SINGLE_CHOICE_HINT;
+  }
+
+  if (role === "checkbox") {
+    return selected
+      ? "Toque duas vezes para remover esta opção"
+      : "Toque duas vezes para adicionar esta opção";
+  }
+
+  return undefined;
+}
+
 function isIoniconName(
   value?: string | null
 ): value is keyof typeof Ionicons.glyphMap {
@@ -32,7 +55,7 @@ export function OptionChip({
   return (
     <Pressable
       accessible
-      className={`min-h-[52px] flex-row items-center rounded-full border-2 px-5 py-3 ${
+      className={`min-h-[52px] max-w-full flex-row items-center rounded-full border-2 px-5 py-3 ${
         selected
           ? "border-[#EAEA00] bg-[#EAEA00]"
           : "border-[#494455] bg-transparent"
@@ -44,10 +67,11 @@ export function OptionChip({
       onPress={onPress}
       accessibilityRole={role}
       accessibilityLabel={label}
+      accessibilityHint={optionAccessibilityHint(role, selected)}
       accessibilityState={
         role === "button"
           ? { selected, disabled: Boolean(disabled) }
-          : { checked: selected, disabled: Boolean(disabled) }
+          : { selected, checked: selected, disabled: Boolean(disabled) }
       }
     >
       {/* O icone e decorativo: o estado ja vai em accessibilityState. */}
@@ -66,8 +90,9 @@ export function OptionChip({
           importantForAccessibility="no"
         />
       ) : null}
+      {/* shrink: com fontScale alto o rotulo quebra linha em vez de vazar do chip. */}
       <Text
-        className={`text-[15px] font-bold ${(selected || iconName) ? "ml-2" : ""} ${selected ? "text-[#323200]" : "text-[#E5E2E1]"}`}
+        className={`shrink text-[15px] font-bold ${(selected || iconName) ? "ml-2" : ""} ${selected ? "text-[#323200]" : "text-[#E5E2E1]"}`}
       >
         {label}
       </Text>
@@ -154,6 +179,7 @@ export function MultiChoice({
       </Text>
       {/* Selecao multipla: o rotulo do grupo avisa que mais de uma opcao vale. */}
       <View
+        accessibilityRole="none"
         accessibilityLabel={`${title}. Seleção múltipla.`}
         className="flex-row flex-wrap gap-3"
       >
@@ -211,9 +237,12 @@ export function ChoiceCard({
         speak(buildOptionToggleSpeech(label, true));
         onPress();
       }}
+      // Escolha unica (ex.: objetivo da conexao): a tela envolve os cards num
+      // radiogroup, por isso o papel e radio e nao checkbox.
       accessibilityRole="radio"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ checked: selected }}
+      accessibilityHint={SINGLE_CHOICE_HINT}
+      accessibilityState={{ selected, checked: selected }}
     >
       <Text className="flex-1 text-[16px] font-bold text-white">{label}</Text>
       {selected ? (
@@ -289,7 +318,7 @@ export function SimilaritySelector({
               key={option.value}
               accessible
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              className={`min-h-[48px] rounded-full border-2 px-4 py-3 ${
+              className={`min-h-[48px] max-w-full rounded-full border-2 px-4 py-3 ${
                 selected
                   ? "border-[#7C4DFF] bg-[#7C4DFF]"
                   : "border-[#494455] bg-transparent"
@@ -306,7 +335,8 @@ export function SimilaritySelector({
               }}
               accessibilityRole="radio"
               accessibilityLabel={option.description}
-              accessibilityState={{ checked: selected }}
+              accessibilityHint={SINGLE_CHOICE_HINT}
+              accessibilityState={{ selected, checked: selected }}
             >
               <Text className="text-[14px] font-bold text-white">
                 {option.description}

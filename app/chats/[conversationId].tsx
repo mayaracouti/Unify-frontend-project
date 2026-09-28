@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { FollowPendingIcon } from "../../src/components/social/follow-pending-icon";
 
 import {
   buildActionSpeech,
@@ -23,7 +24,9 @@ import {
 import { ChatComposer } from "../../src/components/chat/chat-composer";
 import { ImageLightbox } from "../../src/components/chat/image-lightbox";
 import { MessageBubble, type MessageAction } from "../../src/components/chat/message-bubble";
+import { BlockUserSheet, type BlockUserTarget } from "../../src/components/privacy/block-user-sheet";
 import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
+import { useProfileFollowToggle } from "../../src/components/social/use-profile-follow-toggle";
 import { ActionSheet, type ActionSheetOption } from "../../src/components/ui/action-sheet";
 import { useAppShell } from "../../src/context/AppShellContext";
 import { useAuth } from "../../src/context/AuthContext";
@@ -31,12 +34,14 @@ import { useChatMessages } from "../../src/hooks/useChatMessages";
 import { useScreenHeadingFocus } from "../../src/hooks/use-screen-heading-focus";
 import { chatService } from "../../src/services/chatService";
 import { followService } from "../../src/services/followService";
+import { isApiError } from "../../src/types/auth";
 import type { ChatMediaUpload, ChatMessageResponse } from "../../src/types/chat";
 import {
   accessibilityAnnouncements,
   announceForAccessibility,
 } from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
+import { followStateFromStats, type FollowState } from "../../src/utils/followRelation";
 import { showGlobalToast } from "../../src/utils/globalToast";
 import { buildUserProfileHref } from "../../src/utils/userProfileRoute";
 
@@ -154,8 +159,7 @@ export default function ConversationScreen() {
   }, [partnerProfileId, resolvedConversationId]);
 
   // ---- seguir / deixar de seguir a pessoa da conversa --------------------
-  const [followState, setFollowState] = useState<{ following: boolean } | null>(null);
-  const [followBusy, setFollowBusy] = useState(false);
+  const [followState, setFollowState] = useState<FollowState | null>(null);
   const followStatsRequestRef = useRef(0);
 
   useEffect(() => {
@@ -167,48 +171,33 @@ export default function ConversationScreen() {
 
     const requestId = ++followStatsRequestRef.current;
 
+    // Silencioso: com bloqueio o backend responde 404 e o botao de seguir
+    // simplesmente fica desabilitado — sem toast a cada abertura da conversa.
     void followService
-      .getFollowStats(partnerProfileId)
+      .getFollowStats(partnerProfileId, { silent: true })
       .then((stats) => {
         if (requestId === followStatsRequestRef.current) {
-          setFollowState({ following: stats.followedByCurrentUser });
+          setFollowState(followStateFromStats(stats));
         }
       })
       .catch(() => {
-        // Global API error toast already explains the failure.
+        // Sem estatisticas o botao de seguir fica desabilitado.
       });
   }, [partnerProfileId]);
 
-  const toggleFollow = useCallback(async () => {
-    if (!partnerProfileId || !followState || followBusy) {
-      return;
-    }
-
-    const willFollow = !followState.following;
-    speak(buildActionSpeech(willFollow ? "Seguir" : "Deixar de seguir", otherName));
-
-    setFollowBusy(true);
-    // Otimista: o botao responde na hora e volta se a requisicao falhar.
-    setFollowState({ following: willFollow });
-
-    try {
-      const response = willFollow
-        ? await followService.follow(partnerProfileId)
-        : await followService.unfollow(partnerProfileId);
-
-      setFollowState({ following: response.following });
-      announceForAccessibility(
-        response.following
-          ? accessibilityAnnouncements.followStarted(otherName)
-          : accessibilityAnnouncements.followStopped(otherName)
-      );
-    } catch {
-      setFollowState({ following: !willFollow });
-      // Global API error toast already explains the failure.
-    } finally {
-      setFollowBusy(false);
-    }
-  }, [followBusy, followState, otherName, partnerProfileId]);
+  // Tres estados (seguir / pedir para seguir, solicitado, seguindo); a
+  // resposta do backend decide se virou "Seguindo" ou "Solicitado".
+  const {
+    busy: followBusy,
+    button: followButton,
+    confirmSheet: cancelFollowRequestSheet,
+    press: pressFollow,
+  } = useProfileFollowToggle({
+    setState: setFollowState,
+    state: followState,
+    targetName: otherName,
+    targetProfileId: partnerProfileId || null,
+  });
 
   const openPartnerProfile = useCallback(() => {
     if (!partnerProfileId) {
@@ -228,6 +217,14 @@ export default function ConversationScreen() {
   const [editing, setEditing] = useState<ChatMessageResponse | null>(null);
   const [lightbox, setLightbox] = useState<Lightbox | null>(null);
   const listRef = useRef<FlatList<ChatMessageResponse>>(null);
+  /** Menu de reticencias do cabecalho (bloquear). */
+  const [conversationMenuVisible, setConversationMenuVisible] = useState(false);
+  const [blockTarget, setBlockTarget] = useState<BlockUserTarget | null>(null);
+  /**
+   * O backend recusou o envio com 409 (bloqueio em qualquer direcao): o
+   * compositor some e fica o aviso. O historico continua visivel.
+   */
+  const [sendBlocked, setSendBlocked] = useState(false);
 
   const handleNewIncomingMessages = useCallback(
     (incoming: ChatMessageResponse[]) => {
@@ -326,6 +323,15 @@ export default function ConversationScreen() {
   }, [editing, messages]);
 
   function showSendError(nextError: unknown, fallback: string) {
+    if (isApiError(nextError) && nextError.status === 409) {
+      // Bloqueio: o toast global ja mostra a mensagem do backend; aqui o
+      // compositor e trocado pelo aviso permanente (live region abaixo).
+      setSendBlocked(true);
+      setEditing(null);
+      announceForAccessibility(accessibilityAnnouncements.chatBlocked());
+      return;
+    }
+
     announceForAccessibility(accessibilityAnnouncements.messageSendFailed());
     showGlobalToast({
       title: "Não foi possível enviar",
@@ -511,44 +517,61 @@ export default function ConversationScreen() {
             <Pressable
               accessible
               accessibilityRole="button"
-              accessibilityLabel={
-                followState?.following
-                  ? `Deixar de seguir ${otherName}`
-                  : `Seguir ${otherName}`
-              }
+              accessibilityLabel={followButton?.accessibilityLabel ?? `Seguir ${otherName}`}
               accessibilityHint={
-                followState?.following
-                  ? "Remove as publicações desta pessoa do seu feed"
-                  : "Publicações desta pessoa aparecem no seu feed"
+                followButton?.accessibilityHint ??
+                "Publicações desta pessoa aparecem no seu feed"
               }
               accessibilityState={{
                 busy: followBusy,
-                disabled: followBusy || !followState,
-                selected: followState?.following ?? false,
+                disabled: followBusy || !followButton,
+                selected: followButton?.selected ?? false,
               }}
-              className={`h-10 flex-row items-center justify-center rounded-full border px-3 ${
-                followState?.following
+              className={`min-h-[44px] flex-row items-center justify-center rounded-full border px-3 ${
+                followButton?.selected
                   ? "border-[#CDBDFF] bg-[#2B2338]"
                   : "border-[#494455] bg-[#1A1C1F]"
               }`}
-              disabled={followBusy || !followState}
-              onPress={() => {
-                void toggleFollow();
-              }}
+              disabled={followBusy || !followButton}
+              onPress={pressFollow}
             >
               {followBusy ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : followButton?.relation === "REQUESTED" ? (
+                <FollowPendingIcon size={16} badgeBackground="#2B2338" />
               ) : (
                 <Ionicons
-                  name={followState?.following ? "checkmark" : "person-add-outline"}
+                  name={followButton?.icon ?? "person-add-outline"}
                   size={16}
                   color="#FFFFFF"
                   importantForAccessibility="no"
                 />
               )}
               <Text className="ml-1.5 text-[13px] font-bold text-white">
-                {followState?.following ? "Seguindo" : "Seguir"}
+                {followButton?.text ?? "Seguir"}
               </Text>
+            </Pressable>
+          ) : null}
+
+          {partnerProfileId ? (
+            <Pressable
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={`Mais opções da conversa com ${otherName}`}
+              accessibilityHint="Abre as opções, como bloquear esta pessoa"
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              className="h-11 w-11 items-center justify-center rounded-full bg-[#17181C]"
+              onPress={() => {
+                speak("Mais opções");
+                setConversationMenuVisible(true);
+              }}
+            >
+              <Ionicons
+                name="ellipsis-vertical"
+                size={20}
+                color="#FFFFFF"
+                importantForAccessibility="no"
+              />
             </Pressable>
           ) : null}
         </View>
@@ -616,20 +639,35 @@ export default function ConversationScreen() {
             />
           )}
 
-          <ChatComposer
-            editing={editing ? { messageId: editing.id, body: editing.body ?? "" } : null}
-            onCancelEdit={() => setEditing(null)}
-            onSendMedia={(media) => {
-              void handleSendMedia(media);
-            }}
-            onSendText={(body) => {
-              void handleSendText(body);
-            }}
-            onSubmitEdit={(messageId, body) => {
-              void handleSubmitEdit(messageId, body);
-            }}
-            sending={sending}
-          />
+          {sendBlocked ? (
+            <View
+              accessible
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              accessibilityLabel="Não é possível enviar mensagens para este contato."
+              className="flex-row items-center gap-3 border-t border-[#353534] bg-[#111214] px-4 py-4"
+            >
+              <Ionicons name="ban-outline" size={22} color="#FF8FAB" importantForAccessibility="no" />
+              <Text className="flex-1 text-[15px] font-semibold leading-6 text-[#FFCCD8]">
+                Não é possível enviar mensagens para este contato.
+              </Text>
+            </View>
+          ) : (
+            <ChatComposer
+              editing={editing ? { messageId: editing.id, body: editing.body ?? "" } : null}
+              onCancelEdit={() => setEditing(null)}
+              onSendMedia={(media) => {
+                void handleSendMedia(media);
+              }}
+              onSendText={(body) => {
+                void handleSendText(body);
+              }}
+              onSubmitEdit={(messageId, body) => {
+                void handleSubmitEdit(messageId, body);
+              }}
+              sending={sending}
+            />
+          )}
         </KeyboardAvoidingView>
       </SafeAreaView>
 
@@ -657,6 +695,45 @@ export default function ConversationScreen() {
         ]}
         title="Apagar mensagem?"
         visible={Boolean(deleteTarget)}
+      />
+
+      <ActionSheet
+        onClose={() => setConversationMenuVisible(false)}
+        options={
+          partnerProfileId
+            ? [
+                {
+                  key: "block",
+                  label: `Bloquear ${otherName}`,
+                  hint: "Pede confirmação. Vocês deixam de se ver e de trocar mensagens",
+                  icon: "ban-outline",
+                  destructive: true,
+                  onPress: () => {
+                    setConversationMenuVisible(false);
+                    speak(buildActionSpeech("Bloquear", otherName));
+                    setBlockTarget({ userProfileId: partnerProfileId, name: otherName });
+                  },
+                },
+              ]
+            : []
+        }
+        title={`Conversa com ${otherName}`}
+        visible={conversationMenuVisible}
+      />
+
+      {cancelFollowRequestSheet}
+
+      <BlockUserSheet
+        target={blockTarget}
+        onClose={() => setBlockTarget(null)}
+        onBlocked={() => {
+          setSendBlocked(true);
+          if (router.canGoBack()) {
+            router.back();
+            return;
+          }
+          router.replace("/chats");
+        }}
       />
 
       <ImageLightbox

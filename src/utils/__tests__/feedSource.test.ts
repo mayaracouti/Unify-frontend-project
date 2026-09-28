@@ -1,4 +1,8 @@
-import { describeFeedSuggestion, feedSourceAfterAction } from "../feedSource";
+import {
+  describeFeedSuggestion,
+  feedSourceAfterAction,
+  feedSourceAfterFollow,
+} from "../feedSource";
 
 const author = { userProfileId: "p1", userId: "u1", name: "Ana Ribeiro", avatarUrl: null };
 const community = { id: "c1", name: "Games Acessíveis", iconUrl: null };
@@ -55,5 +59,36 @@ describe("feedSourceAfterAction", () => {
   it("seguir vira FOLLOWING e entrar vira MEMBER_COMMUNITY", () => {
     expect(feedSourceAfterAction("follow")).toBe("FOLLOWING");
     expect(feedSourceAfterAction("join")).toBe("MEMBER_COMMUNITY");
+  });
+});
+
+describe("seguir com aprovação nas sugestões", () => {
+  it("pedido pendente vira Solicitado e continua sugestão", () => {
+    const suggestion = describeFeedSuggestion(
+      { feedSource: "SUGGESTED_PROFILE", author, community: null },
+      { followRequested: true }
+    );
+
+    expect(suggestion?.source).toBe("SUGGESTED_PROFILE");
+    expect(suggestion?.followRequested).toBe(true);
+    expect(suggestion?.actionLabel).toBe("Solicitado");
+    expect(suggestion?.actionHint).toContain("cancelar");
+  });
+
+  it("sem pedido o botão continua Seguir", () => {
+    const suggestion = describeFeedSuggestion({
+      feedSource: "SUGGESTED_PROFILE",
+      author,
+      community: null,
+    });
+
+    expect(suggestion?.followRequested).toBe(false);
+  });
+
+  it("só vira FOLLOWING quando o backend confirma que passou a seguir", () => {
+    expect(feedSourceAfterFollow({ following: true, followRequested: false })).toBe("FOLLOWING");
+    expect(feedSourceAfterFollow({ following: false, followRequested: true })).toBe(
+      "SUGGESTED_PROFILE"
+    );
   });
 });

@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
 export type ActionSheetOption = {
   key: string;
@@ -8,6 +8,10 @@ export type ActionSheetOption = {
   hint?: string;
   icon?: keyof typeof Ionicons.glyphMap;
   destructive?: boolean;
+  /** Texto de apoio visivel abaixo do rotulo (ex.: o que cada modo significa). */
+  description?: string;
+  /** Opcao atual de uma escolha: marcada visualmente e anunciada como selecionada. */
+  selected?: boolean;
   onPress: () => void;
 };
 
@@ -32,6 +36,9 @@ export function ActionSheet({
   title: string;
   visible: boolean;
 }) {
+  // Com fonte grande, muitas opcoes nao cabem: a lista rola e "Cancelar" fica fixo.
+  const { height: windowHeight } = useWindowDimensions();
+
   return (
     <Modal
       animationType="fade"
@@ -68,33 +75,53 @@ export function ActionSheet({
             <View className="mb-2" />
           )}
 
-          {options.map((option) => (
-            <Pressable
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel={option.label}
-              accessibilityHint={option.hint}
-              className="mb-2 flex-row items-center gap-3 rounded-[16px] bg-[#1D1F24] px-4 py-4"
-              key={option.key}
-              onPress={option.onPress}
-            >
-              {option.icon ? (
-                <Ionicons
-                  name={option.icon}
-                  size={22}
-                  color={option.destructive ? "#FF6B6B" : "#EAEA00"}
-                  importantForAccessibility="no"
-                />
-              ) : null}
-              <Text
-                className={`text-[16px] font-bold ${
-                  option.destructive ? "text-[#FF6B6B]" : "text-white"
+          <ScrollView bounces={false} style={{ maxHeight: windowHeight * 0.6 }}>
+            {options.map((option) => (
+              <Pressable
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel={option.label}
+                accessibilityHint={option.hint ?? option.description}
+                accessibilityState={
+                  option.selected !== undefined ? { selected: option.selected } : undefined
+                }
+                className={`mb-2 min-h-[44px] flex-row items-center gap-3 rounded-[16px] px-4 py-4 ${
+                  option.selected ? "border-2 border-[#EAEA00] bg-[#2A2B1A]" : "bg-[#1D1F24]"
                 }`}
+                key={option.key}
+                onPress={option.onPress}
               >
-                {option.label}
-              </Text>
-            </Pressable>
-          ))}
+                {option.icon ? (
+                  <Ionicons
+                    name={option.icon}
+                    size={22}
+                    color={option.destructive ? "#FF6B6B" : "#EAEA00"}
+                    importantForAccessibility="no"
+                  />
+                ) : null}
+                <View className="flex-1">
+                  <Text
+                    className={`text-[16px] font-bold ${
+                      option.destructive ? "text-[#FF6B6B]" : "text-white"
+                    }`}
+                  >
+                    {option.label}
+                  </Text>
+                  {option.description ? (
+                    <Text className="mt-1 text-[14px] text-[#CAC3D8]">{option.description}</Text>
+                  ) : null}
+                </View>
+                {option.selected ? (
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={22}
+                    color="#EAEA00"
+                    importantForAccessibility="no"
+                  />
+                ) : null}
+              </Pressable>
+            ))}
+          </ScrollView>
 
           <Pressable
             accessible

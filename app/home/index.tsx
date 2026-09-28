@@ -1,9 +1,10 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, RefreshControl, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 
+import { buildActionSpeech, useTTS } from "../../src/accessibility/tts";
 import { FeedPostCard } from "../../src/components/feed/feed-post-card";
 import { usePostListActions } from "../../src/components/feed/use-post-list-actions";
 import { AppTabScreen } from "../../src/components/navigation/app-tab-screen";
@@ -39,6 +40,7 @@ export default function Home() {
   const { currentUserId, currentUserProfileId } = useAppShell();
   const { settings } = useAccessibility();
   const highContrast = settings.highContrast;
+  const { speak } = useTTS();
 
   const [posts, setPosts] = useState<UserPostResponse[]>([]);
   const [page, setPage] = useState(0);
@@ -48,8 +50,14 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState("");
 
-  const { deletingPostId, dialogs, handlers, likeBusyPostId, suggestionBusyPostId } =
-    usePostListActions(setPosts);
+  const {
+    deletingPostId,
+    dialogs,
+    handlers,
+    isAuthorFollowRequested,
+    likeBusyPostId,
+    suggestionBusyPostId,
+  } = usePostListActions(setPosts);
 
   // O anúncio de feed vazio vale uma vez, senão o leitor de tela repete a
   // cada re-render/refoco da tela.
@@ -85,11 +93,13 @@ export default function Home() {
                 (post) => !knownIds.has(post.id)
               ).length;
 
-              if (newCount > 0) {
-                announceForAccessibility(
-                  accessibilityAnnouncements.feedRefreshed(newCount)
-                );
-              }
+              // Sempre anuncia: quem atualiza pelo botao "Atualizar feed"
+              // (alternativa ao gesto de puxar) precisa saber que terminou.
+              announceForAccessibility(
+                newCount > 0
+                  ? accessibilityAnnouncements.feedRefreshed(newCount)
+                  : "Feed atualizado. Nenhuma publicação nova."
+              );
             }
 
             return response.posts;
@@ -166,6 +176,54 @@ export default function Home() {
     void loadFeed(true, { announceNewCount: true });
   }, [loadFeed]);
 
+  // Alternativa acessivel ao pull-to-refresh: o gesto de puxar e dificil com
+  // leitor de tela ativo, entao o topo da lista tem um botao equivalente.
+  const refreshButton = (
+    <View className="mb-3 flex-row items-center justify-between gap-3">
+      {/* Titulo discreto: o cabecalho grande da aba foi removido para dar espaco ao feed. */}
+      <Text
+        accessibilityRole="header"
+        className={`flex-1 text-[20px] font-bold ${
+          highContrast ? "text-hc-text" : "text-white"
+        }`}
+      >
+        Início
+      </Text>
+      <Pressable
+        className={`min-h-[44px] flex-row items-center gap-2 rounded-full px-4 py-2 ${
+          highContrast ? "border border-hc-border bg-hc-surface" : "bg-[#2A2340]"
+        }`}
+        disabled={refreshing}
+        onPress={() => {
+          speak(buildActionSpeech("Atualizar feed"));
+          handleRefresh();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Atualizar feed"
+        accessibilityHint="Busca as publicações mais recentes"
+        accessibilityState={{ disabled: refreshing, busy: refreshing }}
+      >
+        {refreshing ? (
+          <ActivityIndicator color={highContrast ? "#FFFFFF" : "#CDBDFF"} size="small" />
+        ) : (
+          <Ionicons
+            name="refresh"
+            size={18}
+            color={highContrast ? "#FFFFFF" : "#CDBDFF"}
+            importantForAccessibility="no"
+          />
+        )}
+        <Text
+          className={`text-[14px] font-bold ${
+            highContrast ? "text-hc-text" : "text-[#CDBDFF]"
+          }`}
+        >
+          Atualizar feed
+        </Text>
+      </Pressable>
+    </View>
+  );
+
   const handleEndReached = useCallback(() => {
     if (!hasNext || loadingMore || loading || refreshing) {
       return;
@@ -232,6 +290,7 @@ export default function Home() {
             tintColor="#EAEA00"
           />
         }
+        ListHeaderComponent={refreshButton}
         onEndReachedThreshold={0.4}
         onEndReached={handleEndReached}
         ListFooterComponent={
@@ -254,6 +313,7 @@ export default function Home() {
             likeBusy={likeBusyPostId === item.id}
             post={item}
             suggestionBusy={suggestionBusyPostId === item.id}
+            authorFollowRequested={isAuthorFollowRequested(item)}
             {...handlers}
           />
         )}
@@ -262,10 +322,7 @@ export default function Home() {
   };
 
   return (
-    <AppTabScreen
-      title="Início"
-      subtitle="Quem você segue, suas comunidades e sugestões para você."
-    >
+    <AppTabScreen title="Início" hideHeader>
       <View className={`flex-1 ${highContrast ? "bg-hc-bg" : "bg-[#1F2023]"}`}>
         {renderContent()}
       </View>

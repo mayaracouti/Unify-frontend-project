@@ -292,6 +292,8 @@ export default function EditProfile() {
           <View className="flex-row items-center">
             <Pressable
               className="mr-3 h-10 w-10 items-center justify-center rounded-full"
+              // 40dp visuais + hitSlop = area de toque de 48dp.
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               onPress={() => {
                 speak("Voltar para o seu perfil");
                 router.replace("/profile");

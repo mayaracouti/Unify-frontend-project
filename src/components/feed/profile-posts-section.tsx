@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
 import { buildActionSpeech, useTTS } from "../../accessibility/tts";
@@ -22,6 +22,11 @@ type ProfilePostsSectionProps = {
   onSeeAll: () => void;
   /** Nome de quem e o perfil (para textos vazios do perfil publico). */
   ownerName?: string | null;
+  /**
+   * Muda quando algo fora da secao altera o que pode ser visto (ex.: seguir
+   * alguem que restringe as publicacoes a seguidores): recarrega a lista.
+   */
+  reloadToken?: string | number;
   userProfileId: string;
 };
 
@@ -37,6 +42,7 @@ export function ProfilePostsSection({
   onCreatePost,
   onSeeAll,
   ownerName,
+  reloadToken,
   userProfileId,
 }: ProfilePostsSectionProps) {
   const { speak } = useTTS();
@@ -44,6 +50,11 @@ export function ProfilePostsSection({
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  /**
+   * `false` quando o autor restringiu as publicacoes a seguidores e quem le
+   * nao o segue: a lista vem vazia, mas nao e "nenhuma publicacao".
+   */
+  const [visible, setVisible] = useState(true);
 
   const { deletingPostId, dialogs, handlers, likeBusyPostId } = usePostListActions(setPosts);
 
@@ -56,6 +67,7 @@ export function ProfilePostsSection({
 
       setPosts(response.posts);
       setHasMore(response.hasNext);
+      setVisible(response.visible !== false);
       setLoadError("");
     } catch (nextError) {
       setLoadError(
@@ -71,6 +83,19 @@ export function ProfilePostsSection({
       void load();
     }, [load])
   );
+
+  // O foco ja cobre a primeira carga; aqui so as mudancas posteriores.
+  const lastReloadTokenRef = useRef(reloadToken);
+  useEffect(() => {
+    const previous = lastReloadTokenRef.current;
+    lastReloadTokenRef.current = reloadToken;
+
+    if (previous === undefined || previous === reloadToken) {
+      return;
+    }
+
+    void load();
+  }, [load, reloadToken]);
 
   const titleColor = highContrast ? "text-hc-text" : "text-white";
   const secondaryColor = highContrast ? "text-hc-text" : "text-content-secondary";
@@ -149,6 +174,30 @@ export function ProfilePostsSection({
           >
             <Text className="text-[13px] font-black text-white">Tentar novamente</Text>
           </Pressable>
+        </View>
+      ) : !visible && !isOwnProfile ? (
+        <View
+          accessible
+          accessibilityRole="text"
+          accessibilityLabel={`Este perfil só mostra publicações para seguidores. Siga ${
+            ownerName?.trim() || "esta pessoa"
+          } para ver as postagens.`}
+          className="flex-row items-start rounded-[22px] border border-[#3A3246] bg-[#17181C] px-5 py-6"
+        >
+          <Ionicons
+            name="lock-closed-outline"
+            size={22}
+            color="#D6C5FF"
+            importantForAccessibility="no"
+          />
+          <View className="ml-3 flex-1">
+            <Text className={`text-[16px] font-bold ${titleColor}`}>
+              Este perfil só mostra publicações para seguidores
+            </Text>
+            <Text className={`mt-2 text-[14px] font-semibold leading-6 ${secondaryColor}`}>
+              Siga {ownerName?.trim() || "esta pessoa"} para ver as postagens.
+            </Text>
+          </View>
         </View>
       ) : posts.length === 0 ? (
         <View className="rounded-[22px] border border-dashed border-[#494455] bg-[#151619] px-5 py-6">

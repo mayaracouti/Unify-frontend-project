@@ -22,8 +22,15 @@ import type {
 import type { MutualMatchSummaryResponse } from "../../types/match";
 import type { LookupOptionResponse, UserPublicProfileResponse } from "../../types/profile";
 import type { UserPostCommentResponse, UserPostResponse } from "../../types/social";
+import type { ProfileField } from "../../types/privacy";
+import {
+  LOCKED_PROFILE_NOTICE,
+  LOCKED_PROFILE_PARTIAL_NOTICE,
+  presentationAudioNotice,
+} from "../../utils/accessibilityAnnouncements";
 import { describeAudioMessage, formatTimeForSpeech } from "../../utils/chatFormatting";
 import { describeFeedSuggestion } from "../../utils/feedSource";
+import { getHiddenFields, profileFieldLabel } from "../../utils/profileFieldVisibility";
 
 /** Junta partes nao vazias em uma frase unica. */
 export function joinSpeechParts(
@@ -65,17 +72,164 @@ function formatAge(age: number | null | undefined): string | null {
 // Perfis / matches
 // ---------------------------------------------------------------------------
 
-/** Card de descoberta de match e perfis publicos: nome, idade e bio curta. */
+function formatDistance(distanceKm: number | null | undefined): string | null {
+  return typeof distanceKm === "number" && Number.isFinite(distanceKm) && distanceKm >= 0
+    ? `a ${Math.round(distanceKm)} quilômetros`
+    : null;
+}
+
+/** Frase final quando o dono escondeu alguma parte do perfil do visitante. */
+export const PRIVATE_PROFILE_FIELDS_NOTICE = "Algumas informações deste perfil são privadas.";
+
+export { LOCKED_PROFILE_NOTICE, LOCKED_PROFILE_PARTIAL_NOTICE };
+
+/** Dados de match que um perfil travado ainda pode mostrar (match mutuo). */
+type MatchDataKey =
+  | "gender"
+  | "pronouns"
+  | "disabilities"
+  | "accessibilityNeeds"
+  | "autonomyLevel"
+  | "communicationForms"
+  | "lifestyleTypes"
+  | "loveLanguages"
+  | "energyLevel"
+  | "interestTypes";
+
+const MATCH_DATA_FIELDS: readonly { key: MatchDataKey; field: ProfileField }[] = [
+  { key: "gender", field: "GENDER" },
+  { key: "pronouns", field: "PRONOUNS" },
+  { key: "disabilities", field: "DISABILITIES" },
+  { key: "accessibilityNeeds", field: "ACCESSIBILITY_NEEDS" },
+  { key: "autonomyLevel", field: "AUTONOMY_LEVEL" },
+  { key: "communicationForms", field: "COMMUNICATION_FORMS" },
+  { key: "lifestyleTypes", field: "LIFESTYLE_TYPES" },
+  { key: "loveLanguages", field: "LOVE_LANGUAGES" },
+  { key: "energyLevel", field: "ENERGY_LEVEL" },
+  { key: "interestTypes", field: "INTEREST_TYPES" },
+];
+
+export type VisibleProfilePartsInput = Partial<
+  Pick<UserPublicProfileResponse, MatchDataKey | "age" | "distanceKm">
+> & {
+  hiddenFields?: UserPublicProfileResponse["hiddenFields"] | null;
+};
+
+/**
+ * Partes que um perfil travado ainda mostra, ja em frases: "28 anos, a 5
+ * quilômetros", "Gênero: Mulher", "Interesses: Música, Trilhas"... Partes em
+ * `hiddenFields` e valores vazios saem. Visitante comum (tudo escondido) = `[]`.
+ */
+export function buildVisibleProfilePartsSpeech(
+  profile: VisibleProfilePartsInput | null | undefined
+): string[] {
+  if (!profile) {
+    return [];
+  }
+
+  const hiddenFields = getHiddenFields(profile);
+  const sentences: string[] = [];
+  const basics = joinSpeechParts(
+    [formatAge(profile.age), formatDistance(profile.distanceKm)],
+    ", "
+  );
+
+  if (basics) {
+    sentences.push(basics);
+  }
+
+  for (const { key, field } of MATCH_DATA_FIELDS) {
+    if (hiddenFields.includes(field)) {
+      continue;
+    }
+
+    const value = profile[key];
+    const items = (Array.isArray(value) ? value : value ? [value] : [])
+      .map((item) => item?.description?.trim() ?? "")
+      .filter((description) => description.length > 0);
+
+    if (items.length > 0) {
+      sentences.push(`${profileFieldLabel(field)}: ${items.join(", ")}`);
+    }
+  }
+
+  return sentences;
+}
+
+/**
+ * Junta frases com ". ", sem dobrar a pontuacao quando a anterior ja termina
+ * em ".", "!", "?" ou "…" (bio digitada pela pessoa).
+ */
+function joinSentences(parts: (string | null | undefined)[]): string | null {
+  const meaningful = parts
+    .map((part) => (typeof part === "string" ? part.trim() : ""))
+    .filter((part) => part.length > 0);
+
+  if (meaningful.length === 0) {
+    return null;
+  }
+
+  return meaningful.reduce((speech, part) =>
+    /[.!?…]$/.test(speech) ? `${speech} ${part}` : `${speech}. ${part}`
+  );
+}
+
+/**
+ * Card de descoberta de match e perfis publicos: nome, idade, distancia, bio
+ * curta e, se houver, o aviso do audio de apresentacao.
+ *
+ * Idade e distancia nulas (ocultadas pelo dono via privacidade, ou sem
+ * localizacao) sao omitidas — nunca "0 anos". Partes em `hiddenFields` (bio,
+ * audio...) nunca entram na fala, mesmo que algum valor venha preenchido; com
+ * alguma parte escondida, fecha com "Algumas informações deste perfil são
+ * privadas."
+ *
+ * Perfil travado (`locked`, conta privada que nao sigo): nome, "Conta
+ * privada. Siga para ver o perfil completo." e as partes que ainda aparecem
+ * (match mutuo: dados de match nao escondidos, idade/distancia). Sem nenhuma
+ * parte visivel: nome e "Conta privada. Siga para ver o perfil.". Bio e audio
+ * nunca entram. `visibleParts` permite passar as frases prontas (Encontros,
+ * que guarda o perfil em outro formato).
+ */
 export function buildPublicProfileSpeech(
-  profile: Pick<UserPublicProfileResponse, "name" | "age" | "bio"> | null | undefined
+  profile:
+    | (Pick<UserPublicProfileResponse, "name" | "age" | "bio"> & {
+        distanceKm?: number | null;
+        presentationAudio?: UserPublicProfileResponse["presentationAudio"];
+        hiddenFields?: UserPublicProfileResponse["hiddenFields"] | null;
+        locked?: boolean | null;
+        visibleParts?: readonly string[] | null;
+      } & Partial<Pick<UserPublicProfileResponse, MatchDataKey>>)
+    | null
+    | undefined
 ): string | null {
   if (!profile) {
     return null;
   }
 
-  return joinSpeechParts([
-    joinSpeechParts([profile.name ?? null, formatAge(profile.age)], ", "),
-    toConcise(profile.bio),
+  if (profile.locked) {
+    const visibleParts = profile.visibleParts ?? buildVisibleProfilePartsSpeech(profile);
+
+    return visibleParts.length > 0
+      ? joinSentences([profile.name ?? null, LOCKED_PROFILE_PARTIAL_NOTICE, ...visibleParts])
+      : joinSentences([profile.name ?? null, LOCKED_PROFILE_NOTICE]);
+  }
+
+  const hiddenFields = getHiddenFields(profile);
+  const bio = hiddenFields.includes("BIO") ? null : profile.bio;
+  const audioSeconds = hiddenFields.includes("PRESENTATION_AUDIO")
+    ? null
+    : profile.presentationAudio?.durationSeconds;
+
+  return joinSentences([
+    joinSpeechParts(
+      [profile.name ?? null, formatAge(profile.age), formatDistance(profile.distanceKm)],
+      ", "
+    ),
+    toConcise(bio),
+    // Sem o ponto final do aviso: mantem a fala existente (o TTS ignora).
+    presentationAudioNotice(audioSeconds)?.replace(/\.$/, "") ?? null,
+    hiddenFields.length > 0 ? PRIVATE_PROFILE_FIELDS_NOTICE : null,
   ]);
 }
 

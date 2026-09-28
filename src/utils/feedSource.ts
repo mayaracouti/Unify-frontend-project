@@ -1,4 +1,4 @@
-import type { FeedSource, UserPostResponse } from "../types/social";
+import type { FeedSource, FollowActionResponse, UserPostResponse } from "../types/social";
 
 export type FeedSuggestionAction = "follow" | "join";
 
@@ -20,6 +20,12 @@ export type FeedSuggestion = {
   /** Rótulo do botão de ação rápida. */
   actionLabel: string;
   actionHint: string;
+  /**
+   * Perfil sugerido com pedido para seguir PENDENTE (a pessoa aprova
+   * seguidores): o botao vira "Solicitado" e tocar cancela o pedido. O post
+   * continua sugestao — um pedido nunca vira `FOLLOWING`.
+   */
+  followRequested: boolean;
 };
 
 function displayName(value: string | null | undefined, fallback: string) {
@@ -28,7 +34,8 @@ function displayName(value: string | null | undefined, fallback: string) {
 }
 
 export function describeFeedSuggestion(
-  post: Pick<UserPostResponse, "feedSource" | "author" | "community"> | null | undefined
+  post: Pick<UserPostResponse, "feedSource" | "author" | "community"> | null | undefined,
+  options?: { followRequested?: boolean }
 ): FeedSuggestion | null {
   if (!post?.feedSource) {
     return null;
@@ -36,13 +43,27 @@ export function describeFeedSuggestion(
 
   if (post.feedSource === "SUGGESTED_PROFILE") {
     const name = displayName(post.author?.name, "esta pessoa");
+
+    if (options?.followRequested) {
+      return {
+        source: "SUGGESTED_PROFILE",
+        label: "Sugestão para você",
+        reason: `${name} tem interesses parecidos com os seus`,
+        action: "follow",
+        actionLabel: "Solicitado",
+        actionHint: `Pedido para seguir ${name} pendente. Toque para cancelar o pedido. Pede confirmação antes`,
+        followRequested: true,
+      };
+    }
+
     return {
       source: "SUGGESTED_PROFILE",
       label: "Sugestão para você",
       reason: `${name} tem interesses parecidos com os seus`,
       action: "follow",
       actionLabel: "Seguir",
-      actionHint: `Passa a seguir ${name}. As publicações dela aparecem no seu feed`,
+      actionHint: `Passa a seguir ${name}, ou envia um pedido se a pessoa aprovar seguidores. As publicações dela aparecem no seu feed`,
+      followRequested: false,
     };
   }
 
@@ -55,6 +76,7 @@ export function describeFeedSuggestion(
       action: "join",
       actionLabel: "Entrar",
       actionHint: `Entra na comunidade ${name}. É pública, a entrada é imediata`,
+      followRequested: false,
     };
   }
 
@@ -64,4 +86,15 @@ export function describeFeedSuggestion(
 /** Fonte que o post passa a ter depois da ação rápida dar certo. */
 export function feedSourceAfterAction(action: FeedSuggestionAction): FeedSource {
   return action === "follow" ? "FOLLOWING" : "MEMBER_COMMUNITY";
+}
+
+/**
+ * Fonte do post depois de tocar em "Seguir" numa sugestao: so vira
+ * `FOLLOWING` quando o backend confirma que passei a seguir. Pedido pendente
+ * (`followRequested`) continua `SUGGESTED_PROFILE`.
+ */
+export function feedSourceAfterFollow(
+  response: Pick<FollowActionResponse, "following" | "followRequested">
+): FeedSource {
+  return response.following ? "FOLLOWING" : "SUGGESTED_PROFILE";
 }

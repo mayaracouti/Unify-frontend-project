@@ -10,9 +10,12 @@ import {
   announceForAccessibility,
 } from "../../utils/accessibilityAnnouncements";
 import { showGlobalToast } from "../../utils/globalToast";
+import { feedSourceAfterFollow } from "../../utils/feedSource";
+import { followOutcomeAnnouncement } from "../../utils/followRelation";
 import { formatRelativePostDate } from "../../utils/postFormatting";
 import { buildUserProfileHref } from "../../utils/userProfileRoute";
 import { ReportModal } from "../report/report-modal";
+import { CancelFollowRequestSheet } from "../social/cancel-follow-request-sheet";
 import { ActionSheet } from "../ui/action-sheet";
 import type { FeedPostCardHandlers } from "./feed-post-card";
 
@@ -34,6 +37,30 @@ export function usePostListActions(
   const [deleteTarget, setDeleteTarget] = useState<UserPostResponse | null>(null);
   const [reportTarget, setReportTarget] = useState<UserPostResponse | null>(null);
   const [suggestionBusyPostId, setSuggestionBusyPostId] = useState<string | null>(null);
+  /**
+   * Autores (userProfileId) com pedido para seguir PENDENTE feito daqui: a
+   * sugestao vira "Solicitado" sem mudar o `feedSource` dos posts.
+   */
+  const [followRequestedAuthorIds, setFollowRequestedAuthorIds] = useState<ReadonlySet<string>>(
+    () => new Set()
+  );
+  const [cancelRequestTarget, setCancelRequestTarget] = useState<UserPostResponse | null>(null);
+
+  const setAuthorFollowRequested = useCallback((profileId: string, requested: boolean) => {
+    setFollowRequestedAuthorIds((previous) => {
+      if (previous.has(profileId) === requested) {
+        return previous;
+      }
+
+      const next = new Set(previous);
+      if (requested) {
+        next.add(profileId);
+      } else {
+        next.delete(profileId);
+      }
+      return next;
+    });
+  }, []);
 
   const patchPost = useCallback(
     (postId: string, patch: Partial<UserPostResponse>) => {
@@ -102,9 +129,10 @@ export function usePostListActions(
   );
 
   /**
-   * Acao rapida da sugestao "perfil": seguir o autor. Todos os posts do mesmo
-   * autor na lista deixam de ser sugestao (viram FOLLOWING) na hora; se a
-   * requisicao falhar, voltam.
+   * Acao rapida da sugestao "perfil": seguir o autor. A resposta do backend
+   * decide: seguindo -> todos os posts pessoais do autor na lista viram
+   * FOLLOWING; pedido pendente (o autor aprova seguidores) -> o botao vira
+   * "Solicitado" e os posts CONTINUAM sugestao (um pedido nunca e FOLLOWING).
    */
   const followAuthor = useCallback(
     (post: UserPostResponse) => {
@@ -114,37 +142,82 @@ export function usePostListActions(
       }
 
       const authorUserId = post.author.userId;
-      const patchAuthorPosts = (feedSource: UserPostResponse["feedSource"]) => {
-        setPosts((previous) =>
-          previous.map((item) =>
-            item.origin === "PERSONAL" && item.author.userId === authorUserId
-              ? { ...item, feedSource }
-              : item
-          )
-        );
-      };
+      const authorName = post.author.name;
 
       setSuggestionBusyPostId(post.id);
-      patchAuthorPosts("FOLLOWING");
 
       void (async () => {
         try {
-          await followService.follow(targetProfileId);
-          announceForAccessibility(accessibilityAnnouncements.followStarted(post.author.name));
-          showGlobalToast({
-            title: `Você começou a seguir ${post.author.name}`,
-            message: "As publicações dessa pessoa passam a aparecer no seu feed.",
-            variant: "success",
-          });
+          const response = await followService.follow(targetProfileId);
+          const nextSource = feedSourceAfterFollow(response);
+
+          if (nextSource === "FOLLOWING") {
+            setAuthorFollowRequested(targetProfileId, false);
+            setPosts((previous) =>
+              previous.map((item) =>
+                item.origin === "PERSONAL" && item.author.userId === authorUserId
+                  ? { ...item, feedSource: nextSource }
+                  : item
+              )
+            );
+            showGlobalToast({
+              title: `Agora você segue ${authorName}`,
+              message: "As publicações dessa pessoa passam a aparecer no seu feed.",
+              variant: "success",
+            });
+          } else if (response.followRequested) {
+            setAuthorFollowRequested(targetProfileId, true);
+            showGlobalToast({
+              title: "Pedido para seguir enviado",
+              message: `Quando ${authorName} aceitar, as publicações aparecem no seu feed.`,
+              variant: "info",
+            });
+          }
+
+          announceForAccessibility(followOutcomeAnnouncement("NONE", response, authorName));
         } catch {
-          patchAuthorPosts("SUGGESTED_PROFILE");
           // Global API error toast already explains the failure.
         } finally {
           setSuggestionBusyPostId(null);
         }
       })();
     },
-    [setPosts, suggestionBusyPostId]
+    [setAuthorFollowRequested, setPosts, suggestionBusyPostId]
+  );
+
+  /** "Solicitado" confirmado: cancela o pedido (`DELETE /users/{id}/follow`), otimista. */
+  const confirmCancelFollowRequest = useCallback(() => {
+    const target = cancelRequestTarget;
+    setCancelRequestTarget(null);
+
+    const targetProfileId = target?.author.userProfileId;
+    if (!target || !targetProfileId || suggestionBusyPostId) {
+      return;
+    }
+
+    setSuggestionBusyPostId(target.id);
+    setAuthorFollowRequested(targetProfileId, false);
+
+    void (async () => {
+      try {
+        const response = await followService.unfollow(targetProfileId);
+        announceForAccessibility(
+          followOutcomeAnnouncement("REQUESTED", response, target.author.name)
+        );
+      } catch {
+        setAuthorFollowRequested(targetProfileId, true);
+        // Global API error toast already explains the failure.
+      } finally {
+        setSuggestionBusyPostId(null);
+      }
+    })();
+  }, [cancelRequestTarget, setAuthorFollowRequested, suggestionBusyPostId]);
+
+  const isAuthorFollowRequested = useCallback(
+    (post: UserPostResponse) =>
+      Boolean(post.author.userProfileId) &&
+      followRequestedAuthorIds.has(post.author.userProfileId as string),
+    [followRequestedAuthorIds]
   );
 
   /**
@@ -318,6 +391,7 @@ export function usePostListActions(
     onDelete: setDeleteTarget,
     onReport: setReportTarget,
     onFollowAuthor: followAuthor,
+    onCancelFollowRequest: setCancelRequestTarget,
     onJoinCommunity: joinCommunity,
   };
 
@@ -344,6 +418,12 @@ export function usePostListActions(
         visible={Boolean(deleteTarget)}
       />
 
+      <CancelFollowRequestSheet
+        onClose={() => setCancelRequestTarget(null)}
+        onConfirm={confirmCancelFollowRequest}
+        targetName={cancelRequestTarget ? cancelRequestTarget.author.name : null}
+      />
+
       {/*
         Posts pessoais e de comunidade vivem na mesma tabela no backend
         (`posts`, coluna origin), então a denúncia aponta para a própria
@@ -359,5 +439,13 @@ export function usePostListActions(
     </>
   );
 
-  return { deletingPostId, dialogs, handlers, likeBusyPostId, patchPost, suggestionBusyPostId };
+  return {
+    deletingPostId,
+    dialogs,
+    handlers,
+    isAuthorFollowRequested,
+    likeBusyPostId,
+    patchPost,
+    suggestionBusyPostId,
+  };
 }

@@ -5,6 +5,8 @@ import type {
   ProfileCompletionResponse,
   ProfileOptionsResponse,
   UserProfileDirectoryItemResponse,
+  UserProfileAudioResponse,
+  UserProfileAudioStatusResponse,
   UserProfileImageResponse,
   UserMatchPreferencesResponse,
   UserPublicProfileResponse,
@@ -16,6 +18,16 @@ import type {
 const ALL_USER_PROFILES_ENDPOINT = "/users/profiles";
 const PUBLIC_PROFILE_ENDPOINT = "/users/me/profile/public";
 const PROFILE_IMAGES_ENDPOINT = "/users/me/profile/images";
+const PROFILE_AUDIO_ENDPOINT = "/users/me/profile/audio";
+
+/** Upload de audio em rede movel precisa de folga sobre os 20s padrao do cliente. */
+const AUDIO_UPLOAD_TIMEOUT_MS = 60000;
+
+function normalizedApiBaseUrl() {
+  return runtimeConfig.apiBaseUrl.endsWith("/")
+    ? runtimeConfig.apiBaseUrl.slice(0, -1)
+    : runtimeConfig.apiBaseUrl;
+}
 
 function normalizeProfileOptions(
   options: Partial<ProfileOptionsResponse>
@@ -79,11 +91,15 @@ export const profileService = {
     );
   },
 
-  getPublicProfile(userProfileId: string) {
+  /**
+   * 404 tambem quando ha bloqueio em qualquer direcao. `silent` evita o toast
+   * global de erro para telas que ja mostram o estado ("Perfil indisponível").
+   */
+  getPublicProfile(userProfileId: string, options?: { silent?: boolean }) {
     return customApiCall.get<UserPublicProfileResponse>(
       PUBLIC_PROFILE_ENDPOINT,
       { userProfileId },
-      { requiresAuth: true }
+      { requiresAuth: true, suppressErrorToast: options?.silent ?? false }
     );
   },
 
@@ -129,6 +145,54 @@ export const profileService = {
     return customApiCall.delete<void>(`${PROFILE_IMAGES_ENDPOINT}/${imageId}`, {
       requiresAuth: true,
     });
+  },
+
+  /** `{ audio: null }` quando ainda nao ha audio de apresentacao. */
+  getPresentationAudio() {
+    return customApiCall.get<UserProfileAudioStatusResponse>(
+      PROFILE_AUDIO_ENDPOINT,
+      undefined,
+      { requiresAuth: true }
+    );
+  },
+
+  /**
+   * Grava/substitui o audio de apresentacao (id novo a cada envio).
+   * `formData`: campo `audio` (`{ uri, name, type }`) + `durationSeconds`
+   * (inteiro 1..60 como string) — mesmo formato de
+   * `chatService.sendMediaMessage`. O interceptor nao injeta `Content-Type`
+   * para FormData: o fetch monta o boundary do multipart sozinho.
+   */
+  uploadPresentationAudio(formData: FormData) {
+    return customApiCall.put<UserProfileAudioResponse, FormData>(
+      PROFILE_AUDIO_ENDPOINT,
+      formData,
+      { requiresAuth: true, timeoutMs: AUDIO_UPLOAD_TIMEOUT_MS }
+    );
+  },
+
+  deletePresentationAudio() {
+    return customApiCall.delete<void>(PROFILE_AUDIO_ENDPOINT, { requiresAuth: true });
+  },
+
+  /** URL absoluta do MEU audio (`presentationAudio.url` e relativa). */
+  resolveProfileAudioUrl(relativeUrl?: string | null) {
+    return profileService.resolveProfileImageUrl(relativeUrl);
+  },
+
+  /** Bytes do audio de OUTRO perfil; exige `Authorization: Bearer` no download. */
+  resolvePublicPresentationAudioUrl(userProfileId: string, audioId?: string | null) {
+    const normalizedAudioId = audioId?.trim();
+    const normalizedUserProfileId = userProfileId?.trim();
+
+    if (!normalizedAudioId || !normalizedUserProfileId) {
+      return null;
+    }
+
+    const encodedUserProfileId = encodeURIComponent(normalizedUserProfileId);
+    const encodedAudioId = encodeURIComponent(normalizedAudioId);
+
+    return `${normalizedApiBaseUrl()}${PUBLIC_PROFILE_ENDPOINT}/audio/${encodedAudioId}?userProfileId=${encodedUserProfileId}`;
   },
 
   resolveProfileImageUrl(relativeUrl?: string | null) {

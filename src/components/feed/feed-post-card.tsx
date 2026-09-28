@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { FollowPendingIcon } from "../social/follow-pending-icon";
 import { LinearGradient } from "expo-linear-gradient";
 import { memo, useMemo, useState, type ComponentProps } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
@@ -22,6 +23,8 @@ export type FeedPostCardHandlers = {
   onReport?: (post: UserPostResponse) => void;
   /** Acao rapida de sugestao (feed do Inicio): seguir o autor de um `SUGGESTED_PROFILE`. */
   onFollowAuthor?: (post: UserPostResponse) => void;
+  /** Sugestao com pedido pendente ("Solicitado"): cancelar o pedido (a tela confirma). */
+  onCancelFollowRequest?: (post: UserPostResponse) => void;
   /** Acao rapida de sugestao (feed do Inicio): entrar na comunidade de um `SUGGESTED_COMMUNITY`. */
   onJoinCommunity?: (post: UserPostResponse) => void;
 };
@@ -36,6 +39,8 @@ type FeedPostCardProps = FeedPostCardHandlers & {
   deleting: boolean;
   /** Acao rapida da sugestao (seguir/entrar) em andamento. */
   suggestionBusy?: boolean;
+  /** Ja pedi para seguir o autor (sugestao de perfil vira "Solicitado"). */
+  authorFollowRequested?: boolean;
   /** Oculta o cabecalho da comunidade (ex.: dentro da propria comunidade). */
   hideCommunity?: boolean;
 };
@@ -65,7 +70,8 @@ function FeedCounterAction({
 
   return (
     <Pressable
-      className="h-11 flex-1 flex-row items-center justify-center gap-2 rounded-lg"
+      // min-h (e nao h fixo): com fontScale alto o botao cresce em vez de cortar.
+      className="min-h-[44px] flex-1 flex-row items-center justify-center gap-2 rounded-lg"
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
@@ -83,9 +89,11 @@ function FeedCounterAction({
           importantForAccessibility="no"
         />
       )}
+      {/* Numero solto nao e lido: a contagem ja vai embutida no label do botao. */}
       <Text
         className={`text-[15px] font-bold ${active ? "text-[#7C4DFF]" : "text-[#E5E2E1]"}`}
-        importantForAccessibility="no"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
       >
         {count}
       </Text>
@@ -110,6 +118,7 @@ export const FeedPostCard = memo(function FeedPostCard({
   likeBusy,
   deleting,
   suggestionBusy,
+  authorFollowRequested,
   hideCommunity,
   onToggleLike,
   onOpenComments,
@@ -119,6 +128,7 @@ export const FeedPostCard = memo(function FeedPostCard({
   onDelete,
   onReport,
   onFollowAuthor,
+  onCancelFollowRequest,
   onJoinCommunity,
 }: FeedPostCardProps) {
   const { speak } = useTTS();
@@ -134,9 +144,12 @@ export const FeedPostCard = memo(function FeedPostCard({
 
   // Selo de sugestao: so no feed do Inicio (feedSource vem do ranking) e so
   // quando a tela oferece a acao rapida correspondente.
-  const suggestion = describeFeedSuggestion(post);
-  const suggestionHandler =
-    suggestion?.action === "follow"
+  const suggestion = describeFeedSuggestion(post, {
+    followRequested: Boolean(authorFollowRequested),
+  });
+  const suggestionHandler = suggestion?.followRequested
+    ? onCancelFollowRequest
+    : suggestion?.action === "follow"
       ? onFollowAuthor
       : suggestion?.action === "join"
         ? onJoinCommunity
@@ -265,29 +278,53 @@ export const FeedPostCard = memo(function FeedPostCard({
             </Text>
           </View>
           <Pressable
-            className={`h-9 min-w-[76px] flex-row items-center justify-center gap-1 rounded-full px-3 ${
-              highContrast ? "border border-hc-border bg-hc-bg" : "bg-[#7C4DFF]"
+            className={`min-h-[36px] min-w-[76px] flex-row items-center justify-center gap-1 rounded-full px-3 ${
+              highContrast
+                ? "border border-hc-border bg-hc-bg"
+                : suggestion.followRequested
+                  ? "border border-[#CDBDFF] bg-[#2B2338]"
+                  : "bg-[#7C4DFF]"
             }`}
+            // 36dp visuais + hitSlop = area de toque de 48dp.
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             onPress={() => {
-              speak(buildActionSpeech(suggestion.actionLabel));
+              speak(
+                buildActionSpeech(
+                  suggestion.followRequested
+                    ? "Cancelar pedido para seguir"
+                    : suggestion.actionLabel,
+                  suggestion.followRequested ? authorName : null
+                )
+              );
               suggestionHandler?.(post);
             }}
             disabled={Boolean(suggestionBusy)}
             accessibilityRole="button"
             accessibilityLabel={suggestion.actionLabel}
             accessibilityHint={suggestion.actionHint}
-            accessibilityState={{ busy: Boolean(suggestionBusy), disabled: Boolean(suggestionBusy) }}
+            accessibilityState={{
+              busy: Boolean(suggestionBusy),
+              disabled: Boolean(suggestionBusy),
+              selected: suggestion.followRequested,
+            }}
           >
             {suggestionBusy ? (
               <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
               <>
-                <Ionicons
-                  name={suggestion.action === "follow" ? "person-add-outline" : "enter-outline"}
-                  size={15}
-                  color="#FFFFFF"
-                  importantForAccessibility="no"
-                />
+                {suggestion.followRequested ? (
+                  <FollowPendingIcon
+                    size={14}
+                    badgeBackground={highContrast ? "#000000" : "#2B2338"}
+                  />
+                ) : (
+                  <Ionicons
+                    name={suggestion.action === "follow" ? "person-add-outline" : "enter-outline"}
+                    size={15}
+                    color="#FFFFFF"
+                    importantForAccessibility="no"
+                  />
+                )}
                 <Text className="text-[13px] font-black text-white">{suggestion.actionLabel}</Text>
               </>
             )}
@@ -426,8 +463,8 @@ export const FeedPostCard = memo(function FeedPostCard({
       <View className="mt-1 flex-row items-center justify-between">
         <FeedCounterAction
           accessibilityLabel={`${
-            post.likedByCurrentUser ? "Remover curtida" : "Curtir publicação"
-          }. ${formatCount(post.likesCount, "curtida", "curtidas")}`}
+            post.likedByCurrentUser ? "Descurtir publicação" : "Curtir publicação"
+          }, ${formatCount(post.likesCount, "curtida", "curtidas")}`}
           accessibilityHint={
             post.likedByCurrentUser
               ? "Retira a sua curtida desta publicação"
@@ -438,12 +475,12 @@ export const FeedPostCard = memo(function FeedPostCard({
           icon={post.likedByCurrentUser ? "thumbs-up" : "thumbs-up-outline"}
           loading={likeBusy}
           onPress={() => {
-            speak(buildActionSpeech(post.likedByCurrentUser ? "Remover curtida" : "Curtir"));
+            speak(buildActionSpeech(post.likedByCurrentUser ? "Descurtir" : "Curtir"));
             onToggleLike(post);
           }}
         />
         <FeedCounterAction
-          accessibilityLabel={`Abrir comentários. ${formatCount(
+          accessibilityLabel={`Ver comentários, ${formatCount(
             post.commentsCount,
             "comentário",
             "comentários"
@@ -453,7 +490,7 @@ export const FeedPostCard = memo(function FeedPostCard({
           count={post.commentsCount}
           icon={post.commentedByCurrentUser ? "chatbubble" : "chatbubble-outline"}
           onPress={() => {
-            speak(buildActionSpeech("Abrir comentários"));
+            speak(buildActionSpeech("Ver comentários"));
             onOpenComments(post);
           }}
         />

@@ -6,7 +6,10 @@ import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { buildActionSpeech, joinSpeechParts, useTTS } from "../../accessibility/tts";
 import { useAppShell } from "../../context/AppShellContext";
 import { useAuth } from "../../context/AuthContext";
+import { useFollowRequestsCount } from "../../hooks/use-follow-requests-count";
+import { followRequestsAccessLabel } from "../../utils/followRequests";
 import { AuthenticatedRemoteImage } from "../profile/authenticated-remote-image";
+import { CountBadge } from "../ui/count-badge";
 import { navigationTabs } from "./navigation-tabs";
 
 function getInitials(name: string) {
@@ -23,6 +26,7 @@ function getInitials(name: string) {
 const PROFILE_ROUTE = "/profile";
 const HOME_ROUTE = "/home";
 const CREATE_POST_ROUTE = "/profile/new-post";
+const FOLLOW_REQUESTS_ROUTE = "/profile/follow-requests";
 
 type GlobalTopNavProps = {
   settingsRoute?: string | null;
@@ -43,6 +47,13 @@ export function GlobalTopNav({
   const { speak } = useTTS();
   const { currentUserName, currentUserPhotoUrl, unseenProfilesCount } = useAppShell();
   const [menuOpen, setMenuOpen] = useState(false);
+  // Pedidos recebidos aguardando: badge no item do menu e ponto no hamburguer.
+  const { pendingCount: pendingFollowRequests, refresh: refreshFollowRequests } =
+    useFollowRequestsCount(showMenu);
+  const hasPendingFollowRequests = (pendingFollowRequests ?? 0) > 0;
+  const followRequestsLabel = followRequestsAccessLabel(pendingFollowRequests);
+  const followRequestsActive =
+    pathname === FOLLOW_REQUESTS_ROUTE || pathname.startsWith(`${FOLLOW_REQUESTS_ROUTE}/`);
   const initials = useMemo(() => getInitials(currentUserName || "Perfil"), [currentUserName]);
   const shouldShowMutualMatchesShortcut = pathname === "/matches";
   // Nova publicacao pessoal vive no topo do Inicio (e nao na barra inferior):
@@ -60,6 +71,15 @@ export function GlobalTopNav({
 
     if (pathname !== PROFILE_ROUTE && !pathname.startsWith(`${PROFILE_ROUTE}/`)) {
       router.replace(PROFILE_ROUTE);
+    }
+  }
+
+  function handleOpenFollowRequests() {
+    speak(followRequestsLabel);
+    setMenuOpen(false);
+
+    if (!followRequestsActive) {
+      router.push(FOLLOW_REQUESTS_ROUTE);
     }
   }
 
@@ -92,18 +112,35 @@ export function GlobalTopNav({
 
           {showMenu ? (
             <Pressable
-              className="h-10 w-10 items-center justify-center rounded-full"
+              className="relative h-11 w-11 items-center justify-center rounded-full"
               onPress={() => {
                 // O nome do usuario e dado de runtime: falar junto situa o menu.
                 speak(
                   joinSpeechParts(["Menu aberto", currentUserName || null])
                 );
                 setMenuOpen(true);
+                void refreshFollowRequests();
               }}
               accessibilityRole="button"
-              accessibilityLabel="Abrir menu"
+              // O ponto amarelo e decorativo: a informacao vai no rotulo.
+              accessibilityLabel={
+                hasPendingFollowRequests
+                  ? `Abrir menu. ${followRequestsLabel}`
+                  : "Abrir menu"
+              }
+              accessibilityHint="Abre o menu de navegação"
             >
-              <Ionicons name="menu-outline" size={24} color="#A270FF" />
+              <Ionicons name="menu-outline" size={24} color="#A270FF" importantForAccessibility="no" />
+
+              {hasPendingFollowRequests ? (
+                <View
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  aria-hidden
+                  pointerEvents="none"
+                  className="absolute right-1.5 top-1.5 h-3 w-3 rounded-full border-2 border-[#090B18] bg-[#F1EF00]"
+                />
+              ) : null}
             </Pressable>
           ) : backRoute ? null : (
             // Sem menu e sem voltar o lado esquerdo ficaria vazio e o titulo
@@ -274,6 +311,45 @@ export function GlobalTopNav({
                   </Pressable>
                 );
               })}
+
+              <Pressable
+                className="mb-3 min-h-[44px] flex-row items-center rounded-[20px] border border-[#1E2230] bg-[#131521] px-4 py-4"
+                onPress={handleOpenFollowRequests}
+                accessibilityRole="button"
+                accessibilityLabel={followRequestsLabel}
+                accessibilityHint="Abre os pedidos que você recebeu e os que você enviou"
+                accessibilityState={{ selected: followRequestsActive }}
+              >
+                <View className="relative h-11 w-11 items-center justify-center rounded-full bg-[#1B1E2A]">
+                  <Ionicons
+                    name={followRequestsActive ? "person-add" : "person-add-outline"}
+                    size={22}
+                    color={followRequestsActive ? "#7C4DFF" : "#CAC3D8"}
+                    importantForAccessibility="no"
+                  />
+
+                  <CountBadge
+                    count={pendingFollowRequests}
+                    size="sm"
+                    className="absolute -right-2 -top-1"
+                  />
+                </View>
+
+                <Text
+                  className={`ml-4 flex-1 text-[17px] font-black ${
+                    followRequestsActive ? "text-[#7C4DFF]" : "text-white"
+                  }`}
+                >
+                  Pedidos para seguir
+                </Text>
+
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color="#6F7181"
+                  importantForAccessibility="no"
+                />
+              </Pressable>
             </ScrollView>
 
             <Pressable

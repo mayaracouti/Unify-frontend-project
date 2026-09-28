@@ -25,6 +25,34 @@ export function announceForAccessibility(message: string) {
   AccessibilityInfo.announceForAccessibility(normalized);
 }
 
+/**
+ * "Tem áudio de apresentação de N segundos. Use o botão Ouvir apresentação."
+ * Nulo sem audio. Compartilhado com a fala do TTS (`buildPublicProfileSpeech`).
+ */
+export function presentationAudioNotice(seconds: number | null | undefined): string | null {
+  if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds <= 0) {
+    return null;
+  }
+
+  const rounded = Math.round(seconds);
+
+  return `Tem áudio de apresentação de ${rounded} ${
+    rounded === 1 ? "segundo" : "segundos"
+  }. Use o botão Ouvir apresentação.`;
+}
+
+/**
+ * Perfil travado (conta privada que eu nao sigo) sem nenhuma parte visivel:
+ * a fala e os rotulos dizem so isto. Compartilhado com o TTS.
+ */
+export const LOCKED_PROFILE_NOTICE = "Conta privada. Siga para ver o perfil.";
+
+/**
+ * Perfil travado que ainda mostra alguma parte (match mutuo: dados de match
+ * que o dono nao escondeu, idade/distancia).
+ */
+export const LOCKED_PROFILE_PARTIAL_NOTICE = "Conta privada. Siga para ver o perfil completo.";
+
 export const accessibilityAnnouncements = {
   newMutualMatch: (name: string) =>
     `Novo match com ${name}. Vocês demonstraram interesse mútuo. Agora dá para conversar.`,
@@ -40,18 +68,39 @@ export const accessibilityAnnouncements = {
 
   queueLoading: () => "Buscando perfis compatíveis.",
 
-  profileShown: (name: string, age: number | null, distanceKm: number | null) => {
+  /**
+   * Idade/distancia nulas (ocultadas pelo dono ou sem localizacao) sao
+   * omitidas — nunca "0 anos". Com audio de apresentacao, avisa que ele existe
+   * e como ouvir (nao ha autoplay). Perfil travado (conta privada) nunca fala
+   * de audio e fecha com o aviso de conta privada ("perfil completo" quando
+   * ainda ha partes visiveis — `hasVisibleParts`, idade ou distancia).
+   */
+  profileShown: (
+    name: string,
+    age: number | null,
+    distanceKm: number | null,
+    presentationAudioSeconds?: number | null,
+    locked?: boolean,
+    hasVisibleParts?: boolean
+  ) => {
     const parts = [`Perfil de ${name}`];
 
     if (typeof age === "number" && age > 0) {
       parts.push(`${age} anos`);
     }
 
-    if (typeof distanceKm === "number") {
+    if (typeof distanceKm === "number" && Number.isFinite(distanceKm)) {
       parts.push(`a ${Math.round(distanceKm)} quilômetros`);
     }
 
-    return `${parts.join(", ")}.`;
+    if (locked) {
+      const partial = hasVisibleParts === true || parts.length > 1;
+      return `${parts.join(", ")}. ${partial ? LOCKED_PROFILE_PARTIAL_NOTICE : LOCKED_PROFILE_NOTICE}`;
+    }
+
+    const audioNotice = presentationAudioNotice(presentationAudioSeconds);
+
+    return audioNotice ? `${parts.join(", ")}. ${audioNotice}` : `${parts.join(", ")}.`;
   },
 
   photoChanged: (index: number, total: number) => `Foto ${index} de ${total}.`,
@@ -101,7 +150,7 @@ export const accessibilityAnnouncements = {
   reportDuplicate: () =>
     "Você já denunciou este perfil ou publicação e a análise está em andamento.",
 
-  followStarted: (name: string) => `Você começou a seguir ${name}.`,
+  followStarted: (name: string) => `Agora você segue ${name}.`,
   followStopped: (name: string) => `Você deixou de seguir ${name}.`,
 
   personalPostCreated: () => "Publicação criada com sucesso.",
@@ -120,4 +169,45 @@ export const accessibilityAnnouncements = {
     `Você entrou na comunidade ${name}. Agora dá para publicar, curtir e comentar.`,
   communityLeft: (name: string) => `Você saiu da comunidade ${name}.`,
   communityPostDeleted: () => "Publicação excluída da comunidade.",
+
+  // --- Semana 04: privacidade, bloqueio e audio de apresentacao ---
+  privacySettingSaved: (label: string, enabled: boolean) =>
+    `${label} ${enabled ? "ativado" : "desativado"}. Preferência salva.`,
+  feedVisibilitySaved: (optionLabel: string) =>
+    `Quem pode ver seus posts: ${optionLabel}. Preferência salva.`,
+  profileFieldVisibilitySaved: (fieldLabel: string, visibilityLabel: string) =>
+    `Quem vê ${fieldLabel}: ${visibilityLabel}. Preferência salva.`,
+  allProfileFieldsVisibilitySaved: (visibilityLabel: string) =>
+    `Quem vê todas as partes do seu perfil: ${visibilityLabel}. Preferência salva.`,
+  privacySettingFailed: () =>
+    "Não foi possível salvar a preferência de privacidade. A opção anterior foi mantida.",
+  userBlocked: (name: string) =>
+    `${name} foi bloqueado. Vocês não verão mais o perfil, as publicações nem poderão trocar mensagens.`,
+  userUnblocked: (name: string) => `${name} foi desbloqueado.`,
+  chatBlocked: () => "Não é possível enviar mensagens para este contato.",
+  // --- Seguir com aprovacao ---
+  followRequestSent: (name: string) => `Pedido para seguir enviado a ${name}.`,
+  followRequestCanceled: () => "Pedido cancelado.",
+  followRequestAccepted: (name: string) => `Pedido aceito. ${name} agora segue você.`,
+  followRequestDeclined: () => "Pedido recusado.",
+  /** Switch "Conta privada" (aprovar quem quer me seguir). */
+  privateAccountSaved: (enabled: boolean) =>
+    `Conta privada ${enabled ? "ativada" : "desativada"}. Preferência salva.`,
+  followApprovalDisabled: (acceptedCount: number) =>
+    acceptedCount <= 0
+      ? "Conta privada desativada. Preferência salva."
+      : acceptedCount === 1
+        ? "Conta privada desativada. 1 pedido pendente foi aceito."
+        : `Conta privada desativada. ${acceptedCount} pedidos pendentes foram aceitos.`,
+  privatePosts: (name: string) =>
+    `${name} só mostra publicações para seguidores. Siga para ver as postagens.`,
+
+  presentationRecordingProgress: (seconds: number, maxSeconds: number) =>
+    `${seconds} segundos gravados de ${maxSeconds}.`,
+  presentationAudioSaved: () => "Áudio de apresentação salvo.",
+  presentationAudioSaveFailed: () => "Não foi possível salvar o áudio. Tente novamente.",
+  presentationAudioRemoved: () => "Áudio de apresentação removido.",
+  presentationAudioRemoveFailed: () => "Não foi possível remover o áudio. Tente novamente.",
+  microphonePermissionDenied: () =>
+    "Microfone bloqueado. Use o botão Abrir configurações para liberar o acesso e gravar sua apresentação.",
 };

@@ -277,6 +277,8 @@ export default function MatchPreferencesOnboarding() {
           <View className="flex-row items-center">
             <Pressable
               className="mr-3 h-10 w-10 items-center justify-center rounded-full"
+              // 40dp visuais + hitSlop = area de toque de 48dp.
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               onPress={() => router.replace("/onboarding/profile")}
               accessibilityRole="button"
               accessibilityLabel="Voltar"
@@ -316,7 +318,12 @@ export default function MatchPreferencesOnboarding() {
               <>
                 <View className="mb-8">
                   <SectionTitle icon="flag-outline" title="Qual seu objetivo?" />
-                  <View className="flex-row flex-wrap gap-3">
+                  {/* ChoiceCard tem papel radio: o grupo declara a escolha unica. */}
+                  <View
+                    accessibilityRole="radiogroup"
+                    accessibilityLabel="Qual seu objetivo?"
+                    className="flex-row flex-wrap gap-3"
+                  >
                     {options.connectionTypes.map((option: LookupOptionResponse) => (
                       <ChoiceCard
                         key={option.id}
@@ -330,12 +337,17 @@ export default function MatchPreferencesOnboarding() {
 
                 <View className="mb-8">
                   <SectionTitle icon="heart-outline" title="Interesse em" />
-                  <View className="flex-row flex-wrap gap-2">
+                  <View
+                    accessibilityRole="none"
+                    accessibilityLabel="Interesse em. Seleção múltipla."
+                    className="flex-row flex-wrap gap-2"
+                  >
                     {options.genders.map((option) => (
                       option.id !== 4 ? (
                       <Pressable
                         key={option.id}
-                        className={`min-h-[22px] rounded-full border-2 px-5 py-3 ${
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        className={`min-h-[48px] max-w-full justify-center rounded-full border-2 px-5 py-3 ${
                           desiredGenderIds.includes(option.id)
                             ? "border-[#7C4DFF] bg-[#7C4DFF]"
                             : "border-[#262626] bg-[#201F1F]"
@@ -358,7 +370,12 @@ export default function MatchPreferencesOnboarding() {
                       >
                         <View className="flex-row items-center justify-center">
                           {desiredGenderIds.includes(option.id) ? (
-                            <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={18}
+                              color="#FFFFFF"
+                              importantForAccessibility="no"
+                            />
                           ) : null}
                           <Text className={`text-center text-[16px] font-bold text-white ${desiredGenderIds.includes(option.id) ? "ml-2" : ""}`}>
                             {option.description}

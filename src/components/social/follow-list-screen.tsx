@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { FollowPendingIcon } from "./follow-pending-icon";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
@@ -25,12 +26,18 @@ import {
   announceForAccessibility,
 } from "../../utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../utils/auth";
+import {
+  describeFollowButton,
+  followOutcomeAnnouncement,
+  resolveFollowRelation,
+} from "../../utils/followRelation";
 import { buildUserProfileHref } from "../../utils/userProfileRoute";
 import { GlobalTopNav } from "../navigation/global-top-nav";
 import { AuthenticatedRemoteImage } from "../profile/authenticated-remote-image";
 import { ScreenEmpty } from "../ui/screen-empty";
 import { ScreenError } from "../ui/screen-error";
 import { ScreenLoading } from "../ui/screen-loading";
+import { CancelFollowRequestSheet } from "./cancel-follow-request-sheet";
 
 const PAGE_SIZE = 20;
 
@@ -85,7 +92,20 @@ function FollowRow({
 }: FollowRowProps) {
   const { speak } = useTTS();
   const avatarUri = feedService.resolveAssetUrl(profile.avatarUrl);
-  const following = profile.followedByCurrentUser;
+  const button = describeFollowButton(
+    {
+      following: profile.followedByCurrentUser,
+      followRequested: profile.followRequestedByCurrentUser,
+    },
+    profile.name
+  );
+  const active = button.selected;
+  const relationText =
+    button.relation === "FOLLOWING"
+      ? "você segue"
+      : button.relation === "REQUESTED"
+        ? "pedido para seguir pendente"
+        : "você não segue";
 
   const avatarFallback = (
     <LinearGradient
@@ -134,9 +154,7 @@ function FollowRow({
 
         <Text
           accessible
-          accessibilityLabel={`${profile.name}, ${
-            following ? "você segue" : "você não segue"
-          }`}
+          accessibilityLabel={`${profile.name}, ${relationText}`}
           className={`ml-3 flex-1 text-[16px] font-black ${
             highContrast ? "text-hc-text" : "text-white"
           }`}
@@ -147,37 +165,32 @@ function FollowRow({
 
       {isCurrentUser ? null : (
         <Pressable
-          className={`ml-3 rounded-full px-4 py-2 ${
-            following ? "border border-[#494455] bg-[#1A1C1F]" : "bg-[#EAEA00]"
+          className={`ml-3 min-h-[44px] min-w-[44px] flex-row items-center justify-center rounded-full px-4 py-2 ${
+            active ? "border border-[#494455] bg-[#1A1C1F]" : "bg-[#EAEA00]"
           }`}
           onPress={() => {
-            speak(
-              buildActionSpeech(following ? "Deixar de seguir" : "Seguir", profile.name)
-            );
+            speak(buildActionSpeech(button.speechAction, profile.name));
             onToggleFollow(profile);
           }}
           disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel={
-            following ? `Deixar de seguir ${profile.name}` : `Seguir ${profile.name}`
-          }
-          accessibilityHint={
-            following
-              ? "As publicações desta pessoa saem do seu feed"
-              : "As publicações desta pessoa passam a aparecer no seu feed"
-          }
-          accessibilityState={{ selected: following, busy, disabled: busy }}
+          accessibilityLabel={button.accessibilityLabel}
+          accessibilityHint={button.accessibilityHint}
+          accessibilityState={{ selected: active, busy, disabled: busy }}
         >
           {busy ? (
-            <ActivityIndicator color={following ? "#EAEA00" : "#1D1D00"} size="small" />
+            <ActivityIndicator color={active ? "#EAEA00" : "#1D1D00"} size="small" />
           ) : (
-            <Text
-              className={`text-[14px] font-black ${
-                following ? "text-white" : "text-[#1D1D00]"
-              }`}
-            >
-              {following ? "Seguindo" : "Seguir"}
-            </Text>
+            <View className="flex-row items-center gap-1.5">
+              {button.relation === "REQUESTED" ? (
+                <FollowPendingIcon size={15} badgeBackground="#1A1C1F" />
+              ) : null}
+              <Text
+                className={`text-[14px] font-black ${active ? "text-white" : "text-[#1D1D00]"}`}
+              >
+                {button.text}
+              </Text>
+            </View>
           )}
         </Pressable>
       )}
@@ -279,15 +292,25 @@ export function FollowListScreen({ mode }: { mode: FollowListMode }) {
     void loadPage(false);
   }, [hasNext, loadPage, loading, loadingMore, refreshing]);
 
-  const setFollowingFlag = useCallback((profileId: string, value: boolean) => {
-    setProfiles((previous) =>
-      previous.map((profile) =>
-        profile.userProfileId === profileId
-          ? { ...profile, followedByCurrentUser: value }
-          : profile
-      )
-    );
-  }, []);
+  const [cancelRequestTarget, setCancelRequestTarget] =
+    useState<FollowedProfileSummaryResponse | null>(null);
+
+  const setFollowFlags = useCallback(
+    (profileId: string, flags: { following: boolean; followRequested: boolean }) => {
+      setProfiles((previous) =>
+        previous.map((profile) =>
+          profile.userProfileId === profileId
+            ? {
+                ...profile,
+                followedByCurrentUser: flags.following,
+                followRequestedByCurrentUser: !flags.following && flags.followRequested,
+              }
+            : profile
+        )
+      );
+    },
+    []
+  );
 
   const handleOpenProfile = useCallback(
     (profile: FollowedProfileSummaryResponse) => {
@@ -297,37 +320,70 @@ export function FollowListScreen({ mode }: { mode: FollowListMode }) {
     [router]
   );
 
-  const handleToggleFollow = useCallback(
+  /**
+   * Seguir: a lista nao sabe se a pessoa aprova seguidores, entao o botao so
+   * mostra "carregando" e a resposta decide ("Seguindo" ou "Solicitado").
+   * Deixar de seguir / cancelar pedido: otimista, volta se falhar.
+   */
+  const runFollowAction = useCallback(
     (profile: FollowedProfileSummaryResponse) => {
-      const nextFollowing = !profile.followedByCurrentUser;
+      const previousFlags = {
+        following: profile.followedByCurrentUser,
+        followRequested: Boolean(profile.followRequestedByCurrentUser),
+      };
+      const previousRelation = resolveFollowRelation(previousFlags);
 
       setPendingProfileId(profile.userProfileId);
-      // Atualização otimista: o botão responde na hora e volta ao estado
-      // anterior se a requisição falhar.
-      setFollowingFlag(profile.userProfileId, nextFollowing);
+
+      if (previousRelation !== "NONE") {
+        setFollowFlags(profile.userProfileId, { following: false, followRequested: false });
+      }
 
       void (async () => {
         try {
-          if (nextFollowing) {
-            await followService.follow(profile.userProfileId);
-            announceForAccessibility(
-              accessibilityAnnouncements.followStarted(profile.name)
-            );
-          } else {
-            await followService.unfollow(profile.userProfileId);
-            announceForAccessibility(
-              accessibilityAnnouncements.followStopped(profile.name)
-            );
-          }
+          const response =
+            previousRelation === "NONE"
+              ? await followService.follow(profile.userProfileId)
+              : await followService.unfollow(profile.userProfileId);
+
+          setFollowFlags(profile.userProfileId, {
+            following: response.following,
+            followRequested: Boolean(response.followRequested),
+          });
+          announceForAccessibility(
+            followOutcomeAnnouncement(previousRelation, response, profile.name)
+          );
         } catch {
-          setFollowingFlag(profile.userProfileId, !nextFollowing);
+          setFollowFlags(profile.userProfileId, previousFlags);
           // Global API error toast already explains the failure.
         } finally {
           setPendingProfileId(null);
         }
       })();
     },
-    [setFollowingFlag]
+    [setFollowFlags]
+  );
+
+  const handleToggleFollow = useCallback(
+    (profile: FollowedProfileSummaryResponse) => {
+      if (pendingProfileId) {
+        return;
+      }
+
+      const relation = resolveFollowRelation({
+        following: profile.followedByCurrentUser,
+        followRequested: profile.followRequestedByCurrentUser,
+      });
+
+      // "Solicitado": confirma antes de cancelar o pedido.
+      if (relation === "REQUESTED") {
+        setCancelRequestTarget(profile);
+        return;
+      }
+
+      runFollowAction(profile);
+    },
+    [pendingProfileId, runFollowAction]
   );
 
   const renderContent = () => {
@@ -447,6 +503,19 @@ export function FollowListScreen({ mode }: { mode: FollowListMode }) {
           <View className="flex-1">{renderContent()}</View>
         </View>
       </SafeAreaView>
+
+      <CancelFollowRequestSheet
+        onClose={() => setCancelRequestTarget(null)}
+        onConfirm={() => {
+          const target = cancelRequestTarget;
+          setCancelRequestTarget(null);
+
+          if (target) {
+            runFollowAction(target);
+          }
+        }}
+        targetName={cancelRequestTarget?.name ?? null}
+      />
     </View>
   );
 }

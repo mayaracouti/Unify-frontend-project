@@ -22,6 +22,7 @@ import {
   accessibilityAnnouncements,
   announceForAccessibility,
 } from "../../src/utils/accessibilityAnnouncements";
+import { isApiError } from "../../src/types/auth";
 import { formatApiErrorMessage } from "../../src/utils/auth";
 
 const PAGE_SIZE = 10;
@@ -63,6 +64,10 @@ export default function ProfilePostsScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState("");
+  /** `false`: autor restringiu a seguidores e quem le nao o segue. */
+  const [visible, setVisible] = useState(true);
+  /** 404: bloqueio em qualquer direcao (ou perfil inexistente). */
+  const [unavailable, setUnavailable] = useState(false);
 
   const { deletingPostId, dialogs, handlers, likeBusyPostId } = usePostListActions(setPosts);
 
@@ -87,6 +92,8 @@ export default function ProfilePostsScreen() {
         });
 
         setLoadError("");
+        setUnavailable(false);
+        setVisible(response.visible !== false);
         setPage(response.page);
         setHasNext(response.hasNext);
 
@@ -108,6 +115,13 @@ export default function ProfilePostsScreen() {
           return [...previous, ...appended];
         });
       } catch (nextError) {
+        if (reset && isApiError(nextError) && nextError.status === 404) {
+          setPosts([]);
+          setUnavailable(true);
+          setLoadError("");
+          return;
+        }
+
         if (reset) {
           setLoadError(
             formatApiErrorMessage(nextError, "Não foi possível carregar as publicações.")
@@ -180,6 +194,26 @@ export default function ProfilePostsScreen() {
             void loadPosts(true);
           }}
           retrying={loading}
+        />
+      );
+    }
+
+    if (unavailable) {
+      return (
+        <ScreenError
+          title="Perfil indisponível"
+          message="As publicações deste perfil não estão disponíveis para você."
+        />
+      );
+    }
+
+    if (!visible && !isOwnProfile) {
+      return (
+        <ScreenEmpty
+          title="Publicações só para seguidores"
+          description={`Este perfil só mostra publicações para seguidores. Siga ${
+            ownerName || "esta pessoa"
+          } para ver as postagens.`}
         />
       );
     }

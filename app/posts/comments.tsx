@@ -43,6 +43,14 @@ function normalizeParam(value?: string | string[]) {
   return (Array.isArray(value) ? value[0] : value) ?? "";
 }
 
+function describeLoadedComments(count: number) {
+  if (count === 0) {
+    return "Nenhum comentário ainda.";
+  }
+
+  return count === 1 ? "1 comentário carregado." : `${count} comentários carregados.`;
+}
+
 function CommentAvatar({
   authToken,
   avatarUrl,
@@ -176,6 +184,11 @@ export default function PersonalPostCommentsScreen() {
         setHasNext(response.hasNext);
         setComments((current) => {
           if (!options?.append) {
+            // Carga inicial: quem usa leitor de tela nao ve a lista surgir.
+            if (options?.showLoader) {
+              announceForAccessibility(describeLoadedComments(response.comments.length));
+            }
+
             return response.comments;
           }
 
@@ -183,9 +196,9 @@ export default function PersonalPostCommentsScreen() {
           const appended = response.comments.filter((comment) => !knownIds.has(comment.id));
 
           if (appended.length > 0) {
-            announceForAccessibility(
-              accessibilityAnnouncements.moreItemsLoaded(appended.length, "comentários")
-            );
+            // Texto local: o `moreItemsLoaded` do catalogo concorda no feminino
+            // ("carregadas"), o que soa errado para "comentários".
+            announceForAccessibility(describeLoadedComments(appended.length));
           }
 
           return [...current, ...appended];
@@ -286,6 +299,8 @@ export default function PersonalPostCommentsScreen() {
             <View className="flex-row items-center">
               <Pressable
                 className="mr-3 h-10 w-10 items-center justify-center rounded-full"
+                // 40dp visuais + hitSlop = area de toque de 48dp.
+                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                 accessibilityRole="button"
                 accessibilityLabel="Voltar"
                 accessibilityHint="Volta para a tela anterior sem salvar o comentário em edição"
@@ -430,6 +445,8 @@ export default function PersonalPostCommentsScreen() {
                           {canDelete ? (
                             <Pressable
                               className="h-9 w-9 items-center justify-center rounded-full"
+                              // 36dp visuais + hitSlop = area de toque de 48dp.
+                              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                               onPress={() => {
                                 speak(buildActionSpeech("Excluir comentário de", commentAuthorName));
                                 setDeleteTarget(comment);
@@ -479,6 +496,7 @@ export default function PersonalPostCommentsScreen() {
                       disabled={loadingMore}
                       accessibilityRole="button"
                       accessibilityLabel="Carregar mais comentários"
+                      accessibilityHint="Busca os próximos comentários desta publicação"
                       accessibilityState={{ busy: loadingMore, disabled: loadingMore }}
                     >
                       {loadingMore ? (
@@ -508,7 +526,10 @@ export default function PersonalPostCommentsScreen() {
                   accessibilityHint="Obrigatório para publicar"
                 />
                 <View className="mt-4 flex-row items-center justify-between">
-                  <Text className="text-[12px] font-semibold text-[#948EA1]">
+                  <Text
+                    className="text-[12px] font-semibold text-[#948EA1]"
+                    accessibilityLabel={`${draft.length} de ${COMMENT_MAX_LENGTH} caracteres usados`}
+                  >
                     {draft.length} / {COMMENT_MAX_LENGTH}
                   </Text>
                   <Pressable

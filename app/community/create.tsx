@@ -234,6 +234,8 @@ export default function CommunityCreatePostScreen() {
             <View className="flex-row items-center">
               <Pressable
                 className="mr-3 h-10 w-10 items-center justify-center rounded-full"
+                // 40dp visuais + hitSlop = area de toque de 48dp.
+                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                 onPress={() => {
                   speak("Voltar");
                   router.back();
@@ -248,7 +250,7 @@ export default function CommunityCreatePostScreen() {
             </View>
 
             <Pressable
-              className={`rounded-full px-4 py-2 ${
+              className={`min-h-[44px] justify-center rounded-full px-4 py-2 ${
                 trimmedBody.length > 0 && !submitting ? "bg-[#EAEA00]" : "bg-[#3B3841]"
               }`}
               onPress={() => {
@@ -323,8 +325,11 @@ export default function CommunityCreatePostScreen() {
             {isEditing ? null : (
               <View className="mt-6 rounded-[28px] bg-[#111214] p-6">
                 <View className="flex-row items-center justify-between">
-                  <View>
-                    <Text className="text-[22px] font-bold text-white">
+                  <View className="mr-3 flex-1">
+                    <Text
+                      className="text-[22px] font-bold text-white"
+                      accessibilityRole="header"
+                    >
                       Imagem opcional
                     </Text>
                   </View>
@@ -332,13 +337,19 @@ export default function CommunityCreatePostScreen() {
                   <Pressable
                     className="rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-3"
                     onPress={() => {
-                      speak(selectedImage ? "Trocar imagem" : "Selecionar imagem");
+                      speak(
+                        selectedImage
+                          ? "Trocar imagem da publicação"
+                          : "Adicionar imagem à publicação"
+                      );
                       setImageSourceVisible(true);
                     }}
                     disabled={pickingImage}
                     accessibilityRole="button"
                     accessibilityLabel={
-                      selectedImage ? "Trocar imagem" : "Selecionar imagem"
+                      selectedImage
+                        ? "Trocar imagem da publicação"
+                        : "Adicionar imagem à publicação"
                     }
                     accessibilityHint="Escolhe entre tirar uma foto ou abrir a galeria do aparelho"
                     accessibilityState={{
@@ -350,7 +361,12 @@ export default function CommunityCreatePostScreen() {
                       <ActivityIndicator color="#EAEA00" size="small" />
                     ) : (
                       <View className="flex-row items-center">
-                        <Ionicons name="image-outline" size={18} color="#E5E2E1" />
+                        <Ionicons
+                          name="image-outline"
+                          size={18}
+                          color="#E5E2E1"
+                          importantForAccessibility="no"
+                        />
                         <Text className="ml-2 text-[14px] font-bold text-white">
                           {selectedImage ? "Trocar" : "Selecionar"}
                         </Text>
@@ -365,16 +381,20 @@ export default function CommunityCreatePostScreen() {
                       source={{ uri: selectedImage.uri }}
                       className="aspect-video w-full"
                       resizeMode="cover"
+                      accessibilityLabel="Pré-visualização da imagem selecionada"
                     />
                     <View className="flex-row items-center justify-between px-4 py-4">
                       <Text className="flex-1 text-[13px] font-semibold text-[#CAC3D8]">
                         {selectedImage.fileName ?? "Imagem selecionada"}
                       </Text>
                       <Pressable
+                        className="min-h-[44px] justify-center pl-3"
                         onPress={() => {
                           speak("Imagem removida");
                           setSelectedImage(null);
                         }}
+                        // `disabled` real acompanha o accessibilityState abaixo.
+                        disabled={submitting}
                         accessibilityRole="button"
                         accessibilityLabel="Remover imagem"
                         accessibilityHint="Descarta a imagem anexada. O texto da publicação continua."

@@ -16,12 +16,22 @@ import {
 } from "../utils/accessibilityAnnouncements";
 import { showGlobalToast } from "../utils/globalToast";
 
-/** Limite aceito pelo backend (`unify.chat.audio.max-duration-seconds`). */
+/**
+ * Limite padrao: o do chat, aceito pelo backend
+ * (`unify.chat.audio.max-duration-seconds`).
+ */
 export const MAX_AUDIO_DURATION_SECONDS = 120;
+
+export type AudioRecorderStartResult = "started" | "permission-denied" | "failed";
 
 type UseAudioRecorderArgs = {
   /** Chamado quando a gravacao termina com sucesso (toque em parar ou limite atingido). */
   onRecorded: (media: ChatMediaUpload) => void;
+  /**
+   * Corte automatico, em segundos. Padrao `MAX_AUDIO_DURATION_SECONDS` (chat);
+   * o audio de apresentacao do perfil usa 60.
+   */
+  maxDurationSeconds?: number;
 };
 
 /**
@@ -34,7 +44,10 @@ type UseAudioRecorderArgs = {
  * e true o compositor troca a caixa de texto pelo cronometro e pelos botoes
  * de descartar/enviar.
  */
-export function useAudioRecorder({ onRecorded }: UseAudioRecorderArgs) {
+export function useAudioRecorder({
+  onRecorded,
+  maxDurationSeconds = MAX_AUDIO_DURATION_SECONDS,
+}: UseAudioRecorderArgs) {
   const recorder = useExpoAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
   const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null);
@@ -142,16 +155,21 @@ export function useAudioRecorder({ onRecorded }: UseAudioRecorderArgs) {
       return;
     }
 
-    if (elapsedSeconds >= MAX_AUDIO_DURATION_SECONDS && !autoStoppedRef.current) {
+    if (elapsedSeconds >= maxDurationSeconds && !autoStoppedRef.current) {
       autoStoppedRef.current = true;
       announceForAccessibility(
-        `Limite de ${MAX_AUDIO_DURATION_SECONDS} segundos atingido. Finalizando a gravação.`
+        `Limite de ${maxDurationSeconds} segundos atingido. Finalizando a gravação.`
       );
       void stop();
     }
-  }, [elapsedSeconds, recording, stop]);
+  }, [elapsedSeconds, maxDurationSeconds, recording, stop]);
 
-  const start = useCallback(async () => {
+  /**
+   * Inicia a gravacao. Devolve o desfecho para quem precisa reagir alem do
+   * toast (ex.: a tela Perfil mostra "Abrir configuracoes" quando o microfone
+   * esta bloqueado); o `ChatComposer` ignora o retorno.
+   */
+  const start = useCallback(async (): Promise<AudioRecorderStartResult> => {
     let granted = permissionGranted === true;
 
     if (!granted) {
@@ -166,7 +184,7 @@ export function useAudioRecorder({ onRecorded }: UseAudioRecorderArgs) {
         message: "Autorize o uso do microfone nos ajustes do celular para gravar áudios.",
         variant: "warning",
       });
-      return;
+      return "permission-denied";
     }
 
     try {
@@ -175,14 +193,16 @@ export function useAudioRecorder({ onRecorded }: UseAudioRecorderArgs) {
       await recorder.prepareToRecordAsync();
       recorder.record();
       announceForAccessibility(accessibilityAnnouncements.recordingStarted());
+      return "started";
     } catch {
       showGlobalToast({
         title: "Não foi possível gravar",
         message: "Tente novamente em instantes.",
         variant: "error",
       });
+      return "failed";
     }
   }, [permissionGranted, recorder]);
 
-  return { cancel, elapsedSeconds, recording, start, stop };
+  return { cancel, elapsedSeconds, permissionGranted, recording, start, stop };
 }

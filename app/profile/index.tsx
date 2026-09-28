@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { joinSpeechParts, useTTS } from "../../src/accessibility/tts";
@@ -18,6 +18,8 @@ import { ProfilePostsSection } from "../../src/components/feed/profile-posts-sec
 import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-nav";
 import { GlobalTopNav } from "../../src/components/navigation/global-top-nav";
 import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
+import { PresentationAudioSection } from "../../src/components/profile/presentation-audio-section";
+import { CountBadge } from "../../src/components/ui/count-badge";
 import { ScreenError } from "../../src/components/ui/screen-error";
 import { ScreenLoading } from "../../src/components/ui/screen-loading";
 import { useAccessibility } from "../../src/context/AccessibilityContext";
@@ -38,6 +40,10 @@ import {
   announceForAccessibility,
 } from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
+import {
+  followRequestsAccessLabel,
+  shouldShowFollowRequestsShortcut,
+} from "../../src/utils/followRequests";
 
 type StatItem = {
   label: string;
@@ -54,11 +60,20 @@ type ImageSource = "camera" | "gallery";
 const IMAGE_MEDIA_TYPES: ImagePicker.MediaType[] = ["images"];
 
 type ProfileAction = {
-  route: "/profile/edit" | "/profile/edit-match-preferences" | "/profile/accessibility-settings";
+  route:
+    | "/profile/edit"
+    | "/profile/edit-match-preferences"
+    | "/profile/accessibility-settings"
+    | "/profile/privacy"
+    | "/profile/follow-requests";
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   hint: string;
   primary?: boolean;
+  /** Rotulo lido pelo leitor quando difere do `label` (ex.: com contagem). */
+  accessibilityLabel?: string;
+  /** Badge decorativo no canto do botao; a contagem vai no `accessibilityLabel`. */
+  badgeCount?: number;
 };
 
 const PROFILE_ACTIONS: ProfileAction[] = [
@@ -81,19 +96,34 @@ const PROFILE_ACTIONS: ProfileAction[] = [
     label: "Configurações de acessibilidade",
     hint: "Abre os ajustes de fonte, contraste, leitura por voz e movimento",
   },
+  {
+    route: "/profile/privacy",
+    icon: "shield-checkmark-outline",
+    label: "Privacidade e bloqueios",
+    hint: "Abre as opções de conta privada, descoberta, idade, distância, quem vê seus posts e pessoas bloqueadas",
+  },
 ];
+
+const FOLLOW_REQUESTS_ACTION: Omit<ProfileAction, "accessibilityLabel" | "badgeCount"> = {
+  route: "/profile/follow-requests",
+  icon: "person-add-outline",
+  label: "Pedidos para seguir",
+  hint: "Abre os pedidos para seguir para aceitar ou recusar",
+};
 
 function ProfileActionButton({
   action,
+  highContrast,
   onPress,
 }: {
   action: ProfileAction;
+  highContrast: boolean;
   onPress: () => void;
 }) {
   const [tooltipVisible, setTooltipVisible] = useState(false);
 
   return (
-    <View className="flex-1">
+    <View className="relative flex-1">
       {tooltipVisible ? (
         <View
           className="absolute bottom-[62px] left-0 right-0 items-center"
@@ -121,7 +151,7 @@ function ProfileActionButton({
         onPressOut={() => setTooltipVisible(false)}
         delayLongPress={300}
         accessibilityRole="button"
-        accessibilityLabel={action.label}
+        accessibilityLabel={action.accessibilityLabel ?? action.label}
         accessibilityHint={action.hint}
       >
         <Ionicons
@@ -131,6 +161,12 @@ function ProfileActionButton({
           importantForAccessibility="no"
         />
       </Pressable>
+
+      <CountBadge
+        count={action.badgeCount}
+        highContrast={highContrast}
+        className="absolute -right-1 -top-2"
+      />
     </View>
   );
 }
@@ -312,6 +348,24 @@ export default function Profile() {
   const [sourcePickerTarget, setSourcePickerTarget] = useState<UploadTarget | null>(null);
   const [imageAuthToken, setImageAuthToken] = useState<string | null>(null);
   const [followStats, setFollowStats] = useState<FollowStatsResponse | null>(null);
+  // Nulo em backend antigo ou em perfil alheio; so o proprio perfil traz numero.
+  const pendingFollowRequests = followStats?.pendingFollowRequestsCount ?? 0;
+  // Atalho para os pedidos: com a conta privada ligada ou com pendentes.
+  const showFollowRequestsShortcut = shouldShowFollowRequestsShortcut(followStats);
+  const profileActions = useMemo<ProfileAction[]>(
+    () =>
+      showFollowRequestsShortcut
+        ? [
+            ...PROFILE_ACTIONS,
+            {
+              ...FOLLOW_REQUESTS_ACTION,
+              accessibilityLabel: followRequestsAccessLabel(pendingFollowRequests),
+              badgeCount: pendingFollowRequests,
+            },
+          ]
+        : PROFILE_ACTIONS,
+    [pendingFollowRequests, showFollowRequestsShortcut]
+  );
 
   const galleryImages = profile?.galleryImages ?? [];
   const profilePictureUrl = profileService.resolveProfileImageUrl(profile?.profilePicture?.url);
@@ -378,30 +432,35 @@ export default function Profile() {
 
   // Contadores de seguidores/seguindo: so fazem sentido depois que o id do
   // perfil chega. Falha aqui nao derruba a tela — os tiles seguem com "—".
-  useEffect(() => {
-    const profileId = profile?.id;
+  // Recarrega a cada foco: aceitar pedidos ou deixar de seguir em outra tela
+  // muda os contadores e os pedidos pendentes.
+  const profileId = profile?.id;
 
-    if (!profileId) {
-      return;
-    }
+  useFocusEffect(
+    useCallback(() => {
+      if (!profileId) {
+        return;
+      }
 
-    let active = true;
+      let active = true;
 
-    void followService
-      .getFollowStats(profileId)
-      .then((stats) => {
-        if (active) {
-          setFollowStats(stats);
-        }
-      })
-      .catch(() => {
-        // Global API error toast already explains the failure.
-      });
+      // Silencioso: sem stats os tiles ficam com "—" e o atalho de pedidos some.
+      void followService
+        .getFollowStats(profileId, { silent: true })
+        .then((stats) => {
+          if (active) {
+            setFollowStats(stats);
+          }
+        })
+        .catch(() => {
+          // Falha silenciosa (contadores e badge sao extras).
+        });
 
-    return () => {
-      active = false;
-    };
-  }, [profile?.id]);
+      return () => {
+        active = false;
+      };
+    }, [profileId])
+  );
 
   useEffect(() => {
     let active = true;
@@ -826,6 +885,14 @@ export default function Profile() {
               )}
             </View>
 
+            <PresentationAudioSection
+              audio={profile?.presentationAudio ?? null}
+              authToken={imageAuthToken}
+              highContrast={highContrast}
+              loading={loading}
+              onChanged={() => loadProfile(true)}
+            />
+
             {loading ? (
               <View className="mt-8">
                 <SectionLoadingState message="Calculando seus indicadores de perfil..." />
@@ -877,12 +944,15 @@ export default function Profile() {
             )}
 
             <View className="mt-6 flex-row items-center justify-center gap-3">
-              {PROFILE_ACTIONS.map((action) => (
+              {/* Pedidos para seguir entram aqui como mais um botao-icone, com
+                  badge da contagem (vinda do follow-stats do proprio perfil). */}
+              {profileActions.map((action) => (
                 <ProfileActionButton
                   key={action.route}
                   action={action}
+                  highContrast={highContrast}
                   onPress={() => {
-                    speak(action.label);
+                    speak(action.accessibilityLabel ?? action.label);
                     router.push(action.route);
                   }}
                 />

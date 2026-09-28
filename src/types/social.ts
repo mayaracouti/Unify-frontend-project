@@ -11,9 +11,17 @@ export type FeedSource =
   | "SUGGESTED_PROFILE"
   | "SUGGESTED_COMMUNITY";
 
+/**
+ * Resposta de `POST|DELETE /users/{id}/follow`.
+ *
+ * Quando o alvo aprova seguidores (`followApprovalRequired`) e eu ainda nao o
+ * sigo, o `POST` cria um pedido: volta `following=false, followRequested=true`.
+ * O `DELETE` deixa de seguir E cancela o meu pedido pendente (os dois `false`).
+ */
 export interface FollowActionResponse {
   targetUserProfileId: string;
   following: boolean;
+  followRequested: boolean;
   followersCount: number;
   followingCount: number;
 }
@@ -23,6 +31,12 @@ export interface FollowStatsResponse {
   followersCount: number;
   followingCount: number;
   followedByCurrentUser: boolean;
+  /** Tenho um pedido pendente para seguir este perfil. */
+  followRequestedByCurrentUser: boolean;
+  /** O perfil so ganha seguidores depois de aceitar o pedido. */
+  followApprovalRequired: boolean;
+  /** Pedidos recebidos pendentes; so vem preenchido no MEU perfil (nulo nos outros). */
+  pendingFollowRequestsCount: number | null;
 }
 
 export interface FollowedProfileSummaryResponse {
@@ -32,10 +46,36 @@ export interface FollowedProfileSummaryResponse {
   name: string;
   avatarUrl: string | null;
   followedByCurrentUser: boolean;
+  /** Tenho um pedido pendente para seguir esta pessoa. */
+  followRequestedByCurrentUser: boolean;
 }
 
 export interface FollowPageResponse {
   profiles: FollowedProfileSummaryResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  hasNext: boolean;
+}
+
+/**
+ * Pedido para seguir (`GET /users/follow-requests` e `.../sent`). Os campos de
+ * pessoa sao sempre da OUTRA ponta: quem pediu (recebidos) ou quem eu pedi
+ * para seguir (enviados). `avatarUrl` e relativo, como nos outros DTOs sociais.
+ */
+export interface FollowRequestResponse {
+  id: string;
+  userProfileId: string;
+  userId: string;
+  name: string;
+  avatarUrl: string | null;
+  /** ISO-8601. */
+  createdAt: string;
+}
+
+export interface FollowRequestPageResponse {
+  requests: FollowRequestResponse[];
   page: number;
   size: number;
   totalElements: number;
@@ -86,6 +126,12 @@ export interface UserFeedPageResponse {
   page: number;
   size: number;
   hasNext: boolean;
+  /**
+   * `false` em `GET /users/{id}/posts` quando o autor restringiu as
+   * publicacoes a seguidores e quem le nao o segue (lista vem vazia). Sempre
+   * `true` no feed.
+   */
+  visible: boolean;
 }
 
 export interface UserPostUpdateRequest {

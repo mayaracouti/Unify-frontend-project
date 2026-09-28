@@ -172,6 +172,8 @@ function RootNavigator() {
             <Stack.Screen name="profile/edit" />
             <Stack.Screen name="profile/edit-match-preferences" />
             <Stack.Screen name="profile/accessibility-settings" />
+            <Stack.Screen name="profile/privacy" />
+            <Stack.Screen name="profile/follow-requests" />
           </Stack.Protected>
         </Stack.Protected>
       </Stack>

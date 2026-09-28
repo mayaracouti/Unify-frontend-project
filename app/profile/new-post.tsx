@@ -235,6 +235,8 @@ export default function ProfileNewPostScreen() {
             <View className="flex-row items-center">
               <Pressable
                 className="mr-3 h-10 w-10 items-center justify-center rounded-full"
+                // 40dp visuais + hitSlop = area de toque de 48dp.
+                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                 onPress={() => {
                   speak("Voltar");
                   router.back();
@@ -253,7 +255,7 @@ export default function ProfileNewPostScreen() {
             </View>
 
             <Pressable
-              className={`rounded-full px-4 py-2 ${
+              className={`min-h-[44px] justify-center rounded-full px-4 py-2 ${
                 submitDisabled ? "bg-[#3B3841]" : "bg-[#EAEA00]"
               }`}
               onPress={() => {
@@ -334,7 +336,10 @@ export default function ProfileNewPostScreen() {
             {isEditing ? null : (
               <View className={`mt-6 rounded-[28px] p-6 ${cardBackground}`}>
                 <View className="flex-row items-center justify-between">
-                  <Text className={`text-[22px] font-bold ${titleColor}`}>
+                  <Text
+                    className={`mr-3 flex-1 text-[22px] font-bold ${titleColor}`}
+                    accessibilityRole="header"
+                  >
                     Imagem opcional
                   </Text>
 
@@ -345,13 +350,19 @@ export default function ProfileNewPostScreen() {
                         : "border-[#494455] bg-[#1A1C1F]"
                     }`}
                     onPress={() => {
-                      speak(selectedImage ? "Trocar imagem" : "Selecionar imagem");
+                      speak(
+                        selectedImage
+                          ? "Trocar imagem da publicação"
+                          : "Adicionar imagem à publicação"
+                      );
                       setImageSourceVisible(true);
                     }}
                     disabled={pickingImage}
                     accessibilityRole="button"
                     accessibilityLabel={
-                      selectedImage ? "Trocar imagem" : "Selecionar imagem"
+                      selectedImage
+                        ? "Trocar imagem da publicação"
+                        : "Adicionar imagem à publicação"
                     }
                     accessibilityHint="Escolhe entre tirar uma foto ou abrir a galeria do aparelho"
                     accessibilityState={{
@@ -398,6 +409,7 @@ export default function ProfileNewPostScreen() {
                         {selectedImage.fileName ?? "Imagem selecionada"}
                       </Text>
                       <Pressable
+                        className="min-h-[44px] justify-center pl-3"
                         onPress={() => {
                           speak("Remover imagem");
                           setSelectedImage(null);

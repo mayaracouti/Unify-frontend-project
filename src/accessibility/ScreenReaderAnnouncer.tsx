@@ -36,6 +36,8 @@ const ROUTE_LABELS: Record<string, string> = {
   "/profile/edit": "Editar perfil",
   "/profile/edit-match-preferences": "Editar preferências de match",
   "/profile/accessibility-settings": "Configurações de acessibilidade",
+  "/profile/privacy": "Privacidade e bloqueios",
+  "/profile/follow-requests": "Pedidos para seguir",
   "/onboarding/profile": "Complete seu perfil",
   "/onboarding/match-preferences": "Preferências de match",
   "/auth/login": "Entrar na Unify",
