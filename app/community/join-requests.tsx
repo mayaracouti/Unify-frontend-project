@@ -1,5 +1,9 @@
+import { useIsFocused } from "expo-router/react-navigation";
+import { useCommunityAccess } from "../../src/hooks/use-community-access";
+import { useCommunityPage } from "../../src/hooks/use-community-page";
+import { canModerate } from "../../src/utils/communityPermissions";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -21,9 +25,7 @@ import { useAuth } from "../../src/context/AuthContext";
 import { communityService } from "../../src/services/communityService";
 import type {
   CommunityJoinRequestResponse,
-  CommunityJoinRequestsResponse,
 } from "../../src/types/community";
-import { formatApiErrorMessage } from "../../src/utils/auth";
 import {
   accessibilityAnnouncements,
   announceForAccessibility,
@@ -32,14 +34,7 @@ import { showGlobalToast } from "../../src/utils/globalToast";
 
 const REQUESTS_PAGE_SIZE = 20;
 
-const EMPTY_REQUESTS_RESPONSE: CommunityJoinRequestsResponse = {
-  content: [],
-  page: 0,
-  size: REQUESTS_PAGE_SIZE,
-  totalElements: 0,
-  totalPages: 0,
-  hasNext: false,
-};
+
 
 function normalizeRouteParam(value?: string | string[]) {
   if (Array.isArray(value)) {
@@ -167,6 +162,8 @@ function JoinRequestCard({
   );
 }
 
+const requestKey = (request: CommunityJoinRequestResponse) => request.id;
+
 export default function CommunityJoinRequestsScreen() {
   const router = useRouter();
   const { speak } = useTTS();
@@ -186,95 +183,39 @@ export default function CommunityJoinRequestsScreen() {
   );
   const authToken = session?.accessToken ?? null;
 
-  const [requests, setRequests] = useState<CommunityJoinRequestsResponse>(
-    EMPTY_REQUESTS_RESPONSE
-  );
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [busyRequest, setBusyRequest] = useState<{
-    id: string;
-    action: "approve" | "decline";
-  } | null>(null);
-
-  const loadRequests = useCallback(
-    async (options?: { refresh?: boolean; append?: boolean }) => {
-      if (!communityId) {
-        setLoading(false);
-        setLoadError("Não foi possível identificar a comunidade selecionada.");
-        return;
-      }
-
-      if (options?.refresh) {
-        setRefreshing(true);
-      } else if (options?.append) {
-        setLoadingMore(true);
-      }
-
-      try {
-        setLoadError(null);
-
-        const nextPage = options?.append ? requests.page + 1 : 0;
-        const response = await communityService.getJoinRequests(communityId, {
-          page: nextPage,
-          size: REQUESTS_PAGE_SIZE,
-        });
-
-        setRequests((currentRequests) => {
-          if (!options?.append) {
-            return response;
-          }
-
-          const merged = new Map<string, CommunityJoinRequestResponse>();
-
-          for (const request of currentRequests.content) {
-            merged.set(request.id, request);
-          }
-
-          for (const request of response.content) {
-            merged.set(request.id, request);
-          }
-
-          return { ...response, content: Array.from(merged.values()) };
-        });
-      } catch (error) {
-        setLoadError(
-          formatApiErrorMessage(
-            error,
-            "Não foi possível carregar as solicitações de entrada."
-          )
-        );
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
-        setRefreshing(false);
-      }
-    },
-    [communityId, requests.page]
-  );
-
-  useEffect(() => {
-    void loadRequests();
-    // Carrega uma vez ao abrir a tela; atualizacoes seguem via pull-to-refresh.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityId]);
-
+  const access = useCommunityAccess(communityId);
+  const isFocused = useIsFocused();
+  const allowed = canModerate(access.community);
+  const fetchRequests = useCallback((page: number) => communityService.getJoinRequests(communityId, { page, size: REQUESTS_PAGE_SIZE }), [communityId]);
+  const list = useCommunityPage(fetchRequests, requestKey);
+  const { refresh, loadMore, setItems } = list;
+  const reloadAccess = access.reload;
+  const requests = { content: list.items, hasNext: list.hasNext };
+  const loading = access.loading || list.loading && list.items.length === 0;
+  const loadingMore = list.loadingMore;
+  const refreshing = list.loading && list.items.length > 0;
+  const loadError = access.error || list.error || (!access.loading && !allowed ? "Somente administradores e moderadores podem revisar solicitações." : null);
+  const [busyRequest, setBusyRequest] = useState<{ id: string; action: "approve" | "decline" } | null>(null);
+  const actionLock = useRef(false);
+  const loadRequests = useCallback(async (options?: { refresh?: boolean; append?: boolean }) => {
+    if (!allowed) { await reloadAccess(); return; }
+    if (options?.append) await loadMore(); else await refresh();
+  }, [allowed, reloadAccess, loadMore, refresh]);
+  useEffect(() => { if (isFocused && allowed) void refresh(); }, [isFocused, allowed, refresh]);
   const removeRequestFromList = useCallback((requestId: string) => {
-    setRequests((currentRequests) => ({
-      ...currentRequests,
-      content: currentRequests.content.filter((request) => request.id !== requestId),
-      totalElements: Math.max(currentRequests.totalElements - 1, 0),
-    }));
-  }, []);
+    setItems((current) => current.filter((request) => request.id !== requestId));
+    // Removal changes page offsets: refresh before loading the next page.
+    void refresh();
+  }, [setItems, refresh]);
 
   const handleApprove = useCallback(
     async (request: CommunityJoinRequestResponse) => {
-      if (!communityId || busyRequest) {
+      if (!communityId || actionLock.current || !allowed) {
         return;
       }
 
       speak(buildActionSpeech("Aceitar entrada de", request.name ?? null));
+      actionLock.current = true;
       setBusyRequest({ id: request.id, action: "approve" });
 
       try {
@@ -292,19 +233,21 @@ export default function CommunityJoinRequestsScreen() {
       } catch {
         // Global API error toast already explains the failure.
       } finally {
+        actionLock.current = false;
         setBusyRequest(null);
       }
     },
-    [busyRequest, communityId, removeRequestFromList, speak]
+    [allowed, communityId, removeRequestFromList, speak]
   );
 
   const handleDecline = useCallback(
     async (request: CommunityJoinRequestResponse) => {
-      if (!communityId || busyRequest) {
+      if (!communityId || actionLock.current || !allowed) {
         return;
       }
 
       speak(buildActionSpeech("Recusar entrada de", request.name ?? null));
+      actionLock.current = true;
       setBusyRequest({ id: request.id, action: "decline" });
 
       try {
@@ -322,10 +265,11 @@ export default function CommunityJoinRequestsScreen() {
       } catch {
         // Global API error toast already explains the failure.
       } finally {
+        actionLock.current = false;
         setBusyRequest(null);
       }
     },
-    [busyRequest, communityId, removeRequestFromList, speak]
+    [allowed, communityId, removeRequestFromList, speak]
   );
 
   return (
@@ -361,7 +305,6 @@ export default function CommunityJoinRequestsScreen() {
               title="Solicitações indisponíveis"
               message={loadError}
               onRetry={() => {
-                setLoading(true);
                 void loadRequests();
               }}
             />

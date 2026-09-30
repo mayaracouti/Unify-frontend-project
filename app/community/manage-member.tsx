@@ -1,5 +1,10 @@
+import { useCommunityAccess } from "../../src/hooks/use-community-access";
+import { communityRole } from "../../src/utils/communityPermissions";
+import { useAppShell } from "../../src/context/AppShellContext";
+import { ScreenError } from "../../src/components/ui/screen-error";
+import { formatApiErrorMessage } from "../../src/utils/auth";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -7,7 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { buildActionSpeech, useTTS } from "../../src/accessibility/tts";
 import { useScreenHeadingFocus } from "../../src/hooks/use-screen-heading-focus";
 import { communityService } from "../../src/services/communityService";
-import type { CommunityRole } from "../../src/types/community";
+import type { CommunityRole, CommunityMemberResponse } from "../../src/types/community";
 import {
   accessibilityAnnouncements,
   announceForAccessibility,
@@ -32,16 +37,6 @@ function normalizeRouteParam(value?: string | string[]) {
   }
 
   return value ?? "";
-}
-
-function normalizeRole(value?: string | string[]): CommunityRole | null {
-  const normalizedValue = normalizeRouteParam(value).trim().toUpperCase();
-
-  if (normalizedValue === "ADMIN" || normalizedValue === "MODERATOR" || normalizedValue === "MEMBER") {
-    return normalizedValue;
-  }
-
-  return null;
 }
 
 export default function CommunityManageMemberScreen() {
@@ -75,7 +70,38 @@ export default function CommunityManageMemberScreen() {
     () => normalizeRouteParam(params.userName).trim() || "Membro da comunidade",
     [params.userName]
   );
-  const viewerRole = useMemo(() => normalizeRole(params.viewerRole), [params.viewerRole]);
+  const access = useCommunityAccess(communityId);
+  const viewerRole = communityRole(access.community);
+  const { currentUserId, currentUserProfileId } = useAppShell();
+  const [target, setTarget] = useState<CommunityMemberResponse | null>(null);
+  const [targetLoading, setTargetLoading] = useState(true);
+  const [targetError, setTargetError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
+  const roleLock = useRef(false);
+  useEffect(() => {
+    let active = true;
+    setTarget(null);
+    setTargetError(null);
+    setTargetLoading(true);
+    const findTarget = async () => {
+      try {
+        if (!communityId || !userProfileId) throw new Error("Membro não identificado.");
+        let page = 0;
+        while (active) {
+          const result = await communityService.getMembers(communityId, { page, size: 50 });
+          const member = result.content.find((item) => item.userProfileId === userProfileId);
+          if (member) { if (active) setTarget(member); return; }
+          if (!result.hasNext || result.content.length === 0) throw new Error("Essa pessoa não participa mais da comunidade.");
+          page += 1;
+        }
+      } catch (cause) {
+        if (active) setTargetError(formatApiErrorMessage(cause, "Não foi possível verificar o cargo atual."));
+      } finally { if (active) setTargetLoading(false); }
+    };
+    if (viewerRole === "ADMIN" || viewerRole === "MODERATOR") void findTarget();
+    else setTargetLoading(false);
+    return () => { active = false; };
+  }, [communityId, userProfileId, viewerRole, retry]);
   const returnTab = useMemo(
     () => normalizeRouteParam(params.returnTab).trim().toLowerCase(),
     [params.returnTab]
@@ -95,7 +121,11 @@ export default function CommunityManageMemberScreen() {
   }, [viewerRole]);
 
   const canManage =
-    communityId.length > 0 && userProfileId.length > 0 && availableRoles.length > 0;
+    !access.loading && !targetLoading && Boolean(target) && availableRoles.length > 0 &&
+    !target?.isOwner && !target?.owner && userProfileId !== access.community?.owner?.userProfileId &&
+    !(target?.id && target.id === access.community?.owner?.id) &&
+    userProfileId !== currentUserProfileId && !(target?.id && target.id === currentUserId) &&
+    !(viewerRole === "MODERATOR" && target?.role === "ADMIN");
 
   const handleBack = useCallback(() => {
     if (communityId) {
@@ -111,12 +141,13 @@ export default function CommunityManageMemberScreen() {
 
   const handleSelectRole = useCallback(
     async (role: CommunityRole) => {
-      if (!canManage || pendingRole) {
+      if (!canManage || roleLock.current || !availableRoles.includes(role) || target?.role === role) {
         return;
       }
 
       // Acao sobre pessoa dinamica: "Tornar Maria Moderador".
       speak(buildActionSpeech(`Tornar ${userName}`, ROLE_LABELS[role]));
+      roleLock.current = true;
       setPendingRole(role);
 
       try {
@@ -134,10 +165,11 @@ export default function CommunityManageMemberScreen() {
       } catch {
         // Global API error toast already explains the failure.
       } finally {
+        roleLock.current = false;
         setPendingRole(null);
       }
     },
-    [canManage, communityId, handleBack, pendingRole, speak, userName, userProfileId]
+    [availableRoles, canManage, communityId, handleBack, speak, target?.role, userName, userProfileId]
   );
 
   return (
@@ -185,12 +217,13 @@ export default function CommunityManageMemberScreen() {
               </Text>
             ) : null}
             <Text className="mt-4 text-[15px] font-semibold leading-7 text-[#E5E2E1]">
-              Escolha o novo cargo dessa pessoa dentro da comunidade. O backend continua
-              validando as regras de owner, autoalteração e limites de moderação.
+              Escolha o novo cargo dessa pessoa dentro da comunidade.
             </Text>
           </View>
 
-          {canManage ? (
+          {access.loading || targetLoading ? <ActivityIndicator color="#7C4DFF" /> : access.error || targetError ? (
+            <ScreenError message={access.error || targetError || "Não foi possível carregar o membro."} onRetry={() => { void access.reload(); setRetry((value) => value + 1); }} />
+          ) : canManage ? (
             <View className="mt-6 gap-4">
               {availableRoles.map((role) => {
                 const isPending = pendingRole === role;
@@ -208,11 +241,11 @@ export default function CommunityManageMemberScreen() {
                     onPress={() => {
                       void handleSelectRole(role);
                     }}
-                    disabled={Boolean(pendingRole)}
+                    disabled={Boolean(pendingRole) || target?.role === role}
                     accessibilityRole="button"
                     accessibilityLabel={`Tornar ${userName} ${ROLE_LABELS[role]}`}
                     accessibilityHint="Aplica o novo cargo na hora e volta para a comunidade."
-                    accessibilityState={{ disabled: Boolean(pendingRole), busy: isPending }}
+                    accessibilityState={{ disabled: Boolean(pendingRole) || target?.role === role, busy: isPending }}
                   >
                     <View className="flex-row items-start gap-4">
                       <View
@@ -243,7 +276,7 @@ export default function CommunityManageMemberScreen() {
 
                       <View className="flex-1">
                         <Text className="text-[20px] font-black text-white">
-                          {ROLE_LABELS[role]}
+                          {ROLE_LABELS[role]}{target?.role === role ? " (atual)" : ""}
                         </Text>
                         <Text className="mt-2 text-[14px] font-semibold leading-6 text-[#CAC3D8]">
                           {ROLE_DESCRIPTIONS[role]}

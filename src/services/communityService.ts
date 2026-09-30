@@ -1,7 +1,10 @@
+import { normalizeCommunityPage } from "../utils/communityPagination";
 import { customApiCall } from "../api/customApi";
 import { runtimeConfig } from "../config/runtime";
 import type {
   CommunityCategoryResponse,
+  CommunityForYouPostResponse,
+  CommunityJoinRequestResponse,
   CommunityDirectoryResponse,
   CommunityCommentResponse,
   CommunityCommentsResponse,
@@ -16,6 +19,7 @@ import type {
   CommunityMemberResponse,
   CommunityMembershipResponse,
   CommunityPostResponse,
+  CommunityPostDetailResponse,
   CommunityPostUpdateRequest,
   CommunitySummaryResponse,
 } from "../types/community";
@@ -94,7 +98,7 @@ export const communityService = {
       categoryId: args?.categoryId ?? undefined,
     }, {
       requiresAuth: true,
-    });
+    }).then((response) => normalizeCommunityPage<CommunitySummaryResponse>(response, "communities", args?.page, args?.size)).then(({ content, ...page }) => ({ ...page, communities: content }));
   },
 
   searchCommunities(
@@ -108,7 +112,7 @@ export const communityService = {
       categoryId: args?.categoryId ?? undefined,
     }, {
       requiresAuth: true,
-    });
+    }).then((response) => normalizeCommunityPage<CommunitySummaryResponse>(response, "communities", args?.page, args?.size)).then(({ content, ...page }) => ({ ...page, communities: content }));
   },
 
   discoverCommunities(args?: { page?: number; size?: number; categoryId?: number | null }) {
@@ -118,7 +122,7 @@ export const communityService = {
       categoryId: args?.categoryId ?? undefined,
     }, {
       requiresAuth: true,
-    });
+    }).then((response) => normalizeCommunityPage<CommunitySummaryResponse>(response, "communities", args?.page, args?.size)).then(({ content, ...page }) => ({ ...page, communities: content }));
   },
 
   getMyCommunities(args?: { page?: number; size?: number }) {
@@ -127,7 +131,7 @@ export const communityService = {
       size: args?.size ?? 20,
     }, {
       requiresAuth: true,
-    });
+    }).then((response) => normalizeCommunityPage<CommunitySummaryResponse>(response, "communities", args?.page, args?.size)).then(({ content, ...page }) => ({ ...page, communities: content }));
   },
 
   createCommunity(formData: FormData) {
@@ -166,7 +170,10 @@ export const communityService = {
         size: args?.size ?? 20,
       },
       { requiresAuth: true }
-    );
+    ).then((response) => ({
+      ...response,
+      posts: normalizeCommunityPage<CommunityPostResponse>(response.posts, "posts", args?.page, args?.size),
+    }));
   },
 
   getForYouFeed(args?: { page?: number; size?: number }) {
@@ -177,7 +184,7 @@ export const communityService = {
         size: args?.size ?? 20,
       },
       { requiresAuth: true }
-    );
+    ).then((response) => normalizeCommunityPage<CommunityForYouPostResponse>(response, "posts", args?.page, args?.size));
   },
 
   joinCommunity(communityId: string) {
@@ -203,7 +210,7 @@ export const communityService = {
         size: args?.size ?? 20,
       },
       { requiresAuth: true }
-    );
+    ).then((response) => normalizeCommunityPage<CommunityJoinRequestResponse>(response, "requests", args?.page, args?.size));
   },
 
   approveJoinRequest(communityId: string, requestId: string) {
@@ -229,7 +236,7 @@ export const communityService = {
         size: args?.size ?? 20,
       },
       { requiresAuth: true }
-    );
+    ).then((response) => normalizeCommunityPage<CommunityMemberResponse>(response, "members", args?.page, args?.size));
   },
 
   updateMemberRole(
@@ -243,6 +250,14 @@ export const communityService = {
     >(
       `${COMMUNITIES_ENDPOINT}/${encodePathSegment(communityId)}/members/${encodePathSegment(userProfileId)}/role`,
       payload,
+      { requiresAuth: true }
+    );
+  },
+
+  getPost(postId: string) {
+    return customApiCall.get<CommunityPostDetailResponse>(
+      `${COMMUNITY_POSTS_ENDPOINT}/${encodePathSegment(postId)}`,
+      undefined,
       { requiresAuth: true }
     );
   },
@@ -301,12 +316,20 @@ export const communityService = {
         size: args?.size ?? 20,
       },
       { requiresAuth: true }
-    );
+    ).then((response) => normalizeCommunityPage<CommunityCommentResponse>(response, "comments", args?.page, args?.size));
   },
 
   createComment(postId: string, payload: CommunityCreateCommentRequest) {
     return customApiCall.post<CommunityCommentResponse, CommunityCreateCommentRequest>(
       `${COMMUNITY_POSTS_ENDPOINT}/${encodePathSegment(postId)}/comments`,
+      payload,
+      { requiresAuth: true }
+    );
+  },
+
+  updateComment(postId: string, commentId: string, payload: CommunityCreateCommentRequest) {
+    return customApiCall.put<CommunityCommentResponse, CommunityCreateCommentRequest>(
+      `${COMMUNITY_POSTS_ENDPOINT}/${encodePathSegment(postId)}/comments/${encodePathSegment(commentId)}`,
       payload,
       { requiresAuth: true }
     );

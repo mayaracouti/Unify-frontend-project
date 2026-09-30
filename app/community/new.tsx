@@ -1,7 +1,8 @@
+import { buildCommunityFormData } from "../../src/utils/communityFormData";
 import { goBackOrReplace } from "../../src/utils/navigation";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -33,51 +34,6 @@ import { showGlobalToast } from "../../src/utils/globalToast";
 
 const IMAGE_MEDIA_TYPES: ImagePicker.MediaType[] = ["images"];
 
-function createCommunityFormData(
-  name: string,
-  description: string,
-  categoryId: number | null,
-  privacy: CommunityPrivacy,
-  asset: ImagePicker.ImagePickerAsset | null
-) {
-  const formData = new FormData();
-
-  formData.append("name", name);
-  formData.append("privacy", privacy);
-
-  if (description.trim().length > 0) {
-    formData.append("description", description.trim());
-  }
-
-  if (categoryId) {
-    formData.append("categoryId", String(categoryId));
-  }
-
-  if (!asset) {
-    return formData;
-  }
-
-  const fileName = asset.fileName ?? `community-${Date.now()}.jpg`;
-  const mimeType = asset.mimeType ?? "image/jpeg";
-  const webFile = (asset as ImagePicker.ImagePickerAsset & { file?: File }).file;
-
-  if (Platform.OS === "web" && webFile) {
-    formData.append("icon", webFile, fileName);
-    return formData;
-  }
-
-  formData.append(
-    "icon",
-    {
-      uri: asset.uri,
-      name: fileName,
-      type: mimeType,
-    } as unknown as Blob
-  );
-
-  return formData;
-}
-
 export default function CommunityCreateScreen() {
   const router = useRouter();
   const { speak } = useTTS();
@@ -91,6 +47,7 @@ export default function CommunityCreateScreen() {
     null
   );
   const [pickingImage, setPickingImage] = useState(false);
+  const submitLock = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [categories, setCategories] = useState<CommunityCategoryResponse[]>([]);
   const [categoryId, setCategoryId] = useState<number | null>(null);
@@ -160,7 +117,7 @@ export default function CommunityCreateScreen() {
   }, [pickingImage]);
 
   const handleSubmit = useCallback(async () => {
-    if (submitting) {
+    if (submitLock.current || pickingImage) {
       return;
     }
 
@@ -173,16 +130,13 @@ export default function CommunityCreateScreen() {
       return;
     }
 
+    submitLock.current = true;
     setSubmitting(true);
 
     try {
-      const formData = createCommunityFormData(
-        trimmedName,
-        description,
-        categoryId,
-        privacy,
-        selectedImage
-      );
+      const formData = await buildCommunityFormData({
+        name: trimmedName, description, categoryId, privacy, asset: selectedImage,
+      });
       const community = await communityService.createCommunity(formData);
 
       showGlobalToast({
@@ -196,12 +150,14 @@ export default function CommunityCreateScreen() {
         pathname: "/community/[communityId]",
         params: { communityId: community.id },
       });
-    } catch {
-      // Global API error toast already explains the failure.
+    } catch (error) {
+      if (error instanceof Error) showGlobalToast({ title: "Não foi possível salvar", variant: "error", message: error.message || "Tente novamente. Seu texto foi mantido." });
+      // HTTP errors already use the global API toast.
     } finally {
+      submitLock.current = false;
       setSubmitting(false);
     }
-  }, [categoryId, description, privacy, router, selectedImage, submitting, trimmedName]);
+  }, [pickingImage, categoryId, description, privacy, router, selectedImage, trimmedName]);
 
   return (
     <View className="flex-1 bg-[#09090A]">
@@ -236,14 +192,14 @@ export default function CommunityCreateScreen() {
                 speak(buildActionSpeech("Criar comunidade", trimmedName));
                 void handleSubmit();
               }}
-              disabled={trimmedName.length === 0 || submitting}
+              disabled={trimmedName.length === 0 || submitting || pickingImage}
               accessibilityRole="button"
               accessibilityLabel={
                 trimmedName ? `Criar comunidade ${trimmedName}` : "Criar comunidade"
               }
               accessibilityHint="Cria a comunidade e abre a página dela"
               accessibilityState={{
-                disabled: trimmedName.length === 0 || submitting,
+                disabled: trimmedName.length === 0 || submitting || pickingImage,
                 busy: submitting,
               }}
             >
@@ -281,7 +237,8 @@ export default function CommunityCreateScreen() {
                 maxLength={80}
                 placeholder="Ex.: Acessibilidade em foco"
                 placeholderTextColor="#948EA1"
-                value={name}
+                editable={!submitting}
+                  value={name}
                 onChangeText={setName}
                 onFocus={() => speak("Nome da comunidade")}
                 accessibilityLabel="Nome da comunidade"
@@ -301,7 +258,8 @@ export default function CommunityCreateScreen() {
                 placeholder="Explique o propósito da comunidade e que tipo de conversa faz sentido nela."
                 placeholderTextColor="#948EA1"
                 textAlignVertical="top"
-                value={description}
+                editable={!submitting}
+                  value={description}
                 onChangeText={setDescription}
                 onFocus={() => speak("Descrição da comunidade")}
                 accessibilityLabel="Descrição da comunidade"
@@ -342,7 +300,7 @@ export default function CommunityCreateScreen() {
                 <View className="flex-1 pr-4">
                   <Text className="text-[22px] font-bold text-white">Ícone opcional</Text>
                   <Text className="mt-1 text-[14px] font-semibold leading-6 text-[#CAC3D8]">
-                    O backend recebe o ícone como multipart, comprime e converte para JPEG automaticamente.
+                    Escolha uma imagem que ajude as pessoas a reconhecer sua comunidade.
                   </Text>
                 </View>
 
@@ -405,7 +363,7 @@ export default function CommunityCreateScreen() {
                     Nenhum ícone selecionado
                   </Text>
                   <Text className="mt-2 text-[14px] font-semibold leading-6 text-[#CAC3D8]">
-                    Você pode criar a comunidade sem ícone e definir isso depois quando existir essa ação no backend.
+                    Você pode criar a comunidade sem ícone e adicioná-lo depois nas configurações.
                   </Text>
                 </View>
               )}

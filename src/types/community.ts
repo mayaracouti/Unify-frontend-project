@@ -107,6 +107,7 @@ export type CommunityMembersResponse = PageResponse<CommunityMemberResponse>;
 
 export interface CommunityCommentResponse {
   id: string;
+  editedAt?: string | null;
   author: CommunityPostAuthorResponse;
   publishedAt?: string | null;
   body: string;
@@ -146,3 +147,9 @@ export interface CommunityForYouPostResponse {
 }
 
 export type CommunityForYouFeedResponse = PageResponse<CommunityForYouPostResponse>;
+
+/** Canonical context for direct links, comment permissions and post editing. */
+export interface CommunityPostDetailResponse {
+  community: CommunitySummaryResponse;
+  post: CommunityPostResponse;
+}

@@ -1,6 +1,7 @@
+import { buildCommunityFormData } from "../../src/utils/communityFormData";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -59,48 +60,6 @@ function canConfigureCommunity(community?: CommunitySummaryResponse | null) {
   return Boolean(community.isOwner) || community.currentUserRole === "ADMIN";
 }
 
-function buildCommunityUpdateFormData(args: {
-  name: string;
-  description: string;
-  categoryId: number | null;
-  privacy: CommunityPrivacy;
-  asset: ImagePicker.ImagePickerAsset | null;
-}) {
-  const formData = new FormData();
-
-  formData.append("name", args.name);
-  formData.append("description", args.description.trim());
-  formData.append("privacy", args.privacy);
-
-  if (args.categoryId) {
-    formData.append("categoryId", String(args.categoryId));
-  }
-
-  if (!args.asset) {
-    return formData;
-  }
-
-  const fileName = args.asset.fileName ?? `community-${Date.now()}.jpg`;
-  const mimeType = args.asset.mimeType ?? "image/jpeg";
-  const webFile = (args.asset as ImagePicker.ImagePickerAsset & { file?: File }).file;
-
-  if (Platform.OS === "web" && webFile) {
-    formData.append("icon", webFile, fileName);
-    return formData;
-  }
-
-  formData.append(
-    "icon",
-    {
-      uri: args.asset.uri,
-      name: fileName,
-      type: mimeType,
-    } as unknown as Blob
-  );
-
-  return formData;
-}
-
 export default function CommunitySettingsScreen() {
   const router = useRouter();
   const { speak } = useTTS();
@@ -119,12 +78,14 @@ export default function CommunitySettingsScreen() {
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [privacy, setPrivacy] = useState<CommunityPrivacy>("PUBLIC");
+  const [removeIcon, setRemoveIcon] = useState(false);
   const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(
     null
   );
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pickingImage, setPickingImage] = useState(false);
+  const submitLock = useRef(false);
   const [saving, setSaving] = useState(false);
 
   const { deleteBusy, handleDeleteCommunity, leaveBusy, handleLeaveCommunity } =
@@ -191,7 +152,7 @@ export default function CommunitySettingsScreen() {
 
   const trimmedName = useMemo(() => name.trim(), [name]);
   const canConfigure = canConfigureCommunity(community);
-  const currentIconUrl = communityService.resolveAssetUrl(community?.iconData);
+  const currentIconUrl = communityService.resolveAssetUrl(removeIcon ? null : community?.iconData);
 
   const handlePickImage = useCallback(async () => {
     if (pickingImage) {
@@ -233,7 +194,7 @@ export default function CommunitySettingsScreen() {
   }, [pickingImage]);
 
   const handleSave = useCallback(async () => {
-    if (saving || !communityId) {
+    if (submitLock.current || pickingImage || !communityId || !canConfigure) {
       return;
     }
 
@@ -246,10 +207,13 @@ export default function CommunitySettingsScreen() {
       return;
     }
 
+    submitLock.current = true;
     setSaving(true);
 
     try {
-      const formData = buildCommunityUpdateFormData({
+      const formData = await buildCommunityFormData({
+        update: true,
+        removeIcon,
         name: trimmedName,
         description,
         categoryId,
@@ -270,12 +234,14 @@ export default function CommunitySettingsScreen() {
         pathname: "/community/[communityId]",
         params: { communityId },
       });
-    } catch {
-      // Global API error toast already explains the failure.
+    } catch (error) {
+      if (error instanceof Error) showGlobalToast({ title: "Não foi possível salvar", variant: "error", message: error.message || "Tente novamente. Seu texto foi mantido." });
+      // HTTP errors already use the global API toast.
     } finally {
+      submitLock.current = false;
       setSaving(false);
     }
-  }, [categoryId, communityId, description, privacy, router, saving, selectedImage, trimmedName]);
+  }, [pickingImage, canConfigure, categoryId, communityId, description, privacy, router, selectedImage, trimmedName, removeIcon]);
 
   const handleBack = useCallback(() => {
     if (communityId) {
@@ -393,6 +359,7 @@ export default function CommunitySettingsScreen() {
                   maxLength={80}
                   placeholder="Ex.: Acessibilidade em foco"
                   placeholderTextColor="#948EA1"
+                  editable={!saving}
                   value={name}
                   onChangeText={setName}
                   onFocus={() => speak("Nome da comunidade")}
@@ -413,6 +380,7 @@ export default function CommunitySettingsScreen() {
                   placeholder="Explique o propósito da comunidade."
                   placeholderTextColor="#948EA1"
                   textAlignVertical="top"
+                  editable={!saving}
                   value={description}
                   onChangeText={setDescription}
                   onFocus={() => speak("Descrição da comunidade")}
@@ -516,6 +484,11 @@ export default function CommunitySettingsScreen() {
                     </View>
                   </View>
                 ) : currentIconUrl ? (
+                  <View>
+                  <Pressable disabled={saving} onPress={() => setRemoveIcon(true)} accessibilityRole="button"
+                    accessibilityLabel="Remover ícone atual" accessibilityHint="Remove o ícone quando você salvar as alterações">
+                    <Text className="mt-4 font-bold text-[#FF8A8A]">Remover ícone atual</Text>
+                  </Pressable>
                   <View className="mt-5 h-24 w-24 overflow-hidden rounded-[20px] border border-[#353534] bg-[#1A1C1F]">
                     <AuthenticatedRemoteImage
                       uri={currentIconUrl}
@@ -529,14 +502,18 @@ export default function CommunitySettingsScreen() {
                       }
                     />
                   </View>
+                  </View>
                 ) : (
                   <View className="mt-5 rounded-[24px] border border-dashed border-[#494455] bg-[#151619] px-5 py-8">
                     <Ionicons name="images-outline" size={32} color="#7C4DFF" />
                     <Text className="mt-4 text-[16px] font-bold text-white">
-                      Nenhum ícone definido
+                      {removeIcon ? "O ícone será removido ao salvar" : "Nenhum ícone definido"}
                     </Text>
                   </View>
                 )}
+                {removeIcon ? <Pressable disabled={saving} onPress={() => setRemoveIcon(false)} accessibilityRole="button" accessibilityLabel="Manter ícone atual">
+                  <Text className="mt-3 font-bold text-[#CDBDFF]">Manter ícone atual</Text>
+                </Pressable> : null}
               </View>
 
               <Pressable
@@ -547,12 +524,12 @@ export default function CommunitySettingsScreen() {
                   speak(buildActionSpeech("Salvar alterações de", trimmedName));
                   void handleSave();
                 }}
-                disabled={trimmedName.length === 0 || saving}
+                disabled={trimmedName.length === 0 || saving || pickingImage}
                 accessibilityRole="button"
                 accessibilityLabel="Salvar alterações da comunidade"
                 accessibilityHint="Salva nome, descrição, privacidade, categoria e ícone da comunidade"
                 accessibilityState={{
-                  disabled: trimmedName.length === 0 || saving,
+                  disabled: trimmedName.length === 0 || saving || pickingImage,
                   busy: saving,
                 }}
               >

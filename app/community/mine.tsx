@@ -149,7 +149,7 @@ export default function MyCommunitiesScreen() {
     };
 
     void loadDirectory();
-  }, [authToken, isFocused]);
+  }, [authToken, isFocused, setDirectory, setLoadError]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -184,7 +184,7 @@ export default function MyCommunitiesScreen() {
   };
 
   const handleLoadMore = async () => {
-    if (!directory.hasNext || loadingMore) {
+    if (!directory.hasNext || loadingMore || refreshing || loading) {
       return;
     }
 

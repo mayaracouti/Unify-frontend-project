@@ -16,6 +16,7 @@ export interface ReportReasonOptionResponse {
 export interface ReportCreateRequest {
   reportedUserId: string;
   reportedPostId?: string | null;
+  reportedCommentId?: string | null;
   reason: ReportReason;
   description?: string | null;
 }

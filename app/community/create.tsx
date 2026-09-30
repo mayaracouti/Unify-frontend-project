@@ -1,7 +1,14 @@
+import { useCommunityPost } from "../../src/hooks/use-community-post";
+import { useAppShell } from "../../src/context/AppShellContext";
+import { isCommunityAuthor } from "../../src/utils/communityPermissions";
+import { buildCommunityPostFormData } from "../../src/utils/communityFormData";
+import { useCommunityAccess } from "../../src/hooks/use-community-access";
+import { canParticipate } from "../../src/utils/communityPermissions";
+import { ScreenError } from "../../src/components/ui/screen-error";
 import { goBackOrReplace } from "../../src/utils/navigation";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -38,36 +45,6 @@ function normalizeRouteParam(value?: string | string[]) {
   return value ?? "";
 }
 
-function createCommunityPostFormData(
-  body: string,
-  asset: ImagePicker.ImagePickerAsset | null
-) {
-  const formData = new FormData();
-
-  formData.append("body", body);
-
-  if (!asset) {
-    return formData;
-  }
-
-  const fileName = asset.fileName ?? `community-post-${Date.now()}.jpg`;
-  const mimeType = asset.mimeType ?? "image/jpeg";
-  const webFile = (asset as ImagePicker.ImagePickerAsset & { file?: File }).file;
-
-  if (Platform.OS === "web" && webFile) {
-    formData.append("image", webFile, fileName);
-    return formData;
-  }
-
-  formData.append("image", {
-    uri: asset.uri,
-    name: fileName,
-    type: mimeType,
-  } as unknown as Blob);
-
-  return formData;
-}
-
 export default function CommunityCreatePostScreen() {
   const router = useRouter();
   const { speak } = useTTS();
@@ -89,7 +66,13 @@ export default function CommunityCreatePostScreen() {
     () => normalizeRouteParam(params.postId).trim() || null,
     [params.postId]
   );
+  const access = useCommunityAccess(communityId);
   const isEditing = editingPostId !== null;
+  const postContext = useCommunityPost(editingPostId ?? "");
+  const { currentUserId, currentUserProfileId } = useAppShell();
+  const submitLock = useRef(false);
+  const canEdit = Boolean(postContext.data && postContext.community?.id === communityId &&
+    isCommunityAuthor(postContext.data.post.author, currentUserId, currentUserProfileId));
   const [body, setBody] = useState(() =>
     isEditing ? normalizeRouteParam(params.body) : ""
   );
@@ -99,6 +82,10 @@ export default function CommunityCreatePostScreen() {
   const [imageSourceVisible, setImageSourceVisible] = useState(false);
   const [pickingImage, setPickingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (postContext.data) setBody(postContext.data.post.body);
+  }, [postContext.data]);
 
   const trimmedBody = useMemo(() => body.trim(), [body]);
 
@@ -160,7 +147,7 @@ export default function CommunityCreatePostScreen() {
   );
 
   const handleSubmit = useCallback(async () => {
-    if (submitting) {
+    if (submitLock.current || pickingImage || access.loading || !canParticipate(access.community) || (isEditing && !canEdit)) {
       return;
     }
 
@@ -183,6 +170,7 @@ export default function CommunityCreatePostScreen() {
       return;
     }
 
+    submitLock.current = true;
     setSubmitting(true);
 
     try {
@@ -202,7 +190,7 @@ export default function CommunityCreatePostScreen() {
         return;
       }
 
-      const formData = createCommunityPostFormData(trimmedBody, selectedImage);
+      const formData = await buildCommunityPostFormData(trimmedBody, selectedImage);
       await communityService.createPost(communityId, formData);
 
       showGlobalToast({
@@ -215,12 +203,20 @@ export default function CommunityCreatePostScreen() {
         pathname: "/community/[communityId]",
         params: { communityId },
       });
-    } catch {
-      // Global API error toast already explains the failure.
+    } catch (error) {
+      if (error instanceof Error) showGlobalToast({ title: "Não foi possível salvar", variant: "error", message: error.message || "Tente novamente. Seu texto foi mantido." });
+      // HTTP errors already use the global API toast.
     } finally {
+      submitLock.current = false;
       setSubmitting(false);
     }
-  }, [communityId, editingPostId, router, selectedImage, submitting, trimmedBody]);
+  }, [access.community, access.loading, canEdit, isEditing, pickingImage, communityId, editingPostId, router, selectedImage, trimmedBody]);
+
+  if (isEditing && postContext.error) return <ScreenError message={postContext.error} onRetry={() => void postContext.reload()} />;
+  if (isEditing && !postContext.loading && !canEdit) return <ScreenError message="Somente o autor pode editar esta publicação." />;
+  if (access.error) return <ScreenError message={access.error} onRetry={() => void access.reload()} />;
+  if (access.loading || (isEditing && postContext.loading)) return <View className="flex-1 items-center justify-center bg-[#09090A]"><ActivityIndicator color="#7C4DFF" /></View>;
+  if (!canParticipate(access.community)) return <ScreenError message="Entre na comunidade para publicar." onRetry={() => router.replace({ pathname: "/community/[communityId]", params: { communityId } })} />;
 
   const submitLabel = isEditing ? "Salvar" : "Publicar na comunidade";
 
@@ -258,7 +254,7 @@ export default function CommunityCreatePostScreen() {
                 speak(submitLabel);
                 void handleSubmit();
               }}
-              disabled={trimmedBody.length === 0 || submitting}
+              disabled={trimmedBody.length === 0 || submitting || pickingImage}
               accessibilityRole="button"
               accessibilityLabel={submitLabel}
               accessibilityHint={
@@ -267,7 +263,7 @@ export default function CommunityCreatePostScreen() {
                   : "Envia o texto e a imagem para o mural da comunidade."
               }
               accessibilityState={{
-                disabled: trimmedBody.length === 0 || submitting,
+                disabled: trimmedBody.length === 0 || submitting || pickingImage,
                 busy: submitting,
               }}
             >
@@ -311,6 +307,7 @@ export default function CommunityCreatePostScreen() {
                 placeholder="O que você quer compartilhar hoje?"
                 placeholderTextColor="#948EA1"
                 textAlignVertical="top"
+                editable={!submitting}
                 value={body}
                 onChangeText={setBody}
                 onFocus={() => speak("Texto da publicação")}

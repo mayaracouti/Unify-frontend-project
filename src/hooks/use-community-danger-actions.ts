@@ -1,6 +1,6 @@
+import { confirmCommunityAction } from "../utils/confirmCommunityAction";
 import { useRouter } from "expo-router";
-import { useCallback, useState } from "react";
-import { Alert } from "react-native";
+import { useCallback, useRef, useState } from "react";
 
 import { communityService } from "../services/communityService";
 import { showGlobalToast } from "../utils/globalToast";
@@ -22,16 +22,18 @@ export function useCommunityDangerActions({
   onCompleted,
 }: UseCommunityDangerActionsArgs) {
   const router = useRouter();
+  const actionLock = useRef(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
 
   const confirmDeleteCommunity = useCallback(async () => {
     const targetCommunityId = communityId?.trim();
 
-    if (!targetCommunityId || deleteBusy) {
+    if (!targetCommunityId || actionLock.current) {
       return;
     }
 
+    actionLock.current = true;
     setDeleteBusy(true);
 
     try {
@@ -46,34 +48,23 @@ export function useCommunityDangerActions({
     } catch {
       // Global API error toast already explains the failure.
     } finally {
+      actionLock.current = false;
       setDeleteBusy(false);
     }
-  }, [communityId, deleteBusy, onCompleted, router]);
+  }, [communityId, onCompleted, router]);
 
   const handleDeleteCommunity = useCallback(() => {
-    Alert.alert(
-      "Excluir comunidade",
-      "Essa ação apaga a comunidade permanentemente. Deseja continuar?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Excluir",
-          style: "destructive",
-          onPress: () => {
-            void confirmDeleteCommunity();
-          },
-        },
-      ]
-    );
+    confirmCommunityAction("Excluir comunidade", "Essa ação apaga a comunidade permanentemente. Deseja continuar?", "Excluir", () => { void confirmDeleteCommunity(); });
   }, [confirmDeleteCommunity]);
 
   const confirmLeaveCommunity = useCallback(async () => {
     const targetCommunityId = communityId?.trim();
 
-    if (!targetCommunityId || leaveBusy) {
+    if (!targetCommunityId || actionLock.current) {
       return;
     }
 
+    actionLock.current = true;
     setLeaveBusy(true);
 
     try {
@@ -88,25 +79,13 @@ export function useCommunityDangerActions({
     } catch {
       // Global API error toast already explains the failure.
     } finally {
+      actionLock.current = false;
       setLeaveBusy(false);
     }
-  }, [communityId, leaveBusy, onCompleted, router]);
+  }, [communityId, onCompleted, router]);
 
   const handleLeaveCommunity = useCallback(() => {
-    Alert.alert(
-      "Sair da comunidade",
-      "Você deixará de ver as publicações e não poderá mais interagir. Deseja continuar?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Sair",
-          style: "destructive",
-          onPress: () => {
-            void confirmLeaveCommunity();
-          },
-        },
-      ]
-    );
+    confirmCommunityAction("Sair da comunidade", "Você deixará de ver as publicações e não poderá mais interagir. Deseja continuar?", "Sair", () => { void confirmLeaveCommunity(); });
   }, [confirmLeaveCommunity]);
 
   return {

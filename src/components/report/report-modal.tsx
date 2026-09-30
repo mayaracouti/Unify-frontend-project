@@ -29,6 +29,7 @@ export type ReportModalProps = {
   /** Id do `User` denunciado (não o id do perfil). */
   reportedUserId: string;
   reportedPostId?: string | null;
+  reportedCommentId?: string | null;
   /** Ex.: "perfil de Marina Souza" ou "publicação de João". */
   contextLabel: string;
 };
@@ -45,6 +46,7 @@ export function ReportModal({
   onClose,
   reportedUserId,
   reportedPostId = null,
+  reportedCommentId = null,
   contextLabel,
 }: ReportModalProps) {
   const { settings } = useAccessibility();
@@ -97,6 +99,7 @@ export function ReportModal({
       await userReportService.createReport({
         reportedUserId,
         reportedPostId,
+        ...(reportedCommentId ? { reportedCommentId } : {}),
         reason: selectedReason,
         description: description.trim() ? description.trim() : null,
       });
@@ -132,7 +135,7 @@ export function ReportModal({
     } finally {
       setSubmitting(false);
     }
-  }, [description, onClose, reportedPostId, reportedUserId, selectedReason, submitting]);
+  }, [description, onClose, reportedCommentId, reportedPostId, reportedUserId, selectedReason, submitting]);
 
   const remainingCharacters = DESCRIPTION_MAX_LENGTH - description.length;
 

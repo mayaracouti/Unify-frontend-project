@@ -1,3 +1,5 @@
+import { showGlobalToast } from "../../src/utils/globalToast";
+import { canParticipate } from "../../src/utils/communityPermissions";
 import { useIsFocused } from "expo-router/react-navigation";
 import { useRouter } from "expo-router";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
@@ -188,7 +190,7 @@ function SearchEmptyState({ searchQuery }: { searchQuery: string }) {
     <ScreenEmpty
       className="rounded-[28px] border border-[#353534] bg-surface-alt px-6 py-8"
       title="Sem resultados"
-      description={`Nenhuma comunidade corresponde a "${searchQuery}" no backend.`}
+      description={`Nenhuma comunidade corresponde a "${searchQuery}".`}
     />
   );
 }
@@ -220,6 +222,7 @@ export default function CommunityDirectoryScreen() {
   const [forYouLoadingMore, setForYouLoadingMore] = useState(false);
   const [forYouRefreshing, setForYouRefreshing] = useState(false);
   const [forYouError, setForYouError] = useState("");
+  const likeLock = useRef(false);
   const [likeBusyPostId, setLikeBusyPostId] = useState<string | null>(null);
   const forYouRequestIdRef = useRef(0);
   const forYouInitialLoadRef = useRef(false);
@@ -331,11 +334,14 @@ export default function CommunityDirectoryScreen() {
     deferredSearchQuery,
     isFocused,
     selectedCategoryId,
+    setDirectory,
+    setLoadError,
     speak,
   ]);
 
   const loadForYouFeed = useCallback(
     async (options?: { refresh?: boolean; append?: boolean }) => {
+      if (options?.append && (forYouLoadingMore || forYouRefreshing || forYouLoading || !forYouFeed.hasNext)) return;
       const requestId = ++forYouRequestIdRef.current;
 
       if (options?.refresh) {
@@ -407,7 +413,7 @@ export default function CommunityDirectoryScreen() {
         }
       }
     },
-    [authToken, forYouFeed.page]
+    [authToken, forYouFeed.page, forYouFeed.hasNext, forYouLoadingMore, forYouRefreshing, forYouLoading]
   );
 
   useEffect(() => {
@@ -423,13 +429,19 @@ export default function CommunityDirectoryScreen() {
 
   const handleToggleForYouLike = useCallback(
     async (item: CommunityForYouPostResponse) => {
-      if (likeBusyPostId) {
+      if (likeLock.current) {
         return;
       }
 
+      likeLock.current = true;
       setLikeBusyPostId(item.post.id);
 
       try {
+        const context = await communityService.getFeed(item.communityId, { page: 0, size: 1 });
+        if (!canParticipate(context.community)) {
+          showGlobalToast({ title: "Participação necessária", variant: "warning", message: "Entre na comunidade para curtir esta publicação." });
+          return;
+        }
         const response = item.post.likedByCurrentUser
           ? await communityService.unlikePost(item.post.id)
           : await communityService.likePost(item.post.id);
@@ -454,10 +466,11 @@ export default function CommunityDirectoryScreen() {
       } catch {
         // O toast global do cliente HTTP ja comunica a falha da curtida.
       } finally {
+        likeLock.current = false;
         setLikeBusyPostId(null);
       }
     },
-    [likeBusyPostId]
+    []
   );
 
   const handleOpenForYouComments = useCallback(
@@ -472,8 +485,6 @@ export default function CommunityDirectoryScreen() {
           authorName: item.post.author.name,
           postBody: item.post.body,
           publishedAt: item.post.publishedAt ?? "",
-          isMember: "true",
-          canModerate: "false",
         },
       });
     },
@@ -531,7 +542,7 @@ export default function CommunityDirectoryScreen() {
   };
 
   const handleLoadMore = async () => {
-    if (!directory.hasNext || loadingMore) {
+    if (!directory.hasNext || loadingMore || refreshing || loading) {
       return;
     }
 

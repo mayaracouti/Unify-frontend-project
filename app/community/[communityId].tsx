@@ -1,10 +1,14 @@
+import { CommunityLoadMore } from "../../src/components/community/load-more";
+import { useCommunityPage } from "../../src/hooks/use-community-page";
+import { isCommunityAuthor } from "../../src/utils/communityPermissions";
+import { mergeCommunityItems } from "../../src/utils/communityPagination";
+import { confirmCommunityAction } from "../../src/utils/confirmCommunityAction";
 import { useIsFocused } from "expo-router/react-navigation";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import type { ComponentProps } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -100,8 +104,6 @@ function canParticipateInCommunity(community?: CommunitySummaryResponse | null) 
 type NormalizedCommunityFeed = {
   community: CommunitySummaryResponse | null;
   posts: CommunityPostResponse[];
-  // TODO: paginação incremental — expor `postsHasNext`/`postsPage` quando o feed
-  // ganhar scroll infinito; hoje carregamos apenas a primeira página (size padrão).
   postsHasNext: boolean;
 };
 
@@ -143,7 +145,7 @@ function resolveCommunityActorId(actor?: CommunityUserSummaryResponse | null) {
 }
 
 function resolveCommunityMemberTargetId(member: CommunityMemberResponse) {
-  return [member.userProfileId, member.id]
+  return [member.userProfileId]
     .map((value) => value?.trim())
     .find((value): value is string => Boolean(value));
 }
@@ -194,8 +196,8 @@ function applyLikeUpdate(currentFeed: NormalizedCommunityFeed | null, like: Comm
       post.id === like.postId
         ? {
             ...post,
-            likedByCurrentUser: like.likedByCurrentUser,
-            likesCount: like.likesCount,
+            likedByCurrentUser: like.likedByCurrentUser ?? !post.likedByCurrentUser,
+            likesCount: like.likesCount ?? Math.max(0, (post.likesCount ?? 0) + (post.likedByCurrentUser ? -1 : 1)),
           }
         : post
     ),
@@ -1048,6 +1050,8 @@ function EmptyMembersState() {
   );
 }
 
+const memberKey = (member: CommunityMemberResponse) => member.userProfileId ?? member.id;
+
 export default function CommunityDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ communityId?: string | string[]; tab?: string | string[] }>();
@@ -1067,12 +1071,20 @@ export default function CommunityDetailScreen() {
   const scrollViewRef = useRef<ScrollView | null>(null);
   const contentStartOffsetRef = useRef(0);
   const [feed, setFeed] = useState<NormalizedCommunityFeed | null>(null);
-  const [members, setMembers] = useState<CommunityMemberResponse[]>([]);
+  const fetchMembers = useCallback((page: number) => communityService.getMembers(requestedCommunityId, { page, size: 20 }), [requestedCommunityId]);
+  const memberList = useCommunityPage(fetchMembers, memberKey);
+  const { items: members, setItems: setMembers, loading: membersLoading, error: membersLoadError, refresh: refreshMembers } = memberList;
+  const loadMembers = useCallback(async (_options?: { showLoader?: boolean }) => { await refreshMembers(); }, [refreshMembers]);
+  const feedRequest = useRef(0);
+  const feedPage = useRef(0);
+  const feedBusy = useRef(false);
+  const [postsLoadingMore, setPostsLoadingMore] = useState(false);
+  const membershipLock = useRef(false);
+  const likeLock = useRef(false);
+  const deleteLock = useRef(false);
   const [activeTab, setActiveTab] = useState<CommunityViewTab>(requestedTab);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [membersLoading, setMembersLoading] = useState(false);
-  const [membersLoadError, setMembersLoadError] = useState<string | null>(null);
   const [membershipBusy, setMembershipBusy] = useState(false);
   const [pendingLikePostId, setPendingLikePostId] = useState<string | null>(null);
   const [pendingDeletePostId, setPendingDeletePostId] = useState<string | null>(null);
@@ -1093,10 +1105,10 @@ export default function CommunityDetailScreen() {
 
   // Deep link com `tab=members` ou saida da comunidade caem de volta nas publicacoes.
   useEffect(() => {
-    if (!canViewMembers) {
+    if (feed?.community && !canViewMembers) {
       setActiveTab("posts");
     }
-  }, [canViewMembers]);
+  }, [canViewMembers, feed?.community]);
 
   // Abrir a comunidade (inclusive por deep link) anuncia o conteudo semantico
   // real dela uma unica vez por comunidade carregada.
@@ -1122,11 +1134,18 @@ export default function CommunityDetailScreen() {
     setMembers([]);
     setLoading(true);
     setLoadError(null);
-    setMembersLoading(false);
-    setMembersLoadError(null);
-  }, [requestedCommunityId]);
+    feedRequest.current += 1;
+    feedPage.current = 0;
+    feedBusy.current = false;
+    setPostsLoadingMore(false);
+    return () => { feedRequest.current += 1; };
+  }, [requestedCommunityId, setMembers]);
 
-  const loadFeed = useCallback(async (options?: { showLoader?: boolean }) => {
+  const loadFeed = useCallback(async (options?: { showLoader?: boolean; append?: boolean }) => {
+    if (options?.append && feedBusy.current) return;
+    const request = ++feedRequest.current;
+    feedBusy.current = true;
+    setPostsLoadingMore(Boolean(options?.append));
     if (options?.showLoader) {
       setLoading(true);
     }
@@ -1134,11 +1153,17 @@ export default function CommunityDetailScreen() {
     try {
       setLoadError(null);
 
-      // TODO: paginação incremental — hoje sempre carregamos a primeira página
-      // (size padrão do backend) das publicações da comunidade.
-      const feedResponse = await communityService.getFeed(requestedCommunityId);
+      if (!requestedCommunityId) throw new Error("Não foi possível identificar a comunidade.");
+      const feedResponse = await communityService.getFeed(requestedCommunityId, {
+        page: options?.append ? feedPage.current + 1 : 0, size: 20,
+      });
+      if (request !== feedRequest.current) return;
+      if (!feedResponse.community || feedResponse.community.id !== requestedCommunityId) throw new Error("A comunidade não foi encontrada.");
+      feedPage.current = feedResponse.posts.page;
       const normalizedFeed = normalizeFeedResponse(feedResponse);
-      setFeed(normalizedFeed);
+      setFeed((current) => options?.append && current
+        ? { ...normalizedFeed, posts: mergeCommunityItems(current.posts, normalizedFeed.posts, (post) => post.id) }
+        : normalizedFeed);
 
       const assetUrls = collectCommunityAssetUrls(normalizedFeed);
 
@@ -1146,54 +1171,24 @@ export default function CommunityDetailScreen() {
         void preloadAuthenticatedRemoteImages(assetUrls, authToken);
       }
     } catch (error) {
+      if (request !== feedRequest.current) return;
       setLoadError(
         formatApiErrorMessage(error, "Não foi possível carregar os dados da comunidade.")
       );
       setFeed((currentFeed) => currentFeed ?? { community: null, posts: [], postsHasNext: false });
     } finally {
-      setLoading(false);
+      if (request === feedRequest.current) {
+        setLoading(false);
+        setPostsLoadingMore(false);
+        feedBusy.current = false;
+      }
     }
   }, [authToken, requestedCommunityId]);
 
-  const loadMembers = useCallback(
-    async (options?: { showLoader?: boolean }) => {
-      const communityId = feed?.community?.id ?? requestedCommunityId;
-
-      if (options?.showLoader) {
-        setMembersLoading(true);
-      }
-
-      if (!communityId) {
-        setMembers([]);
-        setMembersLoadError("Não foi possível identificar a comunidade selecionada.");
-        setMembersLoading(false);
-        return;
-      }
-
-      try {
-        setMembersLoadError(null);
-
-        // TODO: paginação incremental — hoje sempre carregamos a primeira página
-        // (size padrão do backend) da lista de membros.
-        const response = await communityService.getMembers(communityId);
-        const nextMembers = Array.isArray(response.content) ? response.content : [];
-        setMembers(nextMembers);
-
-        const avatarUrls = collectMemberAssetUrls(nextMembers);
-
-        if (avatarUrls.length > 0) {
-          void preloadAuthenticatedRemoteImages(avatarUrls, authToken);
-        }
-      } catch (error) {
-        setMembersLoadError(
-          formatApiErrorMessage(error, "Não foi possível carregar os membros da comunidade.")
-        );
-      } finally {
-        setMembersLoading(false);
-      }
-    },
-    [authToken, feed?.community?.id, requestedCommunityId]
-  );
+  useEffect(() => {
+    const urls = collectMemberAssetUrls(members);
+    if (urls.length) void preloadAuthenticatedRemoteImages(urls, authToken);
+  }, [members, authToken]);
 
   useEffect(() => {
     if (!isFocused) {
@@ -1254,7 +1249,7 @@ export default function CommunityDetailScreen() {
   const handleToggleMembership = useCallback(async () => {
     const communityId = feed?.community?.id ?? requestedCommunityId;
 
-    if (!communityId || !feed?.community || membershipBusy) {
+    if (!communityId || !feed?.community || membershipLock.current || feed.community.isOwner) {
       return;
     }
 
@@ -1275,6 +1270,7 @@ export default function CommunityDetailScreen() {
         feed.community.name
       )
     );
+    membershipLock.current = true;
     setMembershipBusy(true);
 
     try {
@@ -1282,14 +1278,18 @@ export default function CommunityDetailScreen() {
         ? await communityService.leaveCommunity(communityId)
         : await communityService.joinCommunity(communityId);
 
-      setFeed((currentFeed) => applyMembershipUpdate(currentFeed, response));
+      setFeed((currentFeed) => {
+        const updated = applyMembershipUpdate(currentFeed, response);
+        return updated && !response.isMember && updated.community?.privacy === "PRIVATE"
+          ? { ...updated, posts: [], postsHasNext: false } : updated;
+      });
+      await loadFeed();
 
       // Sair da comunidade tira o acesso a listagem: so recarrega quem continua membro.
       if (activeTab === "members" && response.isMember) {
         void loadMembers();
       } else if (!response.isMember) {
         setMembers([]);
-        setMembersLoadError(null);
         membersInitialLoadRef.current = false;
       }
 
@@ -1325,13 +1325,14 @@ export default function CommunityDetailScreen() {
     } catch {
       // Global API error toast already explains the failure.
     } finally {
+      membershipLock.current = false;
       setMembershipBusy(false);
     }
-  }, [activeTab, feed?.community, loadMembers, membershipBusy, requestedCommunityId, speak]);
+  }, [activeTab, feed?.community, loadFeed, loadMembers, requestedCommunityId, setMembers, speak]);
 
   const handleToggleLike = useCallback(
     async (post: CommunityPostResponse) => {
-      if (pendingLikePostId) {
+      if (likeLock.current) {
         return;
       }
 
@@ -1352,6 +1353,7 @@ export default function CommunityDetailScreen() {
           post.author.name
         )
       );
+      likeLock.current = true;
       setPendingLikePostId(post.id);
 
       try {
@@ -1363,10 +1365,11 @@ export default function CommunityDetailScreen() {
       } catch {
         // Global API error toast already explains the failure.
       } finally {
+        likeLock.current = false;
         setPendingLikePostId(null);
       }
     },
-    [feed?.community, pendingLikePostId, speak]
+    [feed?.community, speak]
   );
 
   const canDeletePost = useCallback(
@@ -1381,12 +1384,7 @@ export default function CommunityDetailScreen() {
         return true;
       }
 
-      const postAuthorId = resolveCommunityActorId(post.author);
-
-      return Boolean(
-        postAuthorId &&
-          (postAuthorId === currentUserProfileId || postAuthorId === currentUserId)
-      );
+      return isCommunityAuthor(post.author, currentUserId, currentUserProfileId);
     },
     [currentUserId, currentUserProfileId, feed?.community]
   );
@@ -1394,15 +1392,7 @@ export default function CommunityDetailScreen() {
   /** Editar e so do autor: moderadores excluem, mas nao reescrevem o texto alheio. */
   const canEditPost = useCallback(
     (post: CommunityPostResponse) => {
-      const postAuthorId = resolveCommunityActorId(post.author);
-      const authorUserId = post.author.id?.trim();
-
-      return Boolean(
-        (authorUserId && currentUserId && authorUserId === currentUserId) ||
-          (postAuthorId &&
-            ((currentUserProfileId && postAuthorId === currentUserProfileId) ||
-              (currentUserId && postAuthorId === currentUserId)))
-      );
+      return isCommunityAuthor(post.author, currentUserId, currentUserProfileId);
     },
     [currentUserId, currentUserProfileId]
   );
@@ -1457,14 +1447,14 @@ export default function CommunityDetailScreen() {
         return false;
       }
 
-      return Boolean(authorUserId || postAuthorId);
+      return Boolean(authorUserId);
     },
     [currentUserId, currentUserProfileId]
   );
 
   const handleReportPost = useCallback(
     (post: CommunityPostResponse) => {
-      const reportedUserId = post.author.id?.trim() || resolveCommunityActorId(post.author);
+      const reportedUserId = post.author.id?.trim();
 
       if (!reportedUserId) {
         return;
@@ -1520,15 +1510,17 @@ export default function CommunityDetailScreen() {
 
   const confirmDeletePost = useCallback(
     async (post: CommunityPostResponse) => {
-      if (pendingDeletePostId) {
+      if (deleteLock.current || !canDeletePost(post)) {
         return;
       }
 
+      deleteLock.current = true;
       setPendingDeletePostId(post.id);
 
       try {
         await communityService.deletePost(post.id);
         setFeed((currentFeed) => removePost(currentFeed, post.id));
+        void loadFeed();
         showGlobalToast({
           title: "Publicação removida",
           variant: "success",
@@ -1538,29 +1530,17 @@ export default function CommunityDetailScreen() {
       } catch {
         // Global API error toast already explains the failure.
       } finally {
+        deleteLock.current = false;
         setPendingDeletePostId(null);
       }
     },
-    [pendingDeletePostId]
+    [canDeletePost, loadFeed]
   );
 
   const handleDeletePost = useCallback(
     (post: CommunityPostResponse) => {
       speak(buildActionSpeech("Excluir publicação de", post.author.name));
-      Alert.alert(
-        "Excluir publicação",
-        "Essa ação remove a publicação da comunidade. Deseja continuar?",
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Excluir",
-            style: "destructive",
-            onPress: () => {
-              void confirmDeletePost(post);
-            },
-          },
-        ]
-      );
+      confirmCommunityAction("Excluir publicação", "Essa ação remove a publicação da comunidade. Deseja continuar?", "Excluir", () => { void confirmDeletePost(post); });
     },
     [confirmDeletePost, speak]
   );
@@ -1625,8 +1605,6 @@ export default function CommunityDetailScreen() {
           authorName: post.author.name,
           postBody: post.body,
           publishedAt: post.publishedAt ?? "",
-          isMember: canParticipateInCommunity(feed.community) ? "true" : "false",
-          canModerate: canModerateRole(getEffectiveCommunityRole(feed.community)) ? "true" : "false",
         },
       });
     },
@@ -1691,7 +1669,6 @@ export default function CommunityDetailScreen() {
   const community = feed?.community ?? null;
   const posts = feed?.posts ?? [];
   const canParticipate = canParticipateInCommunity(community);
-  const canManageRoles = canModerateRole(getEffectiveCommunityRole(community));
   const isRequestedCommunityVisible =
     !requestedCommunityId || !community || community.id === requestedCommunityId;
 
@@ -1814,6 +1791,7 @@ export default function CommunityDetailScreen() {
                           <Text className="mt-2 text-[14px] font-semibold leading-6 text-[#FFEAF0]">
                             {membersLoadError}
                           </Text>
+                          <CommunityLoadMore visible busy={membersLoading} onPress={() => void loadMembers()} label="Tentar novamente" />
                         </View>
                       ) : null}
 
@@ -1841,14 +1819,20 @@ export default function CommunityDetailScreen() {
                       )}
                     </>
                   )}
+                  <CommunityLoadMore
+                    visible={activeTab === "posts" ? Boolean(feed?.postsHasNext) : memberList.hasNext}
+                    busy={activeTab === "posts" ? postsLoadingMore || loading || refreshing : membersLoading || memberList.loadingMore}
+                    onPress={() => { if (activeTab === "posts") void loadFeed({ append: true }); else void memberList.loadMore(); }}
+                    label={activeTab === "posts" ? "Carregar mais publicações" : "Carregar mais membros"}
+                  />
                 </>
               ) : (
                 <EmptyCommunityState
                   message={
                     isRequestedCommunityVisible
                       ? loadError ??
-                        "Não foi possível resolver a comunidade solicitada com os dados atuais do backend."
-                      : "O backend retornou uma comunidade diferente da solicitada. Verifique se o communityId ainda existe."
+                        "Não foi possível encontrar esta comunidade."
+                      : "Esta comunidade não está disponível. Volte para a lista e tente novamente."
                   }
                   onRetry={() => {
                     setLoading(true);

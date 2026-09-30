@@ -1,9 +1,17 @@
+import { ReportModal } from "../../src/components/report/report-modal";
+import { useIsFocused } from "expo-router/react-navigation";
+import { useCommunityPost } from "../../src/hooks/use-community-post";
+import { useCommunityPage } from "../../src/hooks/use-community-page";
+import { CommunityLoadMore } from "../../src/components/community/load-more";
+import { ScreenError } from "../../src/components/ui/screen-error";
+import { useAppShell } from "../../src/context/AppShellContext";
+import { canParticipate, canModerate as canModerateCommunity, isCommunityAuthor } from "../../src/utils/communityPermissions";
+import { confirmCommunityAction } from "../../src/utils/confirmCommunityAction";
 import { goBackOrReplace } from "../../src/utils/navigation";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -34,7 +42,6 @@ import {
   accessibilityAnnouncements,
   announceForAccessibility,
 } from "../../src/utils/accessibilityAnnouncements";
-import { formatApiErrorMessage } from "../../src/utils/auth";
 import { showGlobalToast } from "../../src/utils/globalToast";
 import { buildUserProfileHref } from "../../src/utils/userProfileRoute";
 
@@ -137,6 +144,8 @@ function CommentCard({
   comment,
   deleting,
   onDelete,
+  onEdit,
+  onReport,
   onOpenProfile,
 }: {
   authToken: string | null;
@@ -144,6 +153,8 @@ function CommentCard({
   comment: CommunityCommentResponse;
   deleting: boolean;
   onDelete: () => void;
+  onEdit?: () => void;
+  onReport?: () => void;
   onOpenProfile: (userProfileId: string, name?: string | null) => void;
 }) {
   const { speak } = useTTS();
@@ -178,13 +189,25 @@ function CommentCard({
             <View className="flex-row items-center gap-3">
               {comment.publishedAt ? (
                 <Text className="text-[12px] font-semibold text-[#CAC3D8]">
-                  {comment.publishedAt}
+                  {comment.publishedAt}{comment.editedAt ? " · editado" : ""}
                 </Text>
+              ) : null}
+              {onReport ? <Pressable onPress={(event) => { event.stopPropagation(); onReport(); }} accessibilityRole="button"
+                accessibilityLabel="Denunciar comentário" accessibilityHint="Abre o formulário de denúncia"
+                className="h-10 w-10 items-center justify-center">
+                <Ionicons name="flag-outline" size={18} color="#CDBDFF" />
+              </Pressable> : null}
+              {onEdit ? (
+                <Pressable onPress={(event) => { event.stopPropagation(); onEdit(); }} disabled={deleting} accessibilityRole="button"
+                  accessibilityLabel="Editar comentário" accessibilityHint="Abre seu comentário para alterar o texto"
+                  className="h-10 w-10 items-center justify-center">
+                  <Ionicons name="pencil-outline" size={18} color="#CDBDFF" />
+                </Pressable>
               ) : null}
               {canDelete ? (
                 <Pressable
                   className="h-9 w-9 items-center justify-center rounded-full bg-[#221820]"
-                  onPress={onDelete}
+                  onPress={(event) => { event.stopPropagation(); onDelete(); }}
                   disabled={deleting}
                   accessibilityRole="button"
                   accessibilityLabel={`Excluir comentário de ${comment.author.name}`}
@@ -210,6 +233,8 @@ function CommentCard({
   );
 }
 
+const commentKey = (comment: CommunityCommentResponse) => comment.id;
+
 export default function CommunityCommentsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -223,100 +248,60 @@ export default function CommunityCommentsScreen() {
     canModerate?: string | string[];
   }>();
   const { session } = useAuth();
+  const { currentUserId, currentUserProfileId } = useAppShell();
+  const isFocused = useIsFocused();
+  const submitLock = useRef(false);
   const { speak } = useTTS();
 
   // Ao entrar na tela, o leitor de tela do sistema comeca pelo titulo.
   const headingRef = useScreenHeadingFocus<Text>();
 
   const authToken = session?.accessToken ?? null;
-  const communityId = useMemo(
-    () => normalizeRouteParam(params.communityId).trim(),
-    [params.communityId]
-  );
-  const communityName = useMemo(
-    () => normalizeRouteParam(params.communityName).trim(),
-    [params.communityName]
-  );
   const postId = useMemo(() => normalizeRouteParam(params.postId).trim(), [params.postId]);
-  const authorName = useMemo(
-    () => normalizeRouteParam(params.authorName).trim() || "Autor da publicação",
-    [params.authorName]
-  );
-  const postBody = useMemo(() => normalizeRouteParam(params.postBody), [params.postBody]);
-  const publishedAt = useMemo(
-    () => normalizeRouteParam(params.publishedAt).trim(),
-    [params.publishedAt]
-  );
-  const isMember = useMemo(
-    () => normalizeRouteParam(params.isMember).toLowerCase() === "true",
-    [params.isMember]
-  );
-  const canModerate = useMemo(
-    () => normalizeRouteParam(params.canModerate).toLowerCase() === "true",
-    [params.canModerate]
-  );
-
-  const [comments, setComments] = useState<CommunityCommentResponse[]>([]);
+  const access = useCommunityPost(postId);
+  const reloadAccess = access.reload;
+  const communityId = access.community?.id ?? normalizeRouteParam(params.communityId).trim();
+  const communityName = access.community?.name ?? "";
+  const authorName = access.data?.post.author.name ?? "Autor da publicação";
+  const postBody = access.data?.post.body ?? "";
+  const publishedAt = access.data?.post.publishedAt ?? "";
+  const isMember = canParticipate(access.community);
+  const canModerate = canModerateCommunity(access.community);
+  const fetchComments = useCallback((page: number) => {
+    if (!postId) return Promise.reject(new Error("Não foi possível identificar a publicação."));
+    return communityService.getComments(postId, { page, size: 20 });
+  }, [postId]);
+  const list = useCommunityPage(fetchComments, commentKey);
+  const { items: comments, setItems: setComments, loading, error: loadError, refresh: reloadComments } = list;
   const [draft, setDraft] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reportTarget, setReportTarget] = useState<CommunityCommentResponse | null>(null);
+  const [editingComment, setEditingComment] = useState<CommunityCommentResponse | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [pendingDeleteCommentId, setPendingDeleteCommentId] = useState<string | null>(null);
-
-  const loadComments = useCallback(
-    async (options?: { showLoader?: boolean }) => {
-      if (options?.showLoader) {
-        setLoading(true);
-      }
-
-      if (!postId) {
-        setLoadError("Não foi possível identificar a publicação selecionada.");
-        setComments([]);
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
-
-      try {
-        setLoadError(null);
-
-        // TODO: paginação incremental — hoje sempre carregamos a primeira página
-        // (size padrão do backend) dos comentários da publicação.
-        const response = await communityService.getComments(postId);
-        const nextComments = Array.isArray(response.content) ? response.content : [];
-        setComments(nextComments);
-
-        const avatarUrls = nextComments
-          .map((comment) => communityService.resolveAssetUrl(comment.author.avatarData))
-          .filter((value): value is string => typeof value === "string" && value.length > 0);
-
-        if (avatarUrls.length > 0) {
-          void preloadAuthenticatedRemoteImages(avatarUrls, authToken);
-        }
-      } catch (error) {
-        setLoadError(
-          formatApiErrorMessage(error, "Não foi possível carregar os comentários.")
-        );
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [authToken, postId]
-  );
-
+  const deleteLock = useRef(false);
   useEffect(() => {
-    void loadComments({ showLoader: true });
-  }, [loadComments]);
-
+    if (isFocused) void reloadComments();
+  }, [isFocused, reloadComments]);
+  useEffect(() => {
+    setDraft("");
+    setEditingComment(null);
+  }, [postId]);
+  useEffect(() => {
+    const urls = comments.map((comment) => communityService.resolveAssetUrl(comment.author.avatarData))
+      .filter((url): url is string => Boolean(url));
+    if (urls.length) void preloadAuthenticatedRemoteImages(urls, authToken);
+  }, [comments, authToken]);
   const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    void loadComments();
-  }, [loadComments]);
+    void reloadAccess();
+    void reloadComments();
+  }, [reloadAccess, reloadComments]);
+  const refreshing = loading && comments.length > 0;
+  const ownsComment = useCallback((comment: CommunityCommentResponse) =>
+    isCommunityAuthor(comment.author, currentUserId, currentUserProfileId) || comment.commentedByCurrentUser === true,
+    [currentUserId, currentUserProfileId]);
 
   const handleSubmitComment = useCallback(async () => {
-    if (submitting || !postId) {
+    if (submitLock.current || !postId) {
       return;
     }
 
@@ -340,17 +325,23 @@ export default function CommunityCommentsScreen() {
       return;
     }
 
+    submitLock.current = true;
     setSubmitting(true);
 
     try {
-      const createdComment = await communityService.createComment(postId, {
-        body: trimmedDraft,
-      });
+      const createdComment = editingComment
+        ? await communityService.updateComment(postId, editingComment.id, { body: trimmedDraft })
+        : await communityService.createComment(postId, { body: trimmedDraft });
 
-      setComments((currentComments) => [...currentComments, createdComment]);
+      setComments((current) => editingComment
+        ? current.map((comment) => comment.id === createdComment.id ? createdComment : comment)
+        : [createdComment, ...current.filter((comment) => comment.id !== createdComment.id)]);
+      setEditingComment(null);
+      // Reset the offset after insertion so the next page cannot skip comments.
+      void reloadComments();
       setDraft("");
       showGlobalToast({
-        title: "Comentário publicado",
+        title: editingComment ? "Comentário atualizado" : "Comentário publicado",
         variant: "success",
         message: "Seu comentário já apareceu na conversa.",
       });
@@ -358,23 +349,25 @@ export default function CommunityCommentsScreen() {
     } catch {
       // Global API error toast already explains the failure.
     } finally {
+      submitLock.current = false;
       setSubmitting(false);
     }
-  }, [draft, isMember, postId, submitting]);
+  }, [draft, editingComment, isMember, postId, reloadComments, setComments]);
 
   const canDeleteComment = useCallback(
     (comment: CommunityCommentResponse) => {
-      return Boolean(comment.commentedByCurrentUser || canModerate);
+      return Boolean(ownsComment(comment) || canModerate);
     },
-    [canModerate]
+    [canModerate, ownsComment]
   );
 
   const confirmDeleteComment = useCallback(
     async (comment: CommunityCommentResponse) => {
-      if (!postId || pendingDeleteCommentId) {
+      if (!postId || deleteLock.current || !canDeleteComment(comment)) {
         return;
       }
 
+      deleteLock.current = true;
       setPendingDeleteCommentId(comment.id);
 
       try {
@@ -387,14 +380,17 @@ export default function CommunityCommentsScreen() {
           variant: "success",
           message: "O comentário foi removido desta conversa.",
         });
+        if (editingComment?.id === comment.id) { setEditingComment(null); setDraft(""); }
+        void reloadComments();
         announceForAccessibility(accessibilityAnnouncements.commentDeleted());
       } catch {
         // Global API error toast already explains the failure.
       } finally {
+        deleteLock.current = false;
         setPendingDeleteCommentId(null);
       }
     },
-    [pendingDeleteCommentId, postId]
+    [canDeleteComment, editingComment?.id, postId, reloadComments, setComments]
   );
 
   const handleOpenProfile = useCallback(
@@ -408,23 +404,18 @@ export default function CommunityCommentsScreen() {
   const handleDeleteComment = useCallback(
     (comment: CommunityCommentResponse) => {
       speak(buildActionSpeech("Excluir comentário de", comment.author.name));
-      Alert.alert(
-        "Excluir comentário",
-        "Essa ação remove o comentário da conversa. Deseja continuar?",
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Excluir",
-            style: "destructive",
-            onPress: () => {
-              void confirmDeleteComment(comment);
-            },
-          },
-        ]
-      );
+      confirmCommunityAction("Excluir comentário", "Essa ação remove o comentário da conversa. Deseja continuar?", "Excluir", () => { void confirmDeleteComment(comment); });
     },
     [confirmDeleteComment, speak]
   );
+
+  if (access.loading) return <View className="flex-1 items-center justify-center bg-[#0B0B0C]"><ActivityIndicator color="#7C4DFF" /></View>;
+  if (access.error || !access.data) return <View className="flex-1 bg-[#0B0B0C] p-6">
+    <ScreenError message={access.error || "Publicação não encontrada."} onRetry={() => void access.reload()} />
+    <Pressable accessibilityRole="button" accessibilityLabel="Voltar para comunidades" onPress={() => goBackOrReplace(router, "/community")}>
+      <Text className="py-5 text-center font-bold text-white">Voltar</Text>
+    </Pressable>
+  </View>;
 
   return (
     <View className="flex-1 bg-[#0B0B0C]">
@@ -520,12 +511,14 @@ export default function CommunityCommentsScreen() {
                   ) : null}
                 </Pressable>
 
+                {access.error ? <ScreenError message={access.error} onRetry={() => void access.reload()} /> : null}
                 {loadError ? (
                   <View className="mt-6 rounded-2xl border border-[#6A4456] bg-[#2A1C24] px-4 py-4">
                     <Text className="text-[15px] font-bold text-[#FFD3DD]">Falha ao atualizar</Text>
                     <Text className="mt-2 text-[14px] font-semibold leading-6 text-[#FFEAF0]">
                       {loadError}
                     </Text>
+                    <CommunityLoadMore visible busy={loading} onPress={() => void reloadComments()} label="Tentar novamente" />
                   </View>
                 ) : null}
 
@@ -538,7 +531,11 @@ export default function CommunityCommentsScreen() {
                         canDelete={canDeleteComment(comment)}
                         comment={comment}
                         deleting={pendingDeleteCommentId === comment.id}
+                        onReport={!ownsComment(comment) && comment.author.id ? () => setReportTarget(comment) : undefined}
                         onDelete={() => handleDeleteComment(comment)}
+                        onEdit={isMember && ownsComment(comment) && !submitting ? () => {
+                          setEditingComment(comment); setDraft(comment.body);
+                        } : undefined}
                         onOpenProfile={handleOpenProfile}
                       />
                     ))
@@ -555,11 +552,20 @@ export default function CommunityCommentsScreen() {
                     </View>
                   )}
                 </View>
+                <CommunityLoadMore visible={list.hasNext} busy={loading || list.loadingMore}
+                  onPress={() => void list.loadMore()} label="Carregar mais comentários" />
               </ScrollView>
 
               <View className="border-t border-[#2A2A2A] bg-[#111214] px-6 py-5">
                 {isMember ? (
                   <>
+                    {editingComment ? <View className="mb-3 flex-row justify-between">
+                      <Text className="font-bold text-white">Editando comentário</Text>
+                      <Pressable disabled={submitting} accessibilityRole="button" accessibilityLabel="Cancelar edição"
+                        onPress={() => { setEditingComment(null); setDraft(""); }}>
+                        <Text className="text-[#CDBDFF]">Cancelar</Text>
+                      </Pressable>
+                    </View> : null}
                     <TextInput
                       className="min-h-[108px] rounded-2xl border border-[#494455] bg-[#1C1B1B] px-4 py-4 text-[15px] leading-6 text-white"
                       multiline
@@ -567,6 +573,7 @@ export default function CommunityCommentsScreen() {
                       placeholder="Escreva um comentário..."
                       placeholderTextColor="#948EA1"
                       textAlignVertical="top"
+                      editable={!submitting}
                       value={draft}
                       onChangeText={setDraft}
                       onFocus={() => speak("Escreva um comentário")}
@@ -600,7 +607,7 @@ export default function CommunityCommentsScreen() {
                           <ActivityIndicator color="#1D1D00" size="small" />
                         ) : (
                           <Text className="text-[14px] font-black text-[#1D1D00]">
-                            Enviar comentário
+                            {editingComment ? "Salvar comentário" : "Enviar comentário"}
                           </Text>
                         )}
                       </Pressable>
@@ -621,6 +628,9 @@ export default function CommunityCommentsScreen() {
           )}
         </KeyboardAvoidingView>
       </SafeAreaView>
+      {reportTarget?.author.id ? <ReportModal visible onClose={() => setReportTarget(null)}
+        reportedUserId={reportTarget.author.id} reportedPostId={postId} reportedCommentId={reportTarget.id}
+        contextLabel={`comentário de ${reportTarget.author.name}`} /> : null}
     </View>
   );
 }
