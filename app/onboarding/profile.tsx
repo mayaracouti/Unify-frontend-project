@@ -1,3 +1,4 @@
+import { goBackOrReplace } from "../../src/utils/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -373,7 +374,7 @@ export default function ProfileOnboarding() {
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               onPress={() => {
                 speak("Voltar");
-                router.back();
+                goBackOrReplace(router, "/home");
               }}
               accessibilityRole="button"
               accessibilityLabel="Voltar"

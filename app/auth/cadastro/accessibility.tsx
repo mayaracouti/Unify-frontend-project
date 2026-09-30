@@ -1,3 +1,4 @@
+import { goBackOrReplace } from "../../../src/utils/navigation";
 import { useEffect, useState } from "react";
 import {
   AccessibilityInfo,
@@ -96,7 +97,7 @@ export default function CadastroAccessibility() {
               className="mr-5 h-12 w-12 items-center justify-center rounded-full bg-white/8"
               onPress={() => {
                 speak("Voltar");
-                router.back();
+                goBackOrReplace(router, "/auth/cadastro");
               }}
               accessibilityRole="button"
               accessibilityLabel="Voltar"

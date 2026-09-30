@@ -1,3 +1,4 @@
+import { goBackOrReplace } from "../../src/utils/navigation";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -215,7 +216,7 @@ export default function CommunityCreateScreen() {
                 className="mr-3 h-10 w-10 items-center justify-center rounded-full"
                 onPress={() => {
                   speak("Voltar");
-                  router.back();
+                  goBackOrReplace(router, "/community");
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Voltar"

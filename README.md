@@ -121,7 +121,7 @@ npm run android
 #### 🌐 No Navegador (Web)
 
 ```bash
-npm run start:dev -- start --web
+npm run start:dev -- -- start --web
 ```
 
 ---

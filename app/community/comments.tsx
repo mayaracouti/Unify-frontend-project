@@ -1,3 +1,4 @@
+import { goBackOrReplace } from "../../src/utils/navigation";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -450,7 +451,7 @@ export default function CommunityCommentsScreen() {
                     return;
                   }
 
-                  router.back();
+                  goBackOrReplace(router, "/community");
                 }}
               >
                 <Ionicons name="arrow-back" size={24} color="#E5E2E1" />
