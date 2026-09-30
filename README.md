@@ -5,10 +5,10 @@ Este é o repositório do frontend do projeto **Unify**, desenvolvido com **Reac
 ---
 
 ## 🛠️ Tecnologias e Ferramentas
-* **Framework:** Expo (SDK 50+)
+* **Framework:** Expo (SDK 57)
 * **Linguagem:** TypeScript
 * **Estilização:** NativeWind (Tailwind CSS para React Native)
-* **Ambiente:** Node.js (v20+ LTS)
+* **Ambiente:** Node.js (22.13+ ou 24.3+ LTS)
 
 ---
 
@@ -19,7 +19,7 @@ Siga o passo a passo abaixo para configurar o ambiente no seu computador (instru
 
 Certifique-se de ter o **Node.js** instalado (recomenda-se o uso do NVM):
 ```bash
-node -v  # Deve retornar v20.x ou superior
+node -v  # Use v22.13+ ou v24.3+
 ```
 ---
 
@@ -74,14 +74,16 @@ start-expo-local.cmd nome-perfil
 
 #### 📱 No Celular Físico (Recomendado)
 
-1. Instale o aplicativo **Expo Go** na Play Store ou App Store.
-2. No terminal, execute:
+1. Instale o aplicativo **Expo Go compatível com SDK 57** na Play Store ou App Store.
+2. No terminal, inicie o perfil de desenvolvimento e limpe o cache após a atualização:
 
 ```bash
-npm run start:dev
+npm run start:dev -- -- start --go --lan --clear
 ```
 
-3. Escaneie o QR Code gerado com a câmera do seu celular.
+3. Conecte o celular e o computador à mesma rede e leia o QR code no Expo Go.
+
+As customizações nativas de recorte de imagens (patch e tema) são aplicadas apenas em builds próprios; o Expo Go usa seu seletor de imagens integrado.
 
 ---
 

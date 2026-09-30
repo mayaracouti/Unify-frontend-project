@@ -1,5 +1,3 @@
-const appJson = require("./app.json");
-
 const HTTP_CLEAR_TEXT_PROFILES = new Set(["dev", "dev-avd-localhost"]);
 
 function readTrimmedEnv(name) {
@@ -18,8 +16,7 @@ function shouldAllowAndroidCleartextTraffic(appProfile, apiBaseUrl) {
   return HTTP_CLEAR_TEXT_PROFILES.has(appProfile);
 }
 
-module.exports = () => {
-  const expoConfig = appJson.expo;
+module.exports = ({ config: expoConfig }) => {
   const appProfile = readTrimmedEnv("EXPO_PUBLIC_APP_PROFILE") ?? "dev";
   const apiBaseUrl = readTrimmedEnv("EXPO_PUBLIC_API_BASE_URL");
   const usesCleartextTraffic = shouldAllowAndroidCleartextTraffic(
@@ -29,10 +26,10 @@ module.exports = () => {
 
   return {
     ...expoConfig,
-    android: {
-      ...(expoConfig.android ?? {}),
-      usesCleartextTraffic,
-    },
+    plugins: [
+      ...(expoConfig.plugins ?? []),
+      ["expo-build-properties", { android: { usesCleartextTraffic } }],
+    ],
     extra: {
       ...(expoConfig.extra ?? {}),
       appProfile,

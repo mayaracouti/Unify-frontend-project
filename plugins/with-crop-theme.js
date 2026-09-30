@@ -10,7 +10,7 @@
  * o `uiMode` noturno e cair no `values/` claro (icones pretos sobre barra
  * escura, "apagados").
  *
- * Complementa `patches/expo-image-picker+17.0.11.patch`, que liga o pinch/zoom
+ * Complementa `patches/expo-image-picker+57.0.20.patch`, que liga o pinch/zoom
  * (`multiTouchEnabled`) na mesma tela.
  */
 const {

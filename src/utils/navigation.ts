@@ -1,7 +1,7 @@
-import type { Href, Router } from "expo-router";
+import type { Href, router as expoRouter } from "expo-router";
 
 export function goBackOrReplace(
-  router: Pick<Router, "canGoBack" | "back" | "replace">,
+  router: Pick<typeof expoRouter, "canGoBack" | "back" | "replace">,
   fallback: Href
 ) {
   if (router.canGoBack()) {

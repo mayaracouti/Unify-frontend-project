@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused } from "expo-router/react-navigation";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WormRiseText, WormRiseWrapText } from "../../../src/components/ui/hello-wave";
 import { UnifyMark } from "../../../src/components/ui/unify-mark";

@@ -7,11 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "splash": {
-      "image": "./assets/splash-screen.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#4D52B5"
-    },
     "ios": {
       "supportsTablet": true
     },
@@ -49,6 +44,14 @@
         "expo-audio",
         {
           "microphonePermission": "Permita que a Unify use o microfone para você gravar mensagens de áudio nas suas conversas."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-screen.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#4D52B5"
         }
       ]
     ]
