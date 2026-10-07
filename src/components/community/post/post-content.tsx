@@ -6,7 +6,7 @@ export function PostContent({ body, mediaUri, imageDescription, authorName, auth
   authToken: string | null; onRead: () => void; onStop?: () => void;
 }) {
   return <View>
-    <Pressable onPress={onRead} accessibilityRole="button" accessibilityLabel={body} accessibilityHint="Lê o texto completo e a descrição da imagem em voz alta">
+    <Pressable onPress={onRead} accessibilityRole="button" accessibilityLabel={mediaUri ? `${body}. Publicação com imagem` : body} accessibilityHint="Lê o texto completo e a descrição da imagem em voz alta">
       <Text className="mt-4 text-[17px] font-semibold leading-7 text-[#E5E2E1]">{body}</Text>
     </Pressable>
     {mediaUri ? <PostImage version={editedAt} uri={mediaUri} description={imageDescription} authorName={authorName} authToken={authToken} /> : null}

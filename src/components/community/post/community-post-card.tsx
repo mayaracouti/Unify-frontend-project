@@ -6,6 +6,10 @@ import type { CommunityPostResponse } from "../../../types/community";
 import { AuthorAvatar } from "./post-author-avatar";
 import { PostAction } from "./post-action";
 import { PostContent } from "./post-content";
+function formatCount(count: number | null | undefined, singular: string, plural: string) {
+  const value = count ?? 0;
+  return `${value} ${value === 1 ? singular : plural}`;
+}
 export function CommunityPostCard({
   authToken,
   likeBusy,
@@ -14,6 +18,7 @@ export function CommunityPostCard({
   onToggleLike,
   post,
   menu,
+  communityName,
 }: {
   authToken: string | null;
   likeBusy: boolean;
@@ -22,6 +27,7 @@ export function CommunityPostCard({
   onToggleLike: () => void;
   post: CommunityPostResponse;
   menu?: ReactNode;
+  communityName?: string;
 }) {
   const reader = useCommunityPostReader(post);
   const mediaUrl = communityService.resolveAssetUrl(post.mediaData);
@@ -42,7 +48,11 @@ export function CommunityPostCard({
           // corpo e contadores reais vindos do backend.
           onPress={reader.read}
           accessibilityRole="button"
-          accessibilityLabel={`Publicação de ${post.author.name}`}
+          accessibilityLabel={[
+            `Publicação de ${post.author.name}${communityName ? ` na comunidade ${communityName}` : ""}`,
+            post.publishedAt,
+            post.editedAt ? "editada" : null,
+          ].filter(Boolean).join(", ")}
           accessibilityHint="Lê em voz alta o autor, o texto e os contadores desta publicação"
         >
           <Text className="text-[17px] font-black text-[#E5E2E1]">
@@ -70,7 +80,7 @@ export function CommunityPostCard({
 
       <View className="mt-1 flex-row items-center justify-between">
         <PostAction
-          accessibilityLabel={post.likedByCurrentUser ? "Remover curtida" : "Curtir publicação"}
+          accessibilityLabel={`${post.likedByCurrentUser ? "Descurtir publicação" : "Curtir publicação"}, ${formatCount(post.likesCount, "curtida", "curtidas")}`}
           accessibilityHint={
             post.likedByCurrentUser
               ? "Retira a sua curtida desta publicação"
@@ -84,7 +94,7 @@ export function CommunityPostCard({
           onPress={onToggleLike}
         />
         <PostAction
-          accessibilityLabel="Abrir comentários"
+          accessibilityLabel={`Ver comentários, ${formatCount(post.commentsCount, "comentário", "comentários")}`}
           accessibilityHint="Abre a tela de comentários desta publicação"
           icon={post.commentedByCurrentUser ? "chatbubble" : "chatbubble-outline"}
           count={post.commentsCount}
@@ -96,4 +106,3 @@ export function CommunityPostCard({
     </View>
   );
 }
-

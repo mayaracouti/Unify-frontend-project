@@ -62,7 +62,7 @@ export function CommunityForYouPostCard({
       {/* Avatar e um botao irmao do card de texto: abre o perfil publico do
           autor sem aninhar Pressable dentro de Pressable. */}
       <View className="mt-4">
-        <CommunityPostCard authToken={authToken} post={post} likeBusy={likeBusy}
+        <CommunityPostCard authToken={authToken} post={post} likeBusy={likeBusy} communityName={item.communityName}
           onOpenComments={onOpenComments} onToggleLike={onToggleLike}
           onOpenProfile={(id, name) => router.push(buildUserProfileHref(id, name))} />
       </View>

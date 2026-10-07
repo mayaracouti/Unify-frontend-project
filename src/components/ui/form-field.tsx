@@ -1,5 +1,6 @@
 import {
   forwardRef,
+  useEffect,
   useImperativeHandle,
   useRef,
   useState,
@@ -97,6 +98,22 @@ export const FormField = forwardRef<FormFieldHandle, FormFieldProps>(
     const inputRef = useRef<TextInput>(null);
     const [localError, setLocalError] = useState<string | null>(null);
     const displayedError = externalError ?? localError;
+
+    // Com erro na tela, revalida a cada mudança: o blur pode ter lido um `value`
+    // de um render atrasado (digitação rápida/autocompletar) e o erro ficaria
+    // preso sobre um valor já válido até o próximo blur. Sem erro, nada muda
+    // enquanto a pessoa digita (a validação continua sendo no blur).
+    useEffect(() => {
+      if (!validator || !localError) {
+        return;
+      }
+      const message = validator(value) ?? null;
+      if (message !== localError) {
+        setLocalError(message);
+        onValidate?.(message);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [value]);
 
     useImperativeHandle(ref, () => ({
       focus: () => {

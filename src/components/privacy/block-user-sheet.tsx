@@ -52,7 +52,7 @@ export function BlockUserSheet({
 
     showGlobalToast({
       title: "Usuário bloqueado",
-      message: `${current.name} foi bloqueado. Desbloqueie em Privacidade e bloqueios quando quiser.`,
+      message: `Você bloqueou ${current.name}. Desbloqueie em Privacidade e bloqueios quando quiser.`,
       variant: "success",
     });
     announceForAccessibility(accessibilityAnnouncements.userBlocked(current.name));

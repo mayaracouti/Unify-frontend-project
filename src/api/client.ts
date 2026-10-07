@@ -96,6 +96,32 @@ function buildUrl(baseURL: string, path: string, params?: ApiQueryParams): strin
     : `${normalizedBaseUrl}${normalizedPath}`;
 }
 
+/**
+ * O backend monta `message` como "<mensagem padrão do ErrorCode>: <detalhe>".
+ * Nos códigos genéricos a parte padrão é jargão ("Conflito ao processar
+ * recurso") e o detalhe já é a frase em pt-BR para a pessoa; o toast e o
+ * leitor de tela mostram só o detalhe. Códigos com mensagem própria
+ * ("Usuário já existe: ...") ficam como vieram.
+ */
+const GENERIC_ERROR_PREFIXES = [
+  "Conflito ao processar recurso: ",
+  "Recurso não encontrado: ",
+  "Requisicao invalida: ",
+  "Formato de entrada inválido: ",
+  "Campo obrigatório não fornecido: ",
+  "Acesso negado: ",
+  "Operação não suportada: ",
+];
+
+export function stripGenericErrorPrefix(message: string): string {
+  const prefix = GENERIC_ERROR_PREFIXES.find((candidate) => message.startsWith(candidate));
+  if (!prefix) {
+    return message;
+  }
+  const detail = message.slice(prefix.length).trim();
+  return detail.length > 0 ? detail : message;
+}
+
 function extractMessage(body: unknown, status: number): string {
   if (typeof body === "string" && body.trim().length > 0) {
     return body;
@@ -108,7 +134,7 @@ function extractMessage(body: unknown, status: number): string {
     typeof body.message === "string" &&
     body.message.trim().length > 0
   ) {
-    return body.message;
+    return stripGenericErrorPrefix(body.message);
   }
 
   if (status >= 500) {

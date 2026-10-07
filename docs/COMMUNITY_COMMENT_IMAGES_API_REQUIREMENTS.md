@@ -7,7 +7,7 @@ de compatibilidade com o frontend. O frontend contém seletor, prévia e descri�
 a API contém upload multipart, resposta com mídia e descrição e download
 autenticado. Comentários apenas com texto continuam usando o endpoint JSON.
 As configurações de conexão e inicialização foram preservadas byte a byte.
-A migração V21 foi criada, mas não foi executada no banco do servidor.
+A migração V22 foi criada, mas não foi executada no banco do servidor.
 
 Na lista de comentários, “Ouvir descrição da imagem” solicita análise visual
 pela IA e reproduz o resultado. Não usa a descrição informada pelo autor.
@@ -110,7 +110,7 @@ do projeto, usar coluna `media_oid` e `image_description VARCHAR(240)`, com limp
 do arquivo ao excluir um comentário ou seu post. O upload e a criação do
 comentário precisam ocorrer na mesma transação, sem arquivos órfãos em falhas.
 
-A implementação usa `V21__comment_images.sql`, disponível nesta revisão.
+A implementação usa `V22__comment_images.sql`, disponível nesta revisão.
 Validar a migração em um banco isolado e confirmar o perfil de execução antes
 de iniciar a API atualizada. No código atual,
 os perfis `dev` e `test` usam `drop-and-create` e desativam o Flyway; outros perfis

@@ -233,13 +233,13 @@ export function GlobalTopNav({
                     resizeMode="cover"
                     fallback={
                       <View className="flex-1 items-center justify-center bg-[#2D2A33]">
-                        <Text className="text-[20px] font-black text-white">{initials || "?"}</Text>
+                        <Text allowFontScaling={false} className="text-[20px] font-black text-white">{initials || "?"}</Text>
                       </View>
                     }
                   />
                 ) : (
                   <View className="flex-1 items-center justify-center bg-[#2D2A33]">
-                    <Text className="text-[20px] font-black text-white">{initials || "?"}</Text>
+                    <Text allowFontScaling={false} className="text-[20px] font-black text-white">{initials || "?"}</Text>
                   </View>
                 )}
               </View>

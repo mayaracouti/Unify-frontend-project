@@ -793,7 +793,7 @@ export default function CommunityDetailScreen() {
           onClose={() => setReportTarget(null)}
           reportedUserId={reportTarget.userId}
           reportedPostId={reportTarget.postId}
-          contextLabel={`publicação de ${reportTarget.authorName}`}
+          contextLabel={`uma publicação de ${reportTarget.authorName}`}
         />
       ) : null}
     </View>

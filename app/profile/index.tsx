@@ -7,6 +7,7 @@ import {
   ScrollView,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
@@ -327,6 +328,10 @@ export default function Profile() {
   const { speak } = useTTS();
   const { syncProfileSummary } = useAppShell();
   const { settings } = useAccessibility();
+  // O bloco "Adicionar foto" tem largura fixa; com a fonte do sistema grande o
+  // rótulo partia no meio da palavra ("Adicion/ar"). Cresce junto com a fonte.
+  const { fontScale } = useWindowDimensions();
+  const addPhotoTileWidth = Math.round(132 * Math.min(Math.max(fontScale, 1), 2));
   const reduceMotion = settings.reduceMotion;
   const highContrast = settings.highContrast;
   const params = useLocalSearchParams<{ created?: string | string[] }>();
@@ -814,10 +819,10 @@ export default function Profile() {
             </View>
 
             <View className="mt-8">
-              <View className="mb-4 flex-row items-center justify-between">
+              <View className="mb-4 flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
                 <Text
                   accessibilityRole="header"
-                  className="text-[20px] font-black text-white"
+                  className="shrink text-[20px] font-black text-white"
                 >
                   Exibição do perfil
                 </Text>
@@ -853,7 +858,8 @@ export default function Profile() {
 
                   {galleryImages.length < 5 ? (
                     <Pressable
-                      className="mr-4 h-[172px] w-[132px] items-center justify-center rounded-[24px] border border-dashed border-[#7C4DFF] bg-[#1A1C1F] px-4"
+                      className="mr-4 min-h-[172px] items-center justify-center rounded-[24px] border border-dashed border-[#7C4DFF] bg-[#1A1C1F] px-4 py-4"
+                      style={{ width: addPhotoTileWidth }}
                       onPress={() => openImageSourcePicker("gallery")}
                       disabled={uploadingTarget !== null}
                       accessibilityRole="button"

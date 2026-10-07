@@ -3,6 +3,9 @@ import { Text, View } from "react-native";
 
 export const LOCKED_PROFILE_TITLE = "Esta conta é privada";
 export const LOCKED_PROFILE_MESSAGE = "Siga esta conta para ver o perfil e as publicações.";
+/** Travado mas com dados de match visíveis (ex.: match mútuo): parte do perfil já aparece. */
+export const LOCKED_PROFILE_PARTIAL_MESSAGE =
+  "Siga esta conta para ver o perfil completo e as publicações.";
 
 /**
  * Estado do perfil travado (conta privada que eu nao sigo): cadeado, titulo e
@@ -11,15 +14,19 @@ export const LOCKED_PROFILE_MESSAGE = "Siga esta conta para ver o perfil e as pu
 export function LockedProfileNotice({
   className = "",
   highContrast = false,
+  partial = false,
 }: {
   className?: string;
   highContrast?: boolean;
+  /** Alguma parte do perfil continua visível abaixo do aviso. */
+  partial?: boolean;
 }) {
+  const message = partial ? LOCKED_PROFILE_PARTIAL_MESSAGE : LOCKED_PROFILE_MESSAGE;
   return (
     <View
       accessible
       accessibilityRole="text"
-      accessibilityLabel={`${LOCKED_PROFILE_TITLE}. ${LOCKED_PROFILE_MESSAGE}`}
+      accessibilityLabel={`${LOCKED_PROFILE_TITLE}. ${message}`}
       className={`items-center rounded-[22px] border px-5 py-6 ${
         highContrast ? "border-hc-border bg-hc-surface" : "border-[#3A3246] bg-[#17181C]"
       } ${className}`}
@@ -48,7 +55,7 @@ export function LockedProfileNotice({
           highContrast ? "text-hc-text" : "text-[#CAC3D8]"
         }`}
       >
-        {LOCKED_PROFILE_MESSAGE}
+        {message}
       </Text>
     </View>
   );

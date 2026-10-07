@@ -10,7 +10,7 @@ it("renders full body, independent description and accessible image", async () =
   let renderer!: { root: { findByType: (type: unknown) => { props: { accessibilityLabel: string; uri: string } }; findAllByProps: (props: object) => { props: { onPress: () => void } }[] }; unmount: () => void };
   await act(async () => { renderer = create(<PostContent body="Texto completo" imageDescription="Uma árvore" mediaUri="https://api/image" authorName="Ana" authToken="token" onRead={read} />); });
   expect(renderer.root.findByType("RemoteImage").props.accessibilityLabel).toBe("Descrição da imagem: Uma árvore");
-  renderer.root.findAllByProps({ accessibilityLabel: "Texto completo" })[0].props.onPress();
+  renderer.root.findAllByProps({ accessibilityLabel: "Texto completo. Publicação com imagem" })[0].props.onPress();
   expect(read).toHaveBeenCalledTimes(1);
   await act(async () => { renderer.unmount(); });
 });

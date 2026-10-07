@@ -10,6 +10,7 @@
  * telas e para manter a voz do produto consistente (pt-BR).
  */
 import { AccessibilityInfo } from "react-native";
+import { formatDistanceSpeech } from "./distanceFormatting";
 
 /**
  * Anuncia uma mensagem para o leitor de tela.
@@ -89,8 +90,9 @@ export const accessibilityAnnouncements = {
       parts.push(`${age} anos`);
     }
 
-    if (typeof distanceKm === "number" && Number.isFinite(distanceKm)) {
-      parts.push(`a ${Math.round(distanceKm)} quilômetros`);
+    const distanceSpeech = formatDistanceSpeech(distanceKm);
+    if (distanceSpeech) {
+      parts.push(distanceSpeech);
     }
 
     if (locked) {
@@ -182,8 +184,8 @@ export const accessibilityAnnouncements = {
   privacySettingFailed: () =>
     "Não foi possível salvar a preferência de privacidade. A opção anterior foi mantida.",
   userBlocked: (name: string) =>
-    `${name} foi bloqueado. Vocês não verão mais o perfil, as publicações nem poderão trocar mensagens.`,
-  userUnblocked: (name: string) => `${name} foi desbloqueado.`,
+    `Você bloqueou ${name}. Vocês não verão mais o perfil, as publicações nem poderão trocar mensagens.`,
+  userUnblocked: (name: string) => `Você desbloqueou ${name}.`,
   chatBlocked: () => "Não é possível enviar mensagens para este contato.",
   // --- Seguir com aprovacao ---
   followRequestSent: (name: string) => `Pedido para seguir enviado a ${name}.`,
