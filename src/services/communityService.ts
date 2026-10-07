@@ -255,7 +255,15 @@ export const communityService = {
     );
   },
 
-  /** Só o autor edita, e só o texto. Devolve o post com `editedAt`. */
+  getPost(postId: string) {
+    return customApiCall.get<CommunityPostResponse>(`${COMMUNITY_POSTS_ENDPOINT}/${encodePathSegment(postId)}`, undefined, { requiresAuth: true });
+  },
+
+  updatePostMedia(postId: string, formData: FormData) {
+    return customApiCall.put<CommunityPostResponse, FormData>(`${COMMUNITY_POSTS_ENDPOINT}/${encodePathSegment(postId)}/media`, formData, { requiresAuth: true });
+  },
+
+  /** O autor edita texto/descrição; campos omitidos são preservados. */
   updatePost(postId: string, payload: CommunityPostUpdateRequest) {
     return customApiCall.put<CommunityPostResponse, CommunityPostUpdateRequest>(
       `${COMMUNITY_POSTS_ENDPOINT}/${encodePathSegment(postId)}`,

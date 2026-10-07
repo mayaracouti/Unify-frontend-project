@@ -1,3 +1,4 @@
+import { postSpeechParts } from "../../community/post-content";
 /**
  * Builders semanticos de fala: transformam objetos de dominio (vindos do
  * backend em runtime) em frases naturais pt-BR para o TTS.
@@ -296,7 +297,7 @@ export function buildCommunityPostSpeech(
 
   return joinSpeechParts([
     post.author?.name ? `Publicação de ${post.author.name}` : "Publicação",
-    toConcise(post.body, 200),
+    ...postSpeechParts({ ...post, hasImage: Boolean(post.mediaData), origin: "COMMUNITY" }),
     joinSpeechParts([likes, comments], ", "),
   ]);
 }

@@ -1,3 +1,4 @@
+import { useCommunityPostActions } from "../../src/hooks/use-community-post-actions";
 import { useIsFocused } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
@@ -6,6 +7,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  FlatList,
   Text,
   TextInput,
   View,
@@ -220,7 +222,7 @@ export default function CommunityDirectoryScreen() {
   const [forYouLoadingMore, setForYouLoadingMore] = useState(false);
   const [forYouRefreshing, setForYouRefreshing] = useState(false);
   const [forYouError, setForYouError] = useState("");
-  const [likeBusyPostId, setLikeBusyPostId] = useState<string | null>(null);
+
   const forYouRequestIdRef = useRef(0);
   const forYouInitialLoadRef = useRef(false);
 
@@ -421,44 +423,13 @@ export default function CommunityDirectoryScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, isFocused]);
 
-  const handleToggleForYouLike = useCallback(
-    async (item: CommunityForYouPostResponse) => {
-      if (likeBusyPostId) {
-        return;
-      }
-
-      setLikeBusyPostId(item.post.id);
-
-      try {
-        const response = item.post.likedByCurrentUser
-          ? await communityService.unlikePost(item.post.id)
-          : await communityService.likePost(item.post.id);
-
-        setForYouFeed((currentFeed) => ({
-          ...currentFeed,
-          content: currentFeed.content.map((currentItem) =>
-            currentItem.post.id === item.post.id
-              ? {
-                  ...currentItem,
-                  post: {
-                    ...currentItem.post,
-                    likesCount: response.likesCount ?? currentItem.post.likesCount,
-                    likedByCurrentUser:
-                      response.likedByCurrentUser ??
-                      !currentItem.post.likedByCurrentUser,
-                  },
-                }
-              : currentItem
-          ),
-        }));
-      } catch {
-        // O toast global do cliente HTTP ja comunica a falha da curtida.
-      } finally {
-        setLikeBusyPostId(null);
-      }
-    },
-    [likeBusyPostId]
-  );
+  const { likeBusyPostIds, toggleLike } = useCommunityPostActions((response) => {
+    setForYouFeed((current) => ({ ...current, content: current.content.map((item) =>
+      item.post.id === response.postId ? { ...item, post: { ...item.post,
+        likesCount: response.likesCount ?? item.post.likesCount,
+        likedByCurrentUser: response.likedByCurrentUser ?? !item.post.likedByCurrentUser } } : item) }));
+  }, authToken ?? "");
+  const handleToggleForYouLike = (item: CommunityForYouPostResponse) => toggleLike(item.post);
 
   const handleOpenForYouComments = useCallback(
     (item: CommunityForYouPostResponse) => {
@@ -606,21 +577,18 @@ export default function CommunityDirectoryScreen() {
                 <ScreenLoading label="Carregando seu feed..." />
               </View>
             ) : (
-              <ScrollView
+              <FlatList
+                data={forYouFeed.content}
+                keyExtractor={(item) => item.post.id}
+                extraData={likeBusyPostIds}
                 className="flex-1 bg-[#131313]"
                 contentContainerClassName="min-h-full px-6 pb-28 pt-5"
-                refreshControl={
-                  <RefreshControl
-                    refreshing={forYouRefreshing}
-                    tintColor="#7C4DFF"
-                    onRefresh={() => {
-                      void loadForYouFeed({ refresh: true });
-                    }}
-                  />
-                }
+                refreshing={forYouRefreshing}
+                onRefresh={() => { void loadForYouFeed({ refresh: true }); }}
+                removeClippedSubviews={false}
                 showsVerticalScrollIndicator={false}
-              >
-                {forYouError && forYouFeed.content.length > 0 ? (
+                ItemSeparatorComponent={() => <View className="h-4" />}
+                ListHeaderComponent={forYouError && forYouFeed.content.length > 0 ? (
                   <View className="mb-4 rounded-2xl border border-[#6A4456] bg-[#2A1C24] px-4 py-4">
                     <Text className="text-[15px] font-bold text-[#FFD3DD]">
                       Atualização parcial
@@ -630,9 +598,7 @@ export default function CommunityDirectoryScreen() {
                     </Text>
                   </View>
                 ) : null}
-
-                {forYouFeed.content.length === 0 ? (
-                  <ScreenEmpty
+                ListEmptyComponent={<ScreenEmpty
                     className="rounded-[28px] border border-[#353534] bg-surface-alt px-6 py-10"
                     icon={
                       <View className="mb-6 h-16 w-16 items-center justify-center rounded-full bg-[#201F1F]">
@@ -649,26 +615,8 @@ export default function CommunityDirectoryScreen() {
                       onPress: () => handleChangeHomeTab("discover"),
                       accessibilityHint: "Abre a aba de descoberta de comunidades",
                     }}
-                  />
-                ) : (
-                  <View className="gap-4">
-                    {forYouFeed.content.map((item) => (
-                      <CommunityForYouPostCard
-                        key={item.post.id}
-                        authToken={authToken}
-                        item={item}
-                        likeBusy={likeBusyPostId === item.post.id}
-                        onOpenCommunity={() => handleOpenForYouCommunity(item)}
-                        onOpenComments={() => handleOpenForYouComments(item)}
-                        onToggleLike={() => {
-                          void handleToggleForYouLike(item);
-                        }}
-                      />
-                    ))}
-                  </View>
-                )}
-
-                {forYouFeed.content.length > 0 && forYouFeed.hasNext ? (
+                  />}
+                ListFooterComponent={forYouFeed.content.length > 0 && forYouFeed.hasNext ? (
                   <Pressable
                     className="mt-6 items-center justify-center rounded-[24px] border border-[#3A3246] bg-[#17181C] px-5 py-2"
                     onPress={() => {
@@ -691,7 +639,12 @@ export default function CommunityDirectoryScreen() {
                     )}
                   </Pressable>
                 ) : null}
-              </ScrollView>
+                renderItem={({ item }) => <CommunityForYouPostCard
+                  authToken={authToken} item={item} likeBusy={likeBusyPostIds.has(item.post.id)}
+                  onOpenCommunity={() => handleOpenForYouCommunity(item)}
+                  onOpenComments={() => handleOpenForYouComments(item)}
+                  onToggleLike={() => { void handleToggleForYouLike(item); }} />}
+              />
             )
           ) : loading && directory.communities.length === 0 ? (
             <View className="flex-1 items-center justify-center bg-[#131313]">

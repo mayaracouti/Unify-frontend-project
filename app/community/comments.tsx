@@ -1,5 +1,7 @@
+import { PostContent } from "../../src/components/community/post/post-content";
+import { useCommunityPostReader } from "../../src/hooks/use-community-post-reader";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -28,7 +30,7 @@ import {
 import { useAuth } from "../../src/context/AuthContext";
 import { useScreenHeadingFocus } from "../../src/hooks/use-screen-heading-focus";
 import { communityService } from "../../src/services/communityService";
-import type { CommunityCommentResponse } from "../../src/types/community";
+import type { CommunityCommentResponse, CommunityPostResponse } from "../../src/types/community";
 import {
   accessibilityAnnouncements,
   announceForAccessibility,
@@ -242,6 +244,17 @@ export default function CommunityCommentsScreen() {
     [params.authorName]
   );
   const postBody = useMemo(() => normalizeRouteParam(params.postBody), [params.postBody]);
+  const [sourcePost, setSourcePost] = useState<CommunityPostResponse | null>(null);
+  const sourceRequestRef = useRef(0);
+  useEffect(() => {
+    const generation = ++sourceRequestRef.current;
+    setSourcePost(null);
+    if (postId) void communityService.getPost(postId).then((post) => {
+      if (sourceRequestRef.current === generation) setSourcePost(post);
+    }).catch(() => { /* Existing route text remains available; API reports failure. */ });
+    const lifecycle = sourceRequestRef; return () => { lifecycle.current++; };
+  }, [postId]);
+  const sourceReader = useCommunityPostReader(sourcePost ?? { id: postId, author: { name: authorName }, body: postBody });
   const publishedAt = useMemo(
     () => normalizeRouteParam(params.publishedAt).trim(),
     [params.publishedAt]
@@ -489,11 +502,7 @@ export default function CommunityCommentsScreen() {
                 <Pressable
                   className="rounded-[28px] bg-[#111214] p-6"
                   // Toque relê a publicacao original (dados de runtime).
-                  onPress={() =>
-                    speak(
-                      buildActionSpeech(`Publicação de ${authorName}.`, postBody)
-                    )
-                  }
+                  onPress={sourceReader.read}
                   accessibilityRole="button"
                   accessibilityLabel={`Publicação de ${authorName}`}
                   accessibilityHint="Lê a publicação original em voz alta"
@@ -512,12 +521,11 @@ export default function CommunityCommentsScreen() {
                       {publishedAt}
                     </Text>
                   ) : null}
-                  {postBody ? (
-                    <Text className="mt-4 text-[16px] font-semibold leading-7 text-[#E5E2E1]">
-                      {postBody}
-                    </Text>
-                  ) : null}
+
                 </Pressable>
+                <PostContent editedAt={sourcePost?.editedAt} body={sourcePost?.body ?? postBody} imageDescription={sourcePost?.imageDescription}
+                  mediaUri={communityService.resolveAssetUrl(sourcePost?.mediaData)} authorName={sourcePost?.author.name ?? authorName}
+                  authToken={authToken} onRead={sourceReader.read} onStop={sourceReader.stop} />
 
                 {loadError ? (
                   <View className="mt-6 rounded-2xl border border-[#6A4456] bg-[#2A1C24] px-4 py-4">

@@ -3,7 +3,8 @@ import { FollowPendingIcon } from "../social/follow-pending-icon";
 import { LinearGradient } from "expo-linear-gradient";
 import { memo, useMemo, useRef, useState, type ComponentProps } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
-import { getPersonalPostImageDescription, splitPostSpeech } from "../../utils/personalPostContent";
+import { postSpeechParts, resolvePostImageDescription } from "../../community/post-content";
+import { PostImage } from "../community/post/post-image";
 
 import { buildActionSpeech, useTTS } from "../../accessibility/tts";
 import { feedService } from "../../services/feedService";
@@ -134,9 +135,11 @@ export const FeedPostCard = memo(function FeedPostCard({
 }: FeedPostCardProps) {
   const { enabled: ttsEnabled, speak, speakSequence, stop } = useTTS();
   const menuButtonRef = useRef<View | null>(null);
+  const accessibleContent = { ...post, hasImage: Boolean(post.mediaUrl) };
+  const imageDescription = resolvePostImageDescription(accessibleContent);
   const readPost = () => speakSequence([
     `Publicação de ${authorName}`,
-    ...splitPostSpeech(post.body),
+    ...postSpeechParts(accessibleContent),
     `${post.likesCount} curtidas e ${post.commentsCount} comentários`,
   ]);
   const [menuVisible, setMenuVisible] = useState(false);
@@ -462,22 +465,7 @@ export const FeedPostCard = memo(function FeedPostCard({
         </Pressable>
       ) : null}
 
-      {mediaUri ? (
-        <View className="mt-3 h-56 w-full overflow-hidden rounded-2xl bg-[#2A2A2A]">
-          <AuthenticatedRemoteImage
-            accessibilityLabel={getPersonalPostImageDescription(post.body) ?? `Imagem da publicação de ${authorName}, sem descrição` }
-            authToken={authToken}
-            className="h-full w-full"
-            fallback={
-              <View className="flex-1 items-center justify-center bg-[#2A2A2A]">
-                <Ionicons name="image-outline" size={28} color="#948EA1" />
-              </View>
-            }
-            resizeMode="cover"
-            uri={mediaUri}
-          />
-        </View>
-      ) : null}
+      {mediaUri ? <PostImage version={post.editedAt} uri={mediaUri} description={imageDescription} authorName={authorName} authToken={authToken} /> : null}
 
       <View className="mt-4 h-px bg-[#353534]" />
 

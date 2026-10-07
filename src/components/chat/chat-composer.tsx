@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
 
 import { useTTS } from "../../accessibility/tts";
@@ -29,11 +29,12 @@ export function ChatComposer({
   editing: ChatComposerEditTarget | null;
   onCancelEdit: () => void;
   onSendMedia: (media: ChatMediaUpload) => void;
-  onSendText: (body: string) => void;
+  onSendText: (body: string) => Promise<boolean>;
   onSubmitEdit: (messageId: string, body: string) => void;
   sending: boolean;
 }) {
   const [draft, setDraft] = useState("");
+  const textSendInFlight = useRef(false);
   const [imageSourceVisible, setImageSourceVisible] = useState(false);
   const recorder = useAudioRecorder({ onRecorded: onSendMedia });
   // TTS in-app: cada controle fala o proprio nome ao ser tocado/focado. O
@@ -95,9 +96,9 @@ export function ChatComposer({
     });
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     const body = draft.trim();
-    if (!body) {
+    if (!canSend || textSendInFlight.current) {
       return;
     }
 
@@ -106,8 +107,14 @@ export function ChatComposer({
       return;
     }
 
-    setDraft("");
-    onSendText(body);
+    textSendInFlight.current = true;
+    try {
+      if (await onSendText(body)) {
+        setDraft((current) => current === draft ? "" : current);
+      }
+    } finally {
+      textSendInFlight.current = false;
+    }
   }
 
   // ---- gravando: cronometro + descartar + enviar (sem caixa de texto) ----
@@ -282,7 +289,7 @@ export function ChatComposer({
           disabled={!canSend}
           onPress={() => {
             speak(editing ? "Confirmar edição" : "Enviar mensagem");
-            handleSubmit();
+            void handleSubmit();
           }}
         >
           {sending ? (

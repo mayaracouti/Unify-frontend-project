@@ -3,7 +3,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -19,6 +18,12 @@ import { useTTS } from "../../src/accessibility/tts";
 import { ActionSheet } from "../../src/components/ui/action-sheet";
 import { useScreenHeadingFocus } from "../../src/hooks/use-screen-heading-focus";
 import { communityService } from "../../src/services/communityService";
+import { useAuth } from "../../src/context/AuthContext";
+import { useCommunityPostEditor } from "../../src/hooks/use-community-post-editor";
+import { PostImage } from "../../src/components/community/post/post-image";
+import { ScreenError } from "../../src/components/ui/screen-error";
+import { ScreenLoading } from "../../src/components/ui/screen-loading";
+import { IMAGE_DESCRIPTION_MAX_LENGTH } from "../../src/community/post-draft";
 import {
   accessibilityAnnouncements,
   announceForAccessibility,
@@ -37,44 +42,13 @@ function normalizeRouteParam(value?: string | string[]) {
   return value ?? "";
 }
 
-function createCommunityPostFormData(
-  body: string,
-  asset: ImagePicker.ImagePickerAsset | null
-) {
-  const formData = new FormData();
-
-  formData.append("body", body);
-
-  if (!asset) {
-    return formData;
-  }
-
-  const fileName = asset.fileName ?? `community-post-${Date.now()}.jpg`;
-  const mimeType = asset.mimeType ?? "image/jpeg";
-  const webFile = (asset as ImagePicker.ImagePickerAsset & { file?: File }).file;
-
-  if (Platform.OS === "web" && webFile) {
-    formData.append("image", webFile, fileName);
-    return formData;
-  }
-
-  formData.append("image", {
-    uri: asset.uri,
-    name: fileName,
-    type: mimeType,
-  } as unknown as Blob);
-
-  return formData;
-}
-
 export default function CommunityCreatePostScreen() {
   const router = useRouter();
   const { speak } = useTTS();
-  // `postId` + `body` presentes = modo edicao (so do texto).
+  // Editing loads the current post by id, including image and description.
   const params = useLocalSearchParams<{
     communityId?: string | string[];
     postId?: string | string[];
-    body?: string | string[];
   }>();
 
   // Ao entrar na tela, o leitor de tela do sistema comeca pelo titulo.
@@ -89,15 +63,14 @@ export default function CommunityCreatePostScreen() {
     [params.postId]
   );
   const isEditing = editingPostId !== null;
-  const [body, setBody] = useState(() =>
-    isEditing ? normalizeRouteParam(params.body) : ""
-  );
-  const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(
-    null
-  );
+  const editor = useCommunityPostEditor(editingPostId);
+  const { session } = useAuth();
+  const { body, image: selectedImage, imageDescription } = editor.draft;
+  const { setBody, submitting } = editor;
+  const previewUri = selectedImage?.uri ?? (!editor.draft.removeImage ? communityService.resolveAssetUrl(editor.draft.existingMedia) : null);
   const [imageSourceVisible, setImageSourceVisible] = useState(false);
   const [pickingImage, setPickingImage] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const unavailable = submitting || editor.loading || Boolean(editor.loadError);
 
   const trimmedBody = useMemo(() => body.trim(), [body]);
 
@@ -142,7 +115,8 @@ export default function CommunityCreatePostScreen() {
             : await ImagePicker.launchImageLibraryAsync(pickerOptions);
 
         if (!pickerResult.canceled) {
-          setSelectedImage(pickerResult.assets[0] ?? null);
+          const image = pickerResult.assets[0];
+          if (image) editor.selectImage(image);
         }
       } catch {
         showGlobalToast({
@@ -155,11 +129,11 @@ export default function CommunityCreatePostScreen() {
         setPickingImage(false);
       }
     },
-    [pickingImage]
+    [editor, pickingImage]
   );
 
   const handleSubmit = useCallback(async () => {
-    if (submitting) {
+    if (unavailable) {
       return;
     }
 
@@ -182,11 +156,9 @@ export default function CommunityCreatePostScreen() {
       return;
     }
 
-    setSubmitting(true);
-
     try {
       if (editingPostId) {
-        await communityService.updatePost(editingPostId, { body: trimmedBody });
+        if (!await editor.save(communityId)) return;
 
         showGlobalToast({
           title: "Publicação atualizada",
@@ -201,8 +173,7 @@ export default function CommunityCreatePostScreen() {
         return;
       }
 
-      const formData = createCommunityPostFormData(trimmedBody, selectedImage);
-      await communityService.createPost(communityId, formData);
+      if (!await editor.save(communityId)) return;
 
       showGlobalToast({
         title: "Publicação criada",
@@ -216,10 +187,8 @@ export default function CommunityCreatePostScreen() {
       });
     } catch {
       // Global API error toast already explains the failure.
-    } finally {
-      setSubmitting(false);
     }
-  }, [communityId, editingPostId, router, selectedImage, submitting, trimmedBody]);
+  }, [communityId, editingPostId, editor, router, unavailable, trimmedBody]);
 
   const submitLabel = isEditing ? "Salvar" : "Publicar na comunidade";
 
@@ -251,22 +220,22 @@ export default function CommunityCreatePostScreen() {
 
             <Pressable
               className={`min-h-[44px] justify-center rounded-full px-4 py-2 ${
-                trimmedBody.length > 0 && !submitting ? "bg-[#EAEA00]" : "bg-[#3B3841]"
+                trimmedBody.length > 0 && !unavailable ? "bg-[#EAEA00]" : "bg-[#3B3841]"
               }`}
               onPress={() => {
                 speak(submitLabel);
                 void handleSubmit();
               }}
-              disabled={trimmedBody.length === 0 || submitting}
+              disabled={trimmedBody.length === 0 || unavailable}
               accessibilityRole="button"
               accessibilityLabel={submitLabel}
               accessibilityHint={
                 isEditing
-                  ? "Salva o novo texto da publicação na comunidade."
+                  ? "Salva o texto, a imagem e sua descrição na comunidade."
                   : "Envia o texto e a imagem para o mural da comunidade."
               }
               accessibilityState={{
-                disabled: trimmedBody.length === 0 || submitting,
+                disabled: trimmedBody.length === 0 || unavailable,
                 busy: submitting,
               }}
             >
@@ -286,6 +255,8 @@ export default function CommunityCreatePostScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
+            {editor.loading ? <ScreenLoading label="Carregando publicação..." /> : null}
+            {editor.loadError ? <ScreenError message={editor.loadError} onRetry={() => { void editor.reload(); }} /> : null}
             <View className="rounded-[28px] bg-[#111214] p-6">
               <Text
                 ref={headingRef}
@@ -296,7 +267,7 @@ export default function CommunityCreatePostScreen() {
               </Text>
               <Text className="mt-2 text-[15px] font-semibold leading-6 text-[#CAC3D8]">
                 {isEditing
-                  ? "Altere o texto da publicação. A imagem anexada continua a mesma."
+                  ? "Altere o texto, a descrição ou a imagem da publicação."
                   : "Publique uma atualização rápida, tire uma foto ou anexe uma imagem da galeria."}
               </Text>
             </View>
@@ -312,6 +283,7 @@ export default function CommunityCreatePostScreen() {
                 textAlignVertical="top"
                 value={body}
                 onChangeText={setBody}
+                editable={!unavailable}
                 onFocus={() => speak("Texto da publicação")}
                 accessibilityLabel="Texto da publicação"
                 accessibilityHint="Obrigatório. Escreva o texto da publicação"
@@ -321,8 +293,7 @@ export default function CommunityCreatePostScreen() {
               </Text>
             </View>
 
-            {/* Edicao e so de texto: a secao de imagem nao aparece. */}
-            {isEditing ? null : (
+            {(
               <View className="mt-6 rounded-[28px] bg-[#111214] p-6">
                 <View className="flex-row items-center justify-between">
                   <View className="mr-3 flex-1">
@@ -338,22 +309,22 @@ export default function CommunityCreatePostScreen() {
                     className="rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-3"
                     onPress={() => {
                       speak(
-                        selectedImage
+                        editor.hasImage
                           ? "Trocar imagem da publicação"
                           : "Adicionar imagem à publicação"
                       );
                       setImageSourceVisible(true);
                     }}
-                    disabled={pickingImage}
+                    disabled={pickingImage || unavailable}
                     accessibilityRole="button"
                     accessibilityLabel={
-                      selectedImage
+                      editor.hasImage
                         ? "Trocar imagem da publicação"
                         : "Adicionar imagem à publicação"
                     }
                     accessibilityHint="Escolhe entre tirar uma foto ou abrir a galeria do aparelho"
                     accessibilityState={{
-                      disabled: pickingImage,
+                      disabled: pickingImage || unavailable,
                       busy: pickingImage,
                     }}
                   >
@@ -375,23 +346,28 @@ export default function CommunityCreatePostScreen() {
                   </Pressable>
                 </View>
 
-                {selectedImage ? (
+                {previewUri ? (
                   <View className="mt-5 overflow-hidden rounded-[24px] border border-[#353534] bg-[#1A1C1F]">
-                    <Image
-                      source={{ uri: selectedImage.uri }}
-                      className="aspect-video w-full"
-                      resizeMode="cover"
-                      accessibilityLabel="Pré-visualização da imagem selecionada"
-                    />
+                    <PostImage uri={previewUri} description={imageDescription} authorName="você" authToken={session?.accessToken ?? null} />
+                    <View className="px-4 pt-4">
+                      <Text className="mb-2 text-[16px] font-bold text-white">Descrição da imagem (opcional)</Text>
+                      <TextInput multiline maxLength={IMAGE_DESCRIPTION_MAX_LENGTH}
+                        value={imageDescription} onChangeText={editor.setDescription} editable={!unavailable}
+                        accessibilityLabel="Descrição da imagem"
+                        accessibilityHint="Descreva o conteúdo relevante para quem não consegue ver a imagem. Até 240 caracteres."
+                        placeholder="O que aparece na imagem?" placeholderTextColor="#948EA1"
+                        className="min-h-[100px] rounded-xl border border-[#494455] px-3 py-3 text-white" />
+                      <Text className="mt-2 text-right text-[#CAC3D8]">{imageDescription.length} / 240</Text>
+                    </View>
                     <View className="flex-row items-center justify-between px-4 py-4">
                       <Text className="flex-1 text-[13px] font-semibold text-[#CAC3D8]">
-                        {selectedImage.fileName ?? "Imagem selecionada"}
+                        {selectedImage?.fileName ?? "Imagem da publicação"}
                       </Text>
                       <Pressable
                         className="min-h-[44px] justify-center pl-3"
                         onPress={() => {
                           speak("Imagem removida");
-                          setSelectedImage(null);
+                          editor.removeImage();
                         }}
                         // `disabled` real acompanha o accessibilityState abaixo.
                         disabled={submitting}
@@ -448,7 +424,7 @@ export default function CommunityCreatePostScreen() {
             },
           },
         ]}
-        title={selectedImage ? "Trocar imagem" : "Adicionar imagem"}
+        title={editor.hasImage ? "Trocar imagem" : "Adicionar imagem"}
         visible={imageSourceVisible}
       />
     </View>

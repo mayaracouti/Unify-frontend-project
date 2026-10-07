@@ -1,9 +1,16 @@
+import { CommunityPostMenu } from "../../src/components/community/post/post-menu";
+import { useCommunityFeed } from "../../src/hooks/use-community-feed";
+import { useCommunityMembers } from "../../src/hooks/use-community-members";
+import { applyLikeUpdate, applyMembershipUpdate, removePost } from "../../src/community/feed-state";
+import { useCommunityPostActions } from "../../src/hooks/use-community-post-actions";
+import { getEffectiveCommunityRole, canParticipateInCommunity, resolveCommunityActorId, resolveCommunityMemberTargetId, isCommunityMemberOwner, canEditCommunityPost, canDeleteCommunityPost, canReportCommunityPost } from "../../src/community/permissions";
+import { CommunityHeader } from "../../src/components/community/community-header";
+import { CommunityMemberCard } from "../../src/components/community/community-member-card";
+import { CommunityPostCard } from "../../src/components/community/post/community-post-card";
 import { useIsFocused } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import type { ComponentProps } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   RefreshControl,
@@ -12,29 +19,19 @@ import {
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
   buildActionSpeech,
-  buildCommunityMemberSpeech,
-  buildCommunityPostSpeech,
   buildCommunitySpeech,
   useTTS,
 } from "../../src/accessibility/tts";
 import {
-  CommunityRoleBadge,
   canModerateRole,
-  formatMemberCount,
 } from "../../src/components/community/community-card";
 import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-nav";
 import { GlobalTopNav } from "../../src/components/navigation/global-top-nav";
-import {
-  AuthenticatedRemoteImage,
-  preloadAuthenticatedRemoteImages,
-} from "../../src/components/profile/authenticated-remote-image";
 import { ReportModal } from "../../src/components/report/report-modal";
-import { ActionSheet, type ActionSheetOption } from "../../src/components/ui/action-sheet";
 import { ScreenEmpty } from "../../src/components/ui/screen-empty";
 import { ScreenError } from "../../src/components/ui/screen-error";
 import { ScreenLoading } from "../../src/components/ui/screen-loading";
@@ -42,20 +39,13 @@ import { useAppShell } from "../../src/context/AppShellContext";
 import { useAuth } from "../../src/context/AuthContext";
 import { communityService } from "../../src/services/communityService";
 import type {
-  CommunityUserSummaryResponse,
   CommunityMemberResponse,
-  CommunityFeedResponse,
-  CommunityLikeResponse,
-  CommunityMembershipResponse,
   CommunityPostResponse,
-  CommunityRole,
-  CommunitySummaryResponse,
 } from "../../src/types/community";
 import {
   accessibilityAnnouncements,
   announceForAccessibility,
 } from "../../src/utils/accessibilityAnnouncements";
-import { formatApiErrorMessage } from "../../src/utils/auth";
 import { showGlobalToast } from "../../src/utils/globalToast";
 import { buildUserProfileHref } from "../../src/utils/userProfileRoute";
 
@@ -73,778 +63,6 @@ function normalizeCommunityTab(value?: string | string[]) {
   return normalizeRouteParam(value).trim().toLowerCase() === "members"
     ? "members"
     : "posts";
-}
-
-function getEffectiveCommunityRole(
-  community?: CommunitySummaryResponse | null
-): CommunityRole | null {
-  if (!community) {
-    return null;
-  }
-
-  if (community.currentUserRole) {
-    return community.currentUserRole;
-  }
-
-  return community.isOwner ? "ADMIN" : null;
-}
-
-function canParticipateInCommunity(community?: CommunitySummaryResponse | null) {
-  if (!community) {
-    return false;
-  }
-
-  return Boolean(community.isMember || community.isOwner || community.currentUserRole);
-}
-
-type NormalizedCommunityFeed = {
-  community: CommunitySummaryResponse | null;
-  posts: CommunityPostResponse[];
-  // TODO: paginação incremental — expor `postsHasNext`/`postsPage` quando o feed
-  // ganhar scroll infinito; hoje carregamos apenas a primeira página (size padrão).
-  postsHasNext: boolean;
-};
-
-function normalizeFeedResponse(response: CommunityFeedResponse): NormalizedCommunityFeed {
-  return {
-    community: response.community ?? null,
-    posts: Array.isArray(response.posts?.content) ? response.posts.content : [],
-    postsHasNext: response.posts?.hasNext ?? false,
-  };
-}
-
-function collectCommunityAssetUrls(feed: NormalizedCommunityFeed) {
-  const communityIconUrl = communityService.resolveAssetUrl(feed.community?.iconData);
-  const ownerAvatarUrl = communityService.resolveAssetUrl(feed.community?.owner?.avatarData);
-  const postAssetUrls = feed.posts.flatMap((post) => {
-    const authorAvatarUrl = communityService.resolveAssetUrl(post.author.avatarData);
-    const mediaUrl = communityService.resolveAssetUrl(post.mediaData);
-
-    return [authorAvatarUrl, mediaUrl].filter(
-      (value): value is string => typeof value === "string" && value.length > 0
-    );
-  });
-
-  return [communityIconUrl, ownerAvatarUrl, ...postAssetUrls].filter(
-    (value): value is string => typeof value === "string" && value.length > 0
-  );
-}
-
-function collectMemberAssetUrls(members: CommunityMemberResponse[]) {
-  return members
-    .map((member) => communityService.resolveAssetUrl(member.avatarData))
-    .filter((value): value is string => typeof value === "string" && value.length > 0);
-}
-
-function resolveCommunityActorId(actor?: CommunityUserSummaryResponse | null) {
-  return [actor?.userProfileId, actor?.id]
-    .map((value) => value?.trim())
-    .find((value): value is string => Boolean(value));
-}
-
-function resolveCommunityMemberTargetId(member: CommunityMemberResponse) {
-  return [member.userProfileId, member.id]
-    .map((value) => value?.trim())
-    .find((value): value is string => Boolean(value));
-}
-
-function isCommunityMemberOwner(
-  member: CommunityMemberResponse,
-  community?: CommunitySummaryResponse | null
-) {
-  if (member.isOwner || member.owner) {
-    return true;
-  }
-
-  const ownerId = resolveCommunityActorId(community?.owner);
-  const memberTargetId = resolveCommunityMemberTargetId(member);
-
-  return Boolean(ownerId && memberTargetId && ownerId === memberTargetId);
-}
-
-function applyMembershipUpdate(
-  currentFeed: NormalizedCommunityFeed | null,
-  membership: CommunityMembershipResponse
-) {
-  if (!currentFeed?.community) {
-    return currentFeed;
-  }
-
-  return {
-    ...currentFeed,
-    community: {
-      ...currentFeed.community,
-      isMember: membership.isMember,
-      memberCount: membership.memberCount,
-      currentUserRole: membership.role ?? null,
-      isOwner: membership.isOwner ?? false,
-      hasPendingRequest: membership.pendingRequest ?? false,
-    },
-  };
-}
-
-function applyLikeUpdate(currentFeed: NormalizedCommunityFeed | null, like: CommunityLikeResponse) {
-  if (!currentFeed) {
-    return currentFeed;
-  }
-
-  return {
-    ...currentFeed,
-    posts: currentFeed.posts.map((post) =>
-      post.id === like.postId
-        ? {
-            ...post,
-            likedByCurrentUser: like.likedByCurrentUser,
-            likesCount: like.likesCount,
-          }
-        : post
-    ),
-  };
-}
-
-function removePost(currentFeed: NormalizedCommunityFeed | null, postId: string) {
-  if (!currentFeed) {
-    return currentFeed;
-  }
-
-  return {
-    ...currentFeed,
-    posts: currentFeed.posts.filter((post) => post.id !== postId),
-  };
-}
-
-function getInitials(name?: string | null) {
-  return (name ?? "")
-    .trim()
-    .split(" ")
-    .filter(Boolean)
-    .map((namePart) => namePart[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
-
-function CommunityBadge({
-  authToken,
-  community,
-}: {
-  authToken: string | null;
-  community: CommunitySummaryResponse;
-}) {
-  const iconUrl = communityService.resolveAssetUrl(community.iconData);
-
-  return (
-    <View className="h-20 w-20 items-center justify-center overflow-hidden rounded-xl border-2 border-[#CDBDFF] bg-[#7C4DFF]">
-      {iconUrl ? (
-        <AuthenticatedRemoteImage
-          uri={iconUrl}
-          authToken={authToken}
-          className="h-full w-full"
-          resizeMode="cover"
-          fallback={
-            <View className="flex-1 items-center justify-center bg-[#7C4DFF]">
-              <Ionicons name="people" size={36} color="#FCF6FF" />
-            </View>
-          }
-        />
-      ) : (
-        <Ionicons name="people" size={36} color="#FCF6FF" />
-      )}
-    </View>
-  );
-}
-
-/**
- * Avatar do autor/membro. Com `userProfileId` + `onOpenProfile` vira um botao
- * que abre o perfil publico da pessoa; sem eles e decorativo. O toque fala o
- * destino antes de navegar (padrao `buildActionSpeech`).
- */
-function AuthorAvatar({
-  authToken,
-  name,
-  avatarData,
-  userProfileId,
-  onOpenProfile,
-}: {
-  authToken: string | null;
-  name?: string | null;
-  avatarData?: string | null;
-  userProfileId?: string | null;
-  onOpenProfile?: (userProfileId: string, name?: string | null) => void;
-}) {
-  const initials = getInitials(name);
-  const avatarUrl = communityService.resolveAssetUrl(avatarData);
-  const resolvedProfileId = userProfileId?.trim() || null;
-  const canOpenProfile = Boolean(resolvedProfileId && onOpenProfile);
-
-  const content = (
-    <View
-      className="h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-[#CDBDFF] bg-[#353534]"
-      importantForAccessibility={canOpenProfile ? "no-hide-descendants" : "auto"}
-    >
-      {avatarUrl ? (
-        <AuthenticatedRemoteImage
-          uri={avatarUrl}
-          authToken={authToken}
-          className="h-full w-full"
-          resizeMode="cover"
-          fallback={
-            <LinearGradient
-              colors={["#CDBDFF", "#7C4DFF"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              className="h-full w-full items-center justify-center"
-            >
-              <Text className="text-[16px] font-black text-white">{initials || "?"}</Text>
-            </LinearGradient>
-          }
-        />
-      ) : (
-        <LinearGradient
-          colors={["#CDBDFF", "#7C4DFF"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          className="h-full w-full items-center justify-center"
-        >
-          <Text className="text-[16px] font-black text-white">{initials || "?"}</Text>
-        </LinearGradient>
-      )}
-    </View>
-  );
-
-  if (!canOpenProfile || !resolvedProfileId) {
-    return content;
-  }
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Abrir perfil de ${name?.trim() || "pessoa sem nome"}`}
-      accessibilityHint="Abre o perfil público desta pessoa"
-      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-      onPress={() => onOpenProfile?.(resolvedProfileId, name)}
-    >
-      {content}
-    </Pressable>
-  );
-}
-
-function PostAction({
-  accessibilityHint,
-  accessibilityLabel,
-  disabled,
-  icon,
-  count,
-  active,
-  loading,
-  onPress,
-}: {
-  accessibilityHint?: string;
-  accessibilityLabel: string;
-  disabled?: boolean;
-  icon: ComponentProps<typeof Ionicons>["name"];
-  count?: number | null;
-  active?: boolean | null;
-  loading?: boolean;
-  onPress: () => void;
-}) {
-  const busy = Boolean(loading);
-
-  return (
-    <Pressable
-      className={`h-14 flex-1 flex-row items-center justify-center gap-2 rounded-lg ${
-        disabled ? "opacity-60" : ""
-      }`}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityHint={accessibilityHint}
-      accessibilityState={{
-        busy,
-        disabled: Boolean(disabled) || busy,
-        selected: Boolean(active),
-      }}
-      onPress={onPress}
-      disabled={disabled || loading}
-    >
-      {loading ? (
-        <ActivityIndicator color="#7C4DFF" size="small" />
-      ) : (
-        <Ionicons
-          name={icon}
-          size={26}
-          color={active ? "#7C4DFF" : "#CAC3D8"}
-        />
-      )}
-      {typeof count === "number" ? (
-        <Text
-          className={`text-[16px] font-bold ${
-            active ? "text-[#7C4DFF]" : "text-[#E5E2E1]"
-          }`}
-        >
-          {count}
-        </Text>
-      ) : null}
-    </Pressable>
-  );
-}
-
-function MemberButton({
-  busy,
-  isMember,
-  isPrivate,
-  pendingRequest,
-  onPress,
-}: {
-  busy: boolean;
-  isMember?: boolean | null;
-  isPrivate?: boolean;
-  pendingRequest?: boolean | null;
-  onPress: () => void;
-}) {
-  const muted = Boolean(isMember || pendingRequest);
-  const label = isMember
-    ? "Sair da comunidade"
-    : pendingRequest
-      ? "Cancelar solicitação"
-      : isPrivate
-        ? "Solicitar entrada"
-        : "Participar";
-  const icon = isMember
-    ? "exit-outline"
-    : pendingRequest
-      ? "hourglass-outline"
-      : isPrivate
-        ? "lock-open-outline"
-        : "add-circle";
-
-  return (
-    <Pressable
-      className={`mt-8 h-14 w-full flex-row items-center justify-center gap-3 rounded-xl border-2 ${
-        muted ? "border-[#494455] bg-[#2E2B33]" : "border-[#EAEA00] bg-[#EAEA00]"
-      }`}
-      onPress={onPress}
-      disabled={busy}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityHint={
-        pendingRequest
-          ? "Cancela sua solicitação pendente de entrada nesta comunidade"
-          : isMember
-            ? "Você deixa de ver e publicar nesta comunidade"
-            : isPrivate
-              ? "Envia um pedido de entrada para a moderação avaliar"
-              : "Você passa a publicar, curtir e comentar nesta comunidade"
-      }
-      accessibilityState={{ busy, disabled: busy }}
-    >
-      {busy ? (
-        <ActivityIndicator color={muted ? "#E5E2E1" : "#323200"} size="small" />
-      ) : (
-        <>
-          <Ionicons
-            name={icon as ComponentProps<typeof Ionicons>["name"]}
-            size={22}
-            color={muted ? "#E5E2E1" : "#323200"}
-          />
-          <Text
-            className={`text-[18px] font-black ${
-              muted ? "text-[#E5E2E1]" : "text-[#1D1D00]"
-            }`}
-          >
-            {label}
-          </Text>
-        </>
-      )}
-    </Pressable>
-  );
-}
-
-function CommunityOwnerCard({
-  authToken,
-  community,
-}: {
-  authToken: string | null;
-  community: CommunitySummaryResponse;
-}) {
-  const avatarUrl = communityService.resolveAssetUrl(community.owner?.avatarData);
-
-  return (
-    <View className="mt-6 rounded-2xl border border-[#353534] bg-[#17181C] px-4 py-4">
-      <View className="flex-row items-center gap-3">
-        <View className="h-12 w-12 overflow-hidden rounded-full bg-[#2C2834]">
-          {avatarUrl ? (
-            <AuthenticatedRemoteImage
-              uri={avatarUrl}
-              authToken={authToken}
-              className="h-full w-full"
-              resizeMode="cover"
-              fallback={
-                <View className="flex-1 items-center justify-center bg-[#2C2834]">
-                  <Ionicons name="person" size={18} color="#E5E2E1" />
-                </View>
-              }
-            />
-          ) : (
-            <View className="flex-1 items-center justify-center bg-[#2C2834]">
-              <Ionicons name="person" size={18} color="#E5E2E1" />
-            </View>
-          )}
-        </View>
-
-        <View className="flex-1">
-          <Text className="text-[13px] font-semibold text-content-secondary">Criador</Text>
-          <Text className="text-[16px] font-black text-white">
-            {community.owner?.name ?? "Criador não informado"}
-          </Text>
-        </View>
-
-        <CommunityRoleBadge isOwner={community.isOwner} role={community.currentUserRole} />
-      </View>
-    </View>
-  );
-}
-
-function CommunityHeader({
-  activeTab,
-  authToken,
-  canViewMembers,
-  community,
-  membershipBusy,
-  onChangeTab,
-  onOpenJoinRequests,
-  onOpenSettings,
-  onToggleMembership,
-}: {
-  activeTab: CommunityViewTab;
-  authToken: string | null;
-  canViewMembers: boolean;
-  community: CommunitySummaryResponse;
-  membershipBusy: boolean;
-  onChangeTab: (tab: CommunityViewTab) => void;
-  onOpenJoinRequests: () => void;
-  onOpenSettings: () => void;
-  onToggleMembership: () => void;
-}) {
-  const memberCountLabel = formatMemberCount(community.memberCount);
-
-  return (
-    <View className="border-b-2 border-[#494455] bg-[#201F1F] px-6 pb-12 pt-7">
-      <View className="flex-row items-start justify-between gap-4">
-        <CommunityBadge authToken={authToken} community={community} />
-
-        <View className="flex-row items-center gap-2">
-          {community.privacy === "PRIVATE" && canModerateRole(community.currentUserRole) ? (
-            <Pressable
-              className="rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-3"
-              onPress={onOpenJoinRequests}
-              accessibilityRole="button"
-              accessibilityLabel="Solicitações de entrada"
-              accessibilityHint="Abre a fila de solicitações pendentes para aprovar ou recusar"
-            >
-              <Ionicons name="person-add-outline" size={16} color="#EAEA00" />
-            </Pressable>
-          ) : null}
-
-          {community.isOwner || community.currentUserRole === "ADMIN" ? (
-            <Pressable
-              className="rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-3"
-              onPress={onOpenSettings}
-              accessibilityRole="button"
-              accessibilityLabel="Configurações da comunidade"
-              accessibilityHint="Abre a tela para editar, sair ou excluir esta comunidade"
-            >
-              <Ionicons name="settings-outline" size={16} color="#E5E2E1" />
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
-
-      <Text className="mt-5 text-[32px] font-black leading-10 text-[#E5E2E1]">
-        {community.name}
-      </Text>
-
-      <View className="mt-3 flex-row items-center gap-4">
-        {memberCountLabel ? (
-          <View className="flex-row items-center gap-2">
-            <Ionicons name="person" size={16} color="#7C4DFF" />
-            <Text className="text-[16px] font-black text-[#7C4DFF]">
-              {memberCountLabel}
-            </Text>
-          </View>
-        ) : null}
-
-        <View
-          className="flex-row items-center gap-1.5"
-          accessible
-          accessibilityLabel={
-            community.privacy === "PRIVATE" ? "Comunidade privada" : "Comunidade pública"
-          }
-        >
-          <Ionicons
-            name={community.privacy === "PRIVATE" ? "lock-closed-outline" : "globe-outline"}
-            size={15}
-            color="#CAC3D8"
-          />
-          <Text className="text-[14px] font-bold text-content-secondary">
-            {community.privacy === "PRIVATE" ? "Privada" : "Pública"}
-          </Text>
-        </View>
-      </View>
-
-      {/* <View className="mt-6 rounded-2xl border border-[#3A3246] bg-[#17181C] px-4 py-4"> */}
-        {/* <Text className="text-[12px] font-black uppercase tracking-[1.2px] text-content-secondary">
-          Navegacao da comunidade
-        </Text>
-        <Text className="mt-2 text-[14px] font-semibold leading-6 text-[#E5E2E1]">
-          Escolha entre as publicacoes e a lista de membros.
-        </Text> */}
-
-        {canViewMembers ? (
-          <CommunityContentTabs
-            activeTab={activeTab}
-            memberCount={community.memberCount}
-            onChange={onChangeTab}
-          />
-        ) : null}
-      {/* </View> */}
-
-      {community.description ? (
-        <Text className="mt-5 text-[18px] font-semibold leading-8 text-[#E5E2E1]">
-          {community.description}
-        </Text>
-      ) : null}
-
-      {/* <CommunityOwnerCard authToken={authToken} community={community} /> */}
-
-      <Text className="mt-5 text-[14px] font-semibold leading-6 text-content-secondary">
-        {community.isOwner
-          ? "Você é a pessoa proprietária desta comunidade e pode gerenciar conteúdo e membros elevados."
-          : community.currentUserRole
-            ? canModerateRole(community.currentUserRole)
-              ? "Você participa com elevação e pode moderar conteúdo dentro desta comunidade."
-              : "Você participa desta comunidade e já pode publicar, curtir e comentar."
-            : community.hasPendingRequest
-              ? "Sua solicitação de entrada está pendente. Um administrador ou moderador precisa aprová-la."
-              : community.privacy === "PRIVATE"
-                ? "Esta comunidade é privada: solicite entrada e aguarde a aprovação da moderação."
-                : "Entre para publicar, curtir e comentar nos posts da comunidade."}
-      </Text>
-
-      {!community.isOwner ? (
-        <MemberButton
-          busy={membershipBusy}
-          isMember={community.isMember}
-          isPrivate={community.privacy === "PRIVATE"}
-          pendingRequest={community.hasPendingRequest}
-          onPress={onToggleMembership}
-        />
-      ) : null}
-    </View>
-  );
-}
-
-function CommunityPostCard({
-  authToken,
-  canDelete,
-  canEdit,
-  canReport,
-  deleting,
-  likeBusy,
-  onDelete,
-  onEdit,
-  onOpenComments,
-  onOpenProfile,
-  onReport,
-  onToggleLike,
-  post,
-}: {
-  authToken: string | null;
-  canDelete: boolean;
-  canEdit: boolean;
-  canReport: boolean;
-  deleting: boolean;
-  likeBusy: boolean;
-  onDelete: () => void;
-  onEdit: () => void;
-  onOpenComments: () => void;
-  onOpenProfile: (userProfileId: string, name?: string | null) => void;
-  onReport: () => void;
-  onToggleLike: () => void;
-  post: CommunityPostResponse;
-}) {
-  const { speak } = useTTS();
-  const mediaUrl = communityService.resolveAssetUrl(post.mediaData);
-  const [menuVisible, setMenuVisible] = useState(false);
-
-  // Editar/excluir/denunciar saem dos botoes grandes e vao para um unico
-  // menu discreto de reticencias: menos ruido visual e um so alvo de foco.
-  const menuOptions: ActionSheetOption[] = [
-    ...(canEdit
-      ? [
-          {
-            key: "edit",
-            label: "Editar publicação",
-            hint: "Abre o texto da publicação para alterar",
-            icon: "pencil-outline" as const,
-            onPress: () => {
-              setMenuVisible(false);
-              speak("Editar publicação");
-              onEdit();
-            },
-          },
-        ]
-      : []),
-    ...(canDelete
-      ? [
-          {
-            key: "delete",
-            label: "Excluir publicação",
-            hint: "Pede confirmação antes de remover a publicação",
-            icon: "trash-outline" as const,
-            destructive: true,
-            onPress: () => {
-              setMenuVisible(false);
-              onDelete();
-            },
-          },
-        ]
-      : []),
-    ...(canReport
-      ? [
-          {
-            key: "report",
-            label: "Denunciar publicação",
-            hint: "Abre o formulário de denúncia desta publicação",
-            icon: "flag-outline" as const,
-            onPress: () => {
-              setMenuVisible(false);
-              onReport();
-            },
-          },
-        ]
-      : []),
-  ];
-
-  return (
-    <View className="rounded-xl bg-[#2A2A2A] p-4">
-      <View className="flex-row items-start gap-3">
-        <AuthorAvatar
-          authToken={authToken}
-          name={post.author.name}
-          avatarData={post.author.avatarData}
-          userProfileId={post.author.userProfileId}
-          onOpenProfile={onOpenProfile}
-        />
-
-        <Pressable
-          className="flex-1"
-          // A area de texto e a dona da fala da publicacao: toque le autor,
-          // corpo e contadores reais vindos do backend.
-          onPress={() => speak(buildCommunityPostSpeech(post))}
-          accessibilityRole="button"
-          accessibilityLabel={`Publicação de ${post.author.name}`}
-          accessibilityHint="Lê em voz alta o autor, o texto e os contadores desta publicação"
-        >
-          <Text className="text-[17px] font-black text-[#E5E2E1]">
-            {post.author.name}
-          </Text>
-          {post.publishedAt || post.editedAt ? (
-            <Text className="mt-0.5 text-[14px] font-semibold text-[#E5E2E1]">
-              {post.publishedAt ?? ""}
-              {post.editedAt ? (
-                <Text className="text-[12px] italic text-[#B5AFC4]">
-                  {post.publishedAt ? " · editada" : "editada"}
-                </Text>
-              ) : null}
-            </Text>
-          ) : null}
-        </Pressable>
-
-        {menuOptions.length > 0 ? (
-          <Pressable
-            className="h-9 w-9 items-center justify-center rounded-full"
-            onPress={() => {
-              speak("Mais opções da publicação");
-              setMenuVisible(true);
-            }}
-            disabled={deleting}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            accessibilityRole="button"
-            accessibilityLabel="Mais opções da publicação"
-            accessibilityHint="Abre editar, excluir ou denunciar"
-            accessibilityState={{ busy: deleting, disabled: deleting }}
-          >
-            {deleting ? (
-              <ActivityIndicator color="#CAC3D8" size="small" />
-            ) : (
-              <Ionicons name="ellipsis-horizontal" size={20} color="#CAC3D8" />
-            )}
-          </Pressable>
-        ) : null}
-      </View>
-
-      <Pressable
-        onPress={() => speak(buildCommunityPostSpeech(post))}
-        accessibilityRole="button"
-        accessibilityLabel={`Texto da publicação de ${post.author.name}`}
-        accessibilityHint="Lê a publicação em voz alta"
-      >
-        <Text className="mt-5 text-[19px] font-semibold leading-8 text-[#E5E2E1]">
-          {post.body}
-        </Text>
-
-        {mediaUrl ? (
-          <View className="mt-4 aspect-video w-full overflow-hidden rounded-lg border-2 border-[#494455]">
-            <AuthenticatedRemoteImage
-              uri={mediaUrl}
-              authToken={authToken}
-              className="h-full w-full"
-              resizeMode="cover"
-              fallback={
-                <View className="flex-1 items-center justify-center bg-[#1F1F23]">
-                  <Ionicons name="image-outline" size={30} color="#CAC3D8" />
-                </View>
-              }
-            />
-          </View>
-        ) : null}
-      </Pressable>
-
-      <View className="mt-4 h-0.5 bg-[#494455]" />
-
-      <View className="mt-1 flex-row items-center justify-between">
-        <PostAction
-          accessibilityLabel={post.likedByCurrentUser ? "Remover curtida" : "Curtir publicação"}
-          accessibilityHint={
-            post.likedByCurrentUser
-              ? "Retira a sua curtida desta publicação"
-              : "Registra a sua curtida nesta publicação"
-          }
-          disabled={likeBusy}
-          icon={post.likedByCurrentUser ? "thumbs-up" : "thumbs-up-outline"}
-          count={post.likesCount}
-          active={post.likedByCurrentUser}
-          loading={likeBusy}
-          onPress={onToggleLike}
-        />
-        <PostAction
-          accessibilityLabel="Abrir comentários"
-          accessibilityHint="Abre a tela de comentários desta publicação"
-          icon={post.commentedByCurrentUser ? "chatbubble" : "chatbubble-outline"}
-          count={post.commentsCount}
-          active={post.commentedByCurrentUser}
-          onPress={onOpenComments}
-        />
-      </View>
-
-      <ActionSheet
-        onClose={() => setMenuVisible(false)}
-        options={menuOptions}
-        title={`Publicação de ${post.author.name}`}
-        visible={menuVisible}
-      />
-    </View>
-  );
 }
 
 function EmptyCommunityState({
@@ -908,136 +126,6 @@ function EmptyPostState({
   );
 }
 
-function CommunityContentTabs({
-  activeTab,
-  memberCount,
-  onChange,
-}: {
-  activeTab: CommunityViewTab;
-  memberCount?: number | null;
-  onChange: (tab: CommunityViewTab) => void;
-}) {
-  const { speak } = useTTS();
-  const membersLabel =
-    typeof memberCount === "number"
-      ? `Membros (${memberCount.toLocaleString("pt-BR")})`
-      : "Membros";
-
-  return (
-    <View className="mt-6">
-      <View className="flex-row rounded-2xl border border-[#3A3246] bg-[#1A1C1F] p-1.5">
-        {[
-          { key: "posts", label: "Publicações", icon: "newspaper-outline" },
-          { key: "members", label: membersLabel, icon: "people-outline" },
-        ].map((tab) => {
-          const isActive = activeTab === tab.key;
-
-          return (
-            <Pressable
-              key={tab.key}
-              className={`flex-1 flex-row items-center justify-center gap-2 rounded-xl px-4 py-3 ${
-                isActive ? "bg-[#7C4DFF]" : "bg-transparent"
-              }`}
-              accessibilityRole="tab"
-              accessibilityLabel={tab.label}
-              accessibilityState={{ selected: isActive }}
-              onPress={() => {
-                // O rotulo inclui a contagem real de membros do backend.
-                speak(tab.label);
-                onChange(tab.key as CommunityViewTab);
-              }}
-            >
-              <Ionicons
-                name={tab.icon as ComponentProps<typeof Ionicons>["name"]}
-                size={16}
-                color={isActive ? "#FCF6FF" : "#CAC3D8"}
-              />
-              <Text
-                className={`text-[13px] font-black ${
-                  isActive ? "text-[#FCF6FF]" : "text-content-secondary"
-                }`}
-              >
-                {tab.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
-function CommunityMemberCard({
-  authToken,
-  canManageRole,
-  community,
-  member,
-  onManageRole,
-  onOpenProfile,
-}: {
-  authToken: string | null;
-  canManageRole: boolean;
-  community: CommunitySummaryResponse;
-  member: CommunityMemberResponse;
-  onManageRole: () => void;
-  onOpenProfile: (userProfileId: string, name?: string | null) => void;
-}) {
-  const { speak } = useTTS();
-
-  return (
-    <View className="rounded-2xl border border-[#353534] bg-[#17181C] p-4">
-      <View className="flex-row items-center gap-3">
-        <AuthorAvatar
-          authToken={authToken}
-          name={member.name}
-          avatarData={member.avatarData}
-          userProfileId={member.userProfileId}
-          onOpenProfile={onOpenProfile}
-        />
-
-        <Pressable
-          className="flex-1"
-          // Toque no membro fala nome e papel reais vindos do backend.
-          onPress={() => speak(buildCommunityMemberSpeech(member))}
-          accessibilityRole="button"
-          accessibilityLabel={member.name}
-          accessibilityHint="Lê o nome e o cargo em voz alta"
-        >
-          <Text className="text-[17px] font-black text-[#E5E2E1]">{member.name}</Text>
-          {member.joinedAt ? (
-            <Text className="mt-1 text-[12px] font-semibold text-[#948EA1]">
-              Membro desde {new Date(member.joinedAt).toLocaleDateString("pt-BR")}
-            </Text>
-          ) : null}
-          <View className="mt-2 flex-row flex-wrap items-center gap-2">
-            <CommunityRoleBadge
-              isOwner={isCommunityMemberOwner(member, community)}
-              role={member.role}
-            />
-          </View>
-        </Pressable>
-
-        {canManageRole ? (
-          <Pressable
-            className="rounded-full border border-[#46708A] bg-[#16232C] px-4 py-3"
-            accessibilityRole="button"
-            accessibilityLabel={`Gerenciar cargo de ${member.name}`}
-            onPress={() => {
-              speak(buildActionSpeech("Gerenciar cargo de", member.name));
-              onManageRole();
-            }}
-          >
-            <View className="flex-row items-center gap-2">
-              <Ionicons name="shield-checkmark-outline" size={16} color="#9FD9FF" />
-              <Text className="text-[13px] font-black text-[#9FD9FF]">Gerenciar cargo</Text>
-            </View>
-          </Pressable>
-        ) : null}
-      </View>
-    </View>
-  );
-}
-
 function EmptyMembersState() {
   return (
     <ScreenEmpty
@@ -1062,19 +150,14 @@ export default function CommunityDetailScreen() {
   );
   const requestedTab = useMemo(() => normalizeCommunityTab(params.tab), [params.tab]);
   const authToken = session?.accessToken ?? null;
-  const initialLoadRef = useRef(false);
-  const membersInitialLoadRef = useRef(false);
   const scrollViewRef = useRef<ScrollView | null>(null);
   const contentStartOffsetRef = useRef(0);
-  const [feed, setFeed] = useState<NormalizedCommunityFeed | null>(null);
-  const [members, setMembers] = useState<CommunityMemberResponse[]>([]);
   const [activeTab, setActiveTab] = useState<CommunityViewTab>(requestedTab);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [membersLoading, setMembersLoading] = useState(false);
-  const [membersLoadError, setMembersLoadError] = useState<string | null>(null);
+  const { feed, setFeed, loading, loadError, loadFeed } = useCommunityFeed(requestedCommunityId, authToken, isFocused);
+  const { members, clearMembers, membersLoading, membersLoadError, loadMembers } = useCommunityMembers(
+    feed?.community?.id ?? requestedCommunityId, authToken, isFocused && canParticipateInCommunity(feed?.community) && activeTab === "members");
   const [membershipBusy, setMembershipBusy] = useState(false);
-  const [pendingLikePostId, setPendingLikePostId] = useState<string | null>(null);
+  const { likeBusyPostIds, toggleLike } = useCommunityPostActions((response) => setFeed((current) => applyLikeUpdate(current, response)), `${requestedCommunityId}:${authToken ?? ""}`);
   const [pendingDeletePostId, setPendingDeletePostId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [reportTarget, setReportTarget] = useState<{
@@ -1114,112 +197,6 @@ export default function CommunityDetailScreen() {
     spokenCommunityIdRef.current = loadedCommunity.id;
     speak(buildCommunitySpeech(loadedCommunity));
   }, [feed?.community, isFocused, speak]);
-
-  useEffect(() => {
-    initialLoadRef.current = false;
-    membersInitialLoadRef.current = false;
-    setFeed(null);
-    setMembers([]);
-    setLoading(true);
-    setLoadError(null);
-    setMembersLoading(false);
-    setMembersLoadError(null);
-  }, [requestedCommunityId]);
-
-  const loadFeed = useCallback(async (options?: { showLoader?: boolean }) => {
-    if (options?.showLoader) {
-      setLoading(true);
-    }
-
-    try {
-      setLoadError(null);
-
-      // TODO: paginação incremental — hoje sempre carregamos a primeira página
-      // (size padrão do backend) das publicações da comunidade.
-      const feedResponse = await communityService.getFeed(requestedCommunityId);
-      const normalizedFeed = normalizeFeedResponse(feedResponse);
-      setFeed(normalizedFeed);
-
-      const assetUrls = collectCommunityAssetUrls(normalizedFeed);
-
-      if (assetUrls.length > 0) {
-        void preloadAuthenticatedRemoteImages(assetUrls, authToken);
-      }
-    } catch (error) {
-      setLoadError(
-        formatApiErrorMessage(error, "Não foi possível carregar os dados da comunidade.")
-      );
-      setFeed((currentFeed) => currentFeed ?? { community: null, posts: [], postsHasNext: false });
-    } finally {
-      setLoading(false);
-    }
-  }, [authToken, requestedCommunityId]);
-
-  const loadMembers = useCallback(
-    async (options?: { showLoader?: boolean }) => {
-      const communityId = feed?.community?.id ?? requestedCommunityId;
-
-      if (options?.showLoader) {
-        setMembersLoading(true);
-      }
-
-      if (!communityId) {
-        setMembers([]);
-        setMembersLoadError("Não foi possível identificar a comunidade selecionada.");
-        setMembersLoading(false);
-        return;
-      }
-
-      try {
-        setMembersLoadError(null);
-
-        // TODO: paginação incremental — hoje sempre carregamos a primeira página
-        // (size padrão do backend) da lista de membros.
-        const response = await communityService.getMembers(communityId);
-        const nextMembers = Array.isArray(response.content) ? response.content : [];
-        setMembers(nextMembers);
-
-        const avatarUrls = collectMemberAssetUrls(nextMembers);
-
-        if (avatarUrls.length > 0) {
-          void preloadAuthenticatedRemoteImages(avatarUrls, authToken);
-        }
-      } catch (error) {
-        setMembersLoadError(
-          formatApiErrorMessage(error, "Não foi possível carregar os membros da comunidade.")
-        );
-      } finally {
-        setMembersLoading(false);
-      }
-    },
-    [authToken, feed?.community?.id, requestedCommunityId]
-  );
-
-  useEffect(() => {
-    if (!isFocused) {
-      return;
-    }
-
-    const shouldShowLoader = !initialLoadRef.current;
-    initialLoadRef.current = true;
-
-    void loadFeed({ showLoader: shouldShowLoader });
-  }, [isFocused, loadFeed]);
-
-  useEffect(() => {
-    if (
-      !isFocused ||
-      !canViewMembers ||
-      activeTab !== "members"
-    ) {
-      return;
-    }
-
-    const shouldShowLoader = !membersInitialLoadRef.current;
-    membersInitialLoadRef.current = true;
-
-    void loadMembers({ showLoader: shouldShowLoader });
-  }, [activeTab, canViewMembers, isFocused, loadMembers]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
@@ -1288,9 +265,7 @@ export default function CommunityDetailScreen() {
       if (activeTab === "members" && response.isMember) {
         void loadMembers();
       } else if (!response.isMember) {
-        setMembers([]);
-        setMembersLoadError(null);
-        membersInitialLoadRef.current = false;
+        clearMembers();
       }
 
       showGlobalToast({
@@ -1327,14 +302,10 @@ export default function CommunityDetailScreen() {
     } finally {
       setMembershipBusy(false);
     }
-  }, [activeTab, feed?.community, loadMembers, membershipBusy, requestedCommunityId, speak]);
+  }, [activeTab, feed?.community, loadMembers, membershipBusy, requestedCommunityId, speak, clearMembers, setFeed]);
 
   const handleToggleLike = useCallback(
     async (post: CommunityPostResponse) => {
-      if (pendingLikePostId) {
-        return;
-      }
-
       if (!canParticipateInCommunity(feed?.community)) {
         showGlobalToast({
           title: "Participação necessária",
@@ -1352,60 +323,14 @@ export default function CommunityDetailScreen() {
           post.author.name
         )
       );
-      setPendingLikePostId(post.id);
-
-      try {
-        const response = post.likedByCurrentUser
-          ? await communityService.unlikePost(post.id)
-          : await communityService.likePost(post.id);
-
-        setFeed((currentFeed) => applyLikeUpdate(currentFeed, response));
-      } catch {
-        // Global API error toast already explains the failure.
-      } finally {
-        setPendingLikePostId(null);
-      }
+      await toggleLike(post);
     },
-    [feed?.community, pendingLikePostId, speak]
+    [feed?.community, toggleLike, speak]
   );
 
-  const canDeletePost = useCallback(
-    (post: CommunityPostResponse) => {
-      if (!feed?.community) {
-        return false;
-      }
-
-      const viewerRole = getEffectiveCommunityRole(feed.community);
-
-      if (canModerateRole(viewerRole)) {
-        return true;
-      }
-
-      const postAuthorId = resolveCommunityActorId(post.author);
-
-      return Boolean(
-        postAuthorId &&
-          (postAuthorId === currentUserProfileId || postAuthorId === currentUserId)
-      );
-    },
-    [currentUserId, currentUserProfileId, feed?.community]
-  );
-
-  /** Editar e so do autor: moderadores excluem, mas nao reescrevem o texto alheio. */
-  const canEditPost = useCallback(
-    (post: CommunityPostResponse) => {
-      const postAuthorId = resolveCommunityActorId(post.author);
-      const authorUserId = post.author.id?.trim();
-
-      return Boolean(
-        (authorUserId && currentUserId && authorUserId === currentUserId) ||
-          (postAuthorId &&
-            ((currentUserProfileId && postAuthorId === currentUserProfileId) ||
-              (currentUserId && postAuthorId === currentUserId)))
-      );
-    },
-    [currentUserId, currentUserProfileId]
-  );
+  const viewer = { userId: currentUserId, userProfileId: currentUserProfileId };
+  const canDeletePost = (post: CommunityPostResponse) => canDeleteCommunityPost(post, viewer, feed?.community);
+  const canEditPost = (post: CommunityPostResponse) => canEditCommunityPost(post, viewer);
 
   const handleEditPost = useCallback(
     (post: CommunityPostResponse) => {
@@ -1420,7 +345,6 @@ export default function CommunityDetailScreen() {
         params: {
           communityId: feed.community.id,
           postId: post.id,
-          body: post.body,
         },
       });
     },
@@ -1440,27 +364,7 @@ export default function CommunityDetailScreen() {
    * A comparacao cobre os dois ids porque o backend ora identifica o autor pelo
    * `User`, ora pelo `UserProfile`.
    */
-  const canReportPost = useCallback(
-    (post: CommunityPostResponse) => {
-      const postAuthorId = resolveCommunityActorId(post.author);
-      const authorUserId = post.author.id?.trim();
-
-      if (
-        postAuthorId &&
-        ((currentUserProfileId && postAuthorId === currentUserProfileId) ||
-          (currentUserId && postAuthorId === currentUserId))
-      ) {
-        return false;
-      }
-
-      if (authorUserId && currentUserId && authorUserId === currentUserId) {
-        return false;
-      }
-
-      return Boolean(authorUserId || postAuthorId);
-    },
-    [currentUserId, currentUserProfileId]
-  );
+  const canReportPost = (post: CommunityPostResponse) => canReportCommunityPost(post, viewer);
 
   const handleReportPost = useCallback(
     (post: CommunityPostResponse) => {
@@ -1541,7 +445,7 @@ export default function CommunityDetailScreen() {
         setPendingDeletePostId(null);
       }
     },
-    [pendingDeletePostId]
+    [pendingDeletePostId, setFeed]
   );
 
   const handleDeletePost = useCallback(
@@ -1691,7 +595,6 @@ export default function CommunityDetailScreen() {
   const community = feed?.community ?? null;
   const posts = feed?.posts ?? [];
   const canParticipate = canParticipateInCommunity(community);
-  const canManageRoles = canModerateRole(getEffectiveCommunityRole(community));
   const isRequestedCommunityVisible =
     !requestedCommunityId || !community || community.id === requestedCommunityId;
 
@@ -1775,18 +678,15 @@ export default function CommunityDetailScreen() {
                           <CommunityPostCard
                             key={post.id}
                             authToken={authToken}
-                            canDelete={canDeletePost(post)}
-                            canEdit={canEditPost(post)}
-                            canReport={canReportPost(post)}
-                            deleting={pendingDeletePostId === post.id}
-                            likeBusy={pendingLikePostId === post.id}
-                            onDelete={() => handleDeletePost(post)}
-                            onEdit={() => handleEditPost(post)}
+                            likeBusy={likeBusyPostIds.has(post.id)}
                             onOpenComments={() => handleOpenComments(post)}
                             onOpenProfile={handleOpenProfile}
-                            onReport={() => handleReportPost(post)}
                             onToggleLike={() => handleToggleLike(post)}
                             post={post}
+                            menu={<CommunityPostMenu authorName={post.author.name} deleting={pendingDeletePostId === post.id}
+                              onEdit={canEditPost(post) ? () => handleEditPost(post) : undefined}
+                              onDelete={canDeletePost(post) ? () => handleDeletePost(post) : undefined}
+                              onReport={canReportPost(post) ? () => handleReportPost(post) : undefined} />}
                           />
                         ))}
                       </View>
@@ -1851,7 +751,6 @@ export default function CommunityDetailScreen() {
                       : "O backend retornou uma comunidade diferente da solicitada. Verifique se o communityId ainda existe."
                   }
                   onRetry={() => {
-                    setLoading(true);
                     void loadFeed({ showLoader: true });
                   }}
                 />

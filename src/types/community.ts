@@ -67,6 +67,7 @@ export interface CommunityPostResponse {
   publishedAt?: string | null;
   body: string;
   mediaData?: string | null;
+  imageDescription?: string | null;
   /** Preenchido quando o autor alterou o texto depois de publicar. */
   editedAt?: string | null;
   likesCount?: number | null;
@@ -120,7 +121,8 @@ export interface CommunityCreateCommentRequest {
 }
 
 export interface CommunityPostUpdateRequest {
-  body: string;
+  body?: string;
+  imageDescription?: string | null;
 }
 
 export interface CommunityFeedResponse {
