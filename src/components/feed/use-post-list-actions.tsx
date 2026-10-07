@@ -434,7 +434,7 @@ export function usePostListActions(
         onClose={() => setReportTarget(null)}
         reportedUserId={reportTarget?.author.userId ?? ""}
         reportedPostId={reportTarget?.id ?? null}
-        contextLabel={`publicação de ${reportTarget?.author.name ?? ""}`}
+        contextLabel={`uma publicação de ${reportTarget?.author.name ?? ""}`}
       />
     </>
   );

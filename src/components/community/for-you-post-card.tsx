@@ -11,6 +11,11 @@ import { communityService } from "../../services/communityService";
 import type { CommunityForYouPostResponse } from "../../types/community";
 import { buildUserProfileHref } from "../../utils/userProfileRoute";
 
+function formatCount(count: number | null | undefined, singular: string, plural: string) {
+  const value = count ?? 0;
+  return `${value} ${value === 1 ? singular : plural}`;
+}
+
 function getInitials(name?: string | null) {
   if (!name) {
     return "";
@@ -97,9 +102,9 @@ export function CommunityForYouPostCard({
       colors={["#CDBDFF", "#7C4DFF"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      className="h-full w-full items-center justify-center"
+      style={{ alignItems: "center", height: "100%", justifyContent: "center", width: "100%" }}
     >
-      <Text className="text-[13px] font-black text-white">
+      <Text allowFontScaling={false} className="text-[13px] font-black text-white">
         {getInitials(post.author.name) || "?"}
       </Text>
     </LinearGradient>
@@ -180,7 +185,13 @@ export function CommunityForYouPostCard({
           className="flex-1"
           onPress={() => speak(buildCommunityPostSpeech(post))}
           accessibilityRole="button"
-          accessibilityLabel={`Publicação de ${post.author.name} na comunidade ${item.communityName}`}
+          accessibilityLabel={[
+            `Publicação de ${post.author.name} na comunidade ${item.communityName}`,
+            post.publishedAt,
+            post.editedAt ? "editada" : null,
+          ]
+            .filter(Boolean)
+            .join(", ")}
           accessibilityHint="Lê em voz alta o autor, o texto e os contadores desta publicação"
         >
           <Text className="text-[16px] font-black text-[#E5E2E1]">{post.author.name}</Text>
@@ -196,7 +207,11 @@ export function CommunityForYouPostCard({
       <Pressable
         onPress={() => speak(buildCommunityPostSpeech(post))}
         accessibilityRole="button"
-        accessibilityLabel={`Texto da publicação de ${post.author.name}`}
+        // Com TalkBack/VoiceOver ligado o TTS do app fica mudo: o rótulo precisa
+        // ser o próprio texto, senão o leitor de tela nunca lê a publicação.
+        accessibilityLabel={
+          mediaUrl ? `${post.body}. Publicação com imagem` : post.body
+        }
         accessibilityHint="Lê a publicação em voz alta"
       >
         <Text className="mt-4 text-[17px] font-semibold leading-7 text-[#E5E2E1]">
@@ -224,7 +239,9 @@ export function CommunityForYouPostCard({
 
       <View className="mt-1 flex-row items-center justify-between">
         <FeedAction
-          accessibilityLabel={post.likedByCurrentUser ? "Remover curtida" : "Curtir publicação"}
+          accessibilityLabel={`${
+            post.likedByCurrentUser ? "Descurtir publicação" : "Curtir publicação"
+          }, ${formatCount(post.likesCount, "curtida", "curtidas")}`}
           accessibilityHint={
             post.likedByCurrentUser
               ? "Retira a sua curtida desta publicação"
@@ -237,7 +254,11 @@ export function CommunityForYouPostCard({
           onPress={onToggleLike}
         />
         <FeedAction
-          accessibilityLabel="Abrir comentários"
+          accessibilityLabel={`Ver comentários, ${formatCount(
+            post.commentsCount,
+            "comentário",
+            "comentários"
+          )}`}
           accessibilityHint="Abre a tela de comentários desta publicação"
           icon={post.commentedByCurrentUser ? "chatbubble" : "chatbubble-outline"}
           count={post.commentsCount}

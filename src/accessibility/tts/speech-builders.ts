@@ -30,6 +30,7 @@ import {
 } from "../../utils/accessibilityAnnouncements";
 import { describeAudioMessage, formatTimeForSpeech } from "../../utils/chatFormatting";
 import { describeFeedSuggestion } from "../../utils/feedSource";
+import { formatDistanceSpeech } from "../../utils/distanceFormatting";
 import { getHiddenFields, profileFieldLabel } from "../../utils/profileFieldVisibility";
 
 /** Junta partes nao vazias em uma frase unica. */
@@ -73,9 +74,7 @@ function formatAge(age: number | null | undefined): string | null {
 // ---------------------------------------------------------------------------
 
 function formatDistance(distanceKm: number | null | undefined): string | null {
-  return typeof distanceKm === "number" && Number.isFinite(distanceKm) && distanceKm >= 0
-    ? `a ${Math.round(distanceKm)} quilômetros`
-    : null;
+  return formatDistanceSpeech(distanceKm);
 }
 
 /** Frase final quando o dono escondeu alguma parte do perfil do visitante. */

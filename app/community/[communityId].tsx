@@ -293,9 +293,9 @@ function AuthorAvatar({
               colors={["#CDBDFF", "#7C4DFF"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              className="h-full w-full items-center justify-center"
+              style={{ alignItems: "center", height: "100%", justifyContent: "center", width: "100%" }}
             >
-              <Text className="text-[16px] font-black text-white">{initials || "?"}</Text>
+              <Text allowFontScaling={false} className="text-[16px] font-black text-white">{initials || "?"}</Text>
             </LinearGradient>
           }
         />
@@ -304,9 +304,9 @@ function AuthorAvatar({
           colors={["#CDBDFF", "#7C4DFF"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          className="h-full w-full items-center justify-center"
+          style={{ alignItems: "center", height: "100%", justifyContent: "center", width: "100%" }}
         >
-          <Text className="text-[16px] font-black text-white">{initials || "?"}</Text>
+          <Text allowFontScaling={false} className="text-[16px] font-black text-white">{initials || "?"}</Text>
         </LinearGradient>
       )}
     </View>
@@ -1894,7 +1894,7 @@ export default function CommunityDetailScreen() {
           onClose={() => setReportTarget(null)}
           reportedUserId={reportTarget.userId}
           reportedPostId={reportTarget.postId}
-          contextLabel={`publicação de ${reportTarget.authorName}`}
+          contextLabel={`uma publicação de ${reportTarget.authorName}`}
         />
       ) : null}
     </View>

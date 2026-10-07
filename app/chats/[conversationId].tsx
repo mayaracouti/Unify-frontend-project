@@ -10,6 +10,7 @@ import {
   Pressable,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FollowPendingIcon } from "../../src/components/social/follow-pending-icon";
@@ -92,6 +93,10 @@ function PartnerAvatar({
 }
 
 export default function ConversationScreen() {
+  // Fonte do sistema grande: o botão de seguir do cabeçalho fica só com o ícone
+  // para o nome da pessoa não virar "Bruno.." (o rótulo acessível continua inteiro).
+  const { fontScale } = useWindowDimensions();
+  const compactHeaderActions = fontScale >= 1.3;
   // Ao entrar na tela, o leitor de tela do sistema comeca pelo titulo.
   const headingRef = useScreenHeadingFocus<Text>();
 
@@ -508,7 +513,7 @@ export default function ConversationScreen() {
             ref={headingRef}
             accessibilityRole="header"
             className="flex-1 text-[20px] font-black text-white"
-            numberOfLines={1}
+            numberOfLines={compactHeaderActions ? 2 : 1}
           >
             {otherName}
           </Text>
@@ -527,7 +532,7 @@ export default function ConversationScreen() {
                 disabled: followBusy || !followButton,
                 selected: followButton?.selected ?? false,
               }}
-              className={`min-h-[44px] flex-row items-center justify-center rounded-full border px-3 ${
+              className={`min-h-[44px] min-w-[44px] flex-row items-center justify-center rounded-full border px-3 ${
                 followButton?.selected
                   ? "border-[#CDBDFF] bg-[#2B2338]"
                   : "border-[#494455] bg-[#1A1C1F]"
@@ -547,9 +552,11 @@ export default function ConversationScreen() {
                   importantForAccessibility="no"
                 />
               )}
-              <Text className="ml-1.5 text-[13px] font-bold text-white">
-                {followButton?.text ?? "Seguir"}
-              </Text>
+              {compactHeaderActions ? null : (
+                <Text className="ml-1.5 text-[13px] font-bold text-white">
+                  {followButton?.text ?? "Seguir"}
+                </Text>
+              )}
             </Pressable>
           ) : null}
 

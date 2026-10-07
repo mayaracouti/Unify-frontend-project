@@ -41,6 +41,8 @@ import {
 } from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
 import { formatAudioDuration } from "../../src/utils/chatFormatting";
+import { formatDistanceText } from "../../src/utils/distanceFormatting";
+import { PROFILE_FIELD_OPTIONS } from "../../src/types/privacy";
 import {
   followStateFromStats,
   type FollowState,
@@ -325,10 +327,7 @@ export default function UserPublicProfileScreen() {
     // Travado: sem galeria, a foto e a de perfil (`avatarUrl` vem mesmo travado).
     const lockedAvatarUrl = locked ? feedService.resolveAssetUrl(profile.avatarUrl) : null;
     const age = typeof profile.age === "number" && profile.age > 0 ? profile.age : null;
-    const distanceKm =
-      typeof profile.distanceKm === "number" && Number.isFinite(profile.distanceKm)
-        ? Math.round(profile.distanceKm)
-        : null;
+    const distanceLabel = formatDistanceText(profile.distanceKm);
     const isHidden = (field: (typeof hiddenFields)[number]) => hiddenFields.includes(field);
     const presentationAudio = isHidden("PRESENTATION_AUDIO") ? null : profile.presentationAudio;
     const pronouns = isHidden("PRONOUNS") ? null : profile.pronouns?.description?.trim() || null;
@@ -467,9 +466,9 @@ export default function UserPublicProfileScreen() {
               </Text>
             ) : null}
             {/* Nula quando a pessoa ocultou a distancia: a linha some (nunca "0 km"). */}
-            {distanceKm !== null ? (
+            {distanceLabel !== null ? (
               <Text className="mt-1 text-center text-[14px] font-semibold text-[#CAC3D8]">
-                A {distanceKm} km de você
+                {distanceLabel}
               </Text>
             ) : null}
             {bio ? (
@@ -580,7 +579,11 @@ export default function UserPublicProfileScreen() {
 
         {locked ? (
           // Abaixo so as partes que ainda vem visiveis; nunca audio nem Postagens.
-          <LockedProfileNotice className="mt-6" highContrast={highContrast} />
+          <LockedProfileNotice
+            className="mt-6"
+            highContrast={highContrast}
+            partial={hiddenFields.length < PROFILE_FIELD_OPTIONS.length}
+          />
         ) : null}
 
         {!locked && presentationAudio && presentationAudioUrl ? (
@@ -704,7 +707,7 @@ export default function UserPublicProfileScreen() {
         visible={reportVisible}
         onClose={() => setReportVisible(false)}
         reportedUserId={userProfileId}
-        contextLabel={`perfil de ${displayName}`}
+        contextLabel={`o perfil de ${displayName}`}
       />
 
       {cancelFollowRequestSheet}

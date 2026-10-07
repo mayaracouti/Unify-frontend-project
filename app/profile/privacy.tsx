@@ -295,7 +295,7 @@ export default function PrivacySettingsScreen() {
     setUnblockingId(null);
     showGlobalToast({
       title: "Usuário desbloqueado",
-      message: `${user.name} foi desbloqueado.`,
+      message: `Você desbloqueou ${user.name}.`,
       variant: "success",
     });
     announceForAccessibility(accessibilityAnnouncements.userUnblocked(user.name));

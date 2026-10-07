@@ -132,7 +132,7 @@ export const MessageBubble = memo(function MessageBubble({
         : "self-end bg-[#7C4DFF]"
       : settings.highContrast
         ? "self-start bg-hc-surface border border-hc-border"
-        : "self-start bg-[#1D1F24]"
+        : "self-start border border-[#3A3545] bg-[#2D2A33]"
   }`;
 
   // No alto contraste o balao proprio fica com fundo amarelo (hc-accent): texto

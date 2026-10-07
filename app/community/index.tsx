@@ -9,6 +9,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -103,9 +104,14 @@ function CommunityHomeTabs({
   onChange: (tab: CommunityHomeTab) => void;
 }) {
   const { speak } = useTTS();
+  // Fonte do sistema grande: lado a lado, "Descubra comunidades" era cortado.
+  const { fontScale } = useWindowDimensions();
+  const stacked = fontScale >= 1.3;
 
   return (
-    <View className="flex-row rounded-2xl border border-[#3A3246] bg-[#1A1C1F] p-1.5">
+    <View
+      className={`${stacked ? "flex-col gap-1" : "flex-row"} rounded-2xl border border-[#3A3246] bg-[#1A1C1F] p-1.5`}
+    >
       {[
         {
           key: "forYou" as const,
@@ -125,7 +131,7 @@ function CommunityHomeTabs({
         return (
           <Pressable
             key={tab.key}
-            className={`flex-1 flex-row items-center justify-center gap-2 rounded-xl px-3 py-3 ${
+            className={`${stacked ? "" : "flex-1 "}flex-row items-center justify-center gap-2 rounded-xl px-3 py-3 ${
               isActive ? "bg-[#7C4DFF]" : "bg-transparent"
             }`}
             accessibilityRole="tab"
@@ -139,10 +145,10 @@ function CommunityHomeTabs({
           >
             <Ionicons name={tab.icon} size={16} color={isActive ? "#FCF6FF" : "#CAC3D8"} />
             <Text
-              className={`text-[13px] font-black ${
+              className={`shrink text-center text-[13px] font-black ${
                 isActive ? "text-[#FCF6FF]" : "text-content-secondary"
               }`}
-              numberOfLines={1}
+              numberOfLines={2}
             >
               {tab.label}
             </Text>

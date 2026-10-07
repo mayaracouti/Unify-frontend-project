@@ -65,7 +65,7 @@ import {
   saveStoredMatchDiscoveryState,
 } from "../../src/storage/matchDiscoveryStorage";
 import { getAuthSnapshot } from "../../src/storage/tokenStorage";
-import type { ProfileField } from "../../src/types/privacy";
+import { PROFILE_FIELD_OPTIONS, type ProfileField } from "../../src/types/privacy";
 import type {
   UserProfileAudioPublicResponse,
   UserPublicProfileResponse,
@@ -78,6 +78,7 @@ import { formatApiErrorMessage } from "../../src/utils/auth";
 import { formatAudioDuration } from "../../src/utils/chatFormatting";
 import { showGlobalToast } from "../../src/utils/globalToast";
 import { followStateFromStats, type FollowState } from "../../src/utils/followRelation";
+import { formatDistanceSpeech, formatDistanceText } from "../../src/utils/distanceFormatting";
 import { getHiddenFields } from "../../src/utils/profileFieldVisibility";
 import {
   getForegroundLocationPermissionState,
@@ -98,10 +99,13 @@ const PHOTO_NAVIGATION_FALLBACK = (
       alignItems: "center",
       height: "100%",
       justifyContent: "center",
+      // A metade de baixo do card e do nome/bio, que crescem com a fonte do
+      // sistema: o icone fica centrado na parte de cima para nao ficar por baixo.
+      paddingBottom: "40%",
       width: "100%",
     }}
   >
-    <Ionicons name="person" size={132} color="#CDBDFF" />
+    <Ionicons name="person" size={132} color="#CDBDFF" importantForAccessibility="no" />
   </LinearGradient>
 );
 
@@ -243,8 +247,7 @@ function hasText(value: string | null | undefined) {
  * orfao nem "Não informado".
  */
 function ProfileDetailsContent({ profile }: { profile: MatchProfile }) {
-  const distanceLabel =
-    profile.distanceKm !== null ? `A ${Math.round(profile.distanceKm)} km de você` : null;
+  const distanceLabel = formatDistanceText(profile.distanceKm);
   const disabilitiesLabel = profile.disabilities.filter(hasText).join(", ");
   const hasBasicInfo = [
     distanceLabel,
@@ -266,7 +269,12 @@ function ProfileDetailsContent({ profile }: { profile: MatchProfile }) {
       </Text>
 
       {/* Travado: aviso primeiro; abaixo so o que ainda vem visivel. */}
-      {profile.locked ? <LockedProfileNotice className="mb-4" /> : null}
+      {profile.locked ? (
+        <LockedProfileNotice
+          className="mb-4"
+          partial={profile.hiddenFields.length < PROFILE_FIELD_OPTIONS.length}
+        />
+      ) : null}
 
       {!profile.locked && hasText(profile.bio) ? (
         <DetailCard title="Sobre mim" icon="chatbubble-ellipses-outline">
@@ -445,8 +453,9 @@ function buildProfileAccessibilityLabel(profile: MatchProfile): string {
     parts.push(`pronomes ${profile.pronouns}`);
   }
 
-  if (typeof profile.distanceKm === "number") {
-    parts.push(`a ${Math.round(profile.distanceKm)} quilômetros de você`);
+  const distanceSpeech = formatDistanceSpeech(profile.distanceKm);
+  if (distanceSpeech) {
+    parts.push(`${distanceSpeech} de você`);
   }
 
   // Conta privada: sem bio, fotos nem audio; fecha com o aviso ("perfil
@@ -1745,7 +1754,7 @@ export default function Matches() {
           // O contrato publico do perfil nao traz o id do `User`; enquanto ele
           // nao existir, a denuncia vai com o `userProfileId`.
           reportedUserId={currentProfile.userId ?? currentProfile.id}
-          contextLabel={`perfil de ${currentProfile.name}`}
+          contextLabel={`o perfil de ${currentProfile.name}`}
         />
       ) : null}
 

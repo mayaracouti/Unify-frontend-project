@@ -16,6 +16,13 @@ import {
   type GlobalToastVariant,
 } from "../../utils/globalToast";
 
+/**
+ * Texto e icones escuros: os fundos dos avisos sao claros (verde, azul, amarelo,
+ * rosa) e branco sobre eles fica entre 1,7:1 e 2,6:1 de contraste; escuro passa
+ * de 7:1 em todos (WCAG AA pede 4,5:1).
+ */
+const TOAST_FOREGROUND = "#111114";
+
 const shadowStyle: ViewStyle = {
   elevation: 10,
   shadowColor: "#020617",
@@ -155,37 +162,41 @@ function GlobalToastCard({
               infoStyle]}
       >
         <View className="flex-row items-start px-4 py-3.5">
-          <View className="mr-3">
+          <View className="mr-3" accessible={false} importantForAccessibility="no-hide-descendants">
             {
               (() => {
                 switch (toast.variant) {
                     case "error":
-                      return <Ionicons name="close-circle-outline" size={18} color={'white'}/>;
+                      return <Ionicons name="close-circle-outline" size={18} color={TOAST_FOREGROUND}/>;
                     case "success":
-                      return <Ionicons name="checkmark-circle-outline" size={18} color={'white'}/>;
+                      return <Ionicons name="checkmark-circle-outline" size={18} color={TOAST_FOREGROUND}/>;
                     case "warning":
-                      return <Ionicons name="warning-outline" size={18} color={'white'}/>;
+                      return <Ionicons name="warning-outline" size={18} color={TOAST_FOREGROUND}/>;
                     default:
-                      return <Ionicons name="information-outline" size={18} color={'white'}/>;
+                      return <Ionicons name="information-outline" size={18} color={TOAST_FOREGROUND}/>;
                 }
             })()}
           </View>
 
           <View className="flex-1">
-            <Text className="text-[14px] font-bold uppercase tracking-[1px] text-white">
+            <Text className="text-[14px] font-bold uppercase tracking-[1px] text-[#111114]">
               {toast.title}
             </Text>
-            <Text className="mt-1 text-[13px] leading-5 text-white">
+            <Text className="mt-1 text-[13px] leading-5 text-[#111114]">
               {toast.message}
             </Text>
           </View>
 
           <Pressable
-            className="ml-3 rounded-full px-2 py-1"
+            accessibilityHint="Fecha esta notificação"
+            accessibilityLabel="Fechar aviso"
+            accessibilityRole="button"
+            className="ml-2 h-11 w-11 items-center justify-center rounded-full"
+            hitSlop={4}
             onPress={dismissToast}
             style={({ pressed }) => (pressed ? { opacity: 0.72 } : null)}
           >
-            <Ionicons name="close" size={20} color={'white'} />
+            <Ionicons name="close" size={20} color={TOAST_FOREGROUND} />
           </Pressable>
         </View>
       </View>
