@@ -111,6 +111,8 @@ export interface CommunityCommentResponse {
   author: CommunityPostAuthorResponse;
   publishedAt?: string | null;
   body: string;
+  mediaData?: string | null;
+  imageDescription?: string | null;
   commentedByCurrentUser?: boolean | null;
 }
 

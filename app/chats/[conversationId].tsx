@@ -362,7 +362,7 @@ export default function ConversationScreen() {
 
   async function handleSendMedia(media: ChatMediaUpload) {
     if (!resolvedConversationId) {
-      return;
+      return false;
     }
 
     setSending(true);
@@ -371,8 +371,10 @@ export default function ConversationScreen() {
       upsertLocalMessage(message);
       listRef.current?.scrollToOffset({ offset: 0, animated: true });
       announceForAccessibility(media.type === "AUDIO" ? "Áudio enviado." : "Imagem enviada.");
+      return true;
     } catch (nextError) {
       showSendError(nextError, "Verifique o tamanho do arquivo e tente de novo.");
+      return false;
     } finally {
       setSending(false);
     }
@@ -658,9 +660,7 @@ export default function ConversationScreen() {
             <ChatComposer
               editing={editing ? { messageId: editing.id, body: editing.body ?? "" } : null}
               onCancelEdit={() => setEditing(null)}
-              onSendMedia={(media) => {
-                void handleSendMedia(media);
-              }}
+              onSendMedia={handleSendMedia}
               onSendText={handleSendText}
               onSubmitEdit={(messageId, body) => {
                 void handleSubmitEdit(messageId, body);

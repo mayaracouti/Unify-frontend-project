@@ -36,6 +36,8 @@ import { formatApiErrorMessage } from "../../src/utils/auth";
 import { showGlobalToast } from "../../src/utils/globalToast";
 import { formatRelativePostDate, getNameInitial } from "../../src/utils/postFormatting";
 import { buildUserProfileHref } from "../../src/utils/userProfileRoute";
+import { postSpeechParts, resolvePostImageDescription } from "../../src/community/post-content";
+import { PostImage } from "../../src/components/community/post/post-image";
 
 const PAGE_SIZE = 20;
 const COMMENT_MAX_LENGTH = 400;
@@ -117,10 +119,12 @@ export default function PersonalPostCommentsScreen() {
     authorName?: string | string[];
     authorUserProfileId?: string | string[];
     postBody?: string | string[];
+    mediaUrl?: string | string[];
+    imageDescription?: string | string[];
     createdAt?: string | string[];
   }>();
   const headingRef = useScreenHeadingFocus<Text>();
-  const { speak } = useTTS();
+  const { speak, speakSequence } = useTTS();
   const { session, userId } = useAuth();
   const { currentUserProfileId } = useAppShell();
   const authToken = session?.accessToken ?? null;
@@ -135,6 +139,9 @@ export default function PersonalPostCommentsScreen() {
     [params.authorUserProfileId]
   );
   const postBody = useMemo(() => normalizeParam(params.postBody), [params.postBody]);
+  const mediaUri = feedService.resolveAssetUrl(normalizeParam(params.mediaUrl));
+  const postContent = { body: postBody, hasImage: Boolean(mediaUri), origin: "PERSONAL" as const,
+    imageDescription: normalizeParam(params.imageDescription) || null };
   const createdAt = useMemo(() => normalizeParam(params.createdAt).trim(), [params.createdAt]);
   const publishedAt = useMemo(
     () => (createdAt ? formatRelativePostDate(createdAt) : ""),
@@ -368,11 +375,11 @@ export default function PersonalPostCommentsScreen() {
               >
                 <Pressable
                   className="rounded-[28px] bg-[#111214] p-6"
-                  onPress={() => speak(buildActionSpeech(`Publicação de ${authorName}.`, postBody))}
+                  onPress={() => speakSequence([`Publicação de ${authorName}.`, ...postSpeechParts(postContent)])}
                   accessibilityRole="button"
                   accessibilityLabel={`Publicação de ${authorName}${
                     publishedAt ? `, ${publishedAt}` : ""
-                  }: ${postBody.slice(0, 200)}`}
+                  }: ${postBody}`}
                   accessibilityHint="Lê a publicação original em voz alta"
                 >
                   <Text className="text-[14px] font-bold uppercase tracking-[1.4px] text-[#7C4DFF]">
@@ -390,6 +397,8 @@ export default function PersonalPostCommentsScreen() {
                     </Text>
                   ) : null}
                 </Pressable>
+                {mediaUri ? <PostImage uri={mediaUri} description={resolvePostImageDescription(postContent)}
+                  authorName={authorName} authToken={authToken} /> : null}
 
                 {loadError ? (
                   <View

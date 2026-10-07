@@ -320,6 +320,14 @@ export const communityService = {
     );
   },
 
+  createCommentWithImage(postId: string, payload: FormData) {
+    return customApiCall.post<CommunityCommentResponse, FormData>(
+      `${COMMUNITY_POSTS_ENDPOINT}/${encodePathSegment(postId)}/comments`,
+      payload,
+      { requiresAuth: true, timeoutMs: 60000 }
+    );
+  },
+
   deleteComment(postId: string, commentId: string) {
     return customApiCall.delete<void>(
       `${COMMUNITY_POSTS_ENDPOINT}/${encodePathSegment(postId)}/comments/${encodePathSegment(commentId)}`,

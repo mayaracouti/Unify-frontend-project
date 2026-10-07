@@ -139,6 +139,13 @@ describe("buildChatMessageSpeech", () => {
     ).toBe("Mensagem de áudio de 12 segundos, hoje às 14:29");
   });
 
+  it("reads the complete image description without treating it as a legacy caption", () => {
+    const description = "Uma árvore " + "verde ".repeat(38);
+    const speech = buildChatMessageSpeech(message({ type: "IMAGE", body: `Descrição da imagem: ${description.trim()}` }));
+    expect(speech).toBe(`Imagem, hoje às 14:29. Descrição da imagem: ${description.trim()}`);
+    expect(speech).not.toContain("Legenda:");
+  });
+
   it("apagada: so aviso e horario", () => {
     expect(buildChatMessageSpeech(message({ deletedAt: TODAY_14_30, body: null }))).toBe(
       "Mensagem apagada, hoje às 14:29"

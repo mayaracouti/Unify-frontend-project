@@ -14,6 +14,14 @@ export function getPersonalPostImageDescription(body: string): string | null {
   return index < 0 ? null : body.slice(index + DESCRIPTION_MARKER.length).trim() || null;
 }
 
+/** Separa o formato já persistido para editar texto e descrição em campos próprios. */
+export function splitPersonalPostBody(body: string): { body: string; imageDescription: string } {
+  const index = body.lastIndexOf(DESCRIPTION_MARKER);
+  return index < 0
+    ? { body, imageDescription: "" }
+    : { body: body.slice(0, index), imageDescription: body.slice(index + DESCRIPTION_MARKER.length).trim() };
+}
+
 /** Frases curtas para o motor não cortar publicações longas. */
 export function splitPostSpeech(body: string): string[] {
   const parts: string[] = [];

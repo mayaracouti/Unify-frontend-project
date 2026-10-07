@@ -12,6 +12,7 @@ import { chatService } from "../../services/chatService";
 import { useAccessibility } from "../../context/AccessibilityContext";
 import type { ChatDeliveryStatus, ChatMessageResponse } from "../../types/chat";
 import { describeAudioMessage, formatTimeForSpeech } from "../../utils/chatFormatting";
+import { describeChatImage } from "../../utils/chatImageDescription";
 import { AuthenticatedRemoteImage } from "../profile/authenticated-remote-image";
 import { AudioMessagePlayer } from "./audio-message-player";
 
@@ -62,7 +63,7 @@ function buildMessageAccessibilityLabel(
     : message.type === "TEXT"
       ? message.body ?? ""
       : message.type === "IMAGE"
-        ? `Imagem${message.body ? `. Legenda: ${message.body}` : ""}`
+        ? describeChatImage(message.body)
         : message.type === "AUDIO"
           ? describeAudioMessage(message.mediaDurationSeconds)
           : "Vídeo";
@@ -139,9 +140,7 @@ export const MessageBubble = memo(function MessageBubble({
   // branco perderia contraste, entao usamos preto nesse caso.
   const ownTextClass = settings.highContrast ? "text-black" : "text-white";
 
-  const imageLabel = `Imagem enviada por ${mine ? "você" : otherName}${
-    message.body ? `. Legenda: ${message.body}` : ""
-  }`;
+  const imageLabel = `Imagem enviada por ${mine ? "você" : otherName}. ${describeChatImage(message.body)}`;
 
   // Mensagens de texto e apagadas nao tem controles internos: o balao inteiro e
   // o elemento focavel, e o toque longo fica nele.

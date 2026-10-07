@@ -97,4 +97,6 @@ export interface ChatMediaUpload {
   mimeType: string;
   durationSeconds?: number;
   caption?: string;
+  /** Arquivo do seletor web; no celular o upload usa uri/name/mimeType. */
+  file?: File;
 }

@@ -306,6 +306,8 @@ export function usePostListActions(
           authorName: post.author.name,
           authorUserProfileId: post.author.userProfileId ?? "",
           postBody: post.body,
+          mediaUrl: post.mediaUrl ?? "",
+          imageDescription: post.imageDescription ?? "",
           createdAt: post.createdAt,
         },
       });
@@ -350,7 +352,7 @@ export function usePostListActions(
 
       router.push({
         pathname: "/profile/new-post",
-        params: { postId: post.id, body: post.body },
+        params: { postId: post.id, body: post.body, mediaUrl: post.mediaUrl ?? "" },
       });
     },
     [router]

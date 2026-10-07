@@ -1,13 +1,16 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTTS } from "../../accessibility/tts";
 import { MAX_AUDIO_DURATION_SECONDS, useAudioRecorder } from "../../hooks/useAudioRecorder";
 import type { ChatMediaUpload } from "../../types/chat";
 import { formatAudioClock, formatAudioDuration } from "../../utils/chatFormatting";
 import { showGlobalToast } from "../../utils/globalToast";
+import { buildChatImageCaption, CHAT_IMAGE_DESCRIPTION_MAX_LENGTH } from "../../utils/chatImageDescription";
+import { PostImage } from "../community/post/post-image";
 import { ActionSheet } from "../ui/action-sheet";
 
 export type ChatComposerEditTarget = {
@@ -28,15 +31,19 @@ export function ChatComposer({
   /** Mensagem em edicao: o compositor vira "Editando" e o envio confirma a edicao. */
   editing: ChatComposerEditTarget | null;
   onCancelEdit: () => void;
-  onSendMedia: (media: ChatMediaUpload) => void;
+  onSendMedia: (media: ChatMediaUpload) => Promise<boolean>;
   onSendText: (body: string) => Promise<boolean>;
   onSubmitEdit: (messageId: string, body: string) => void;
   sending: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const textSendInFlight = useRef(false);
+  const imageSendInFlight = useRef(false);
+  const pickingImage = useRef(false);
+  const [selectedImage, setSelectedImage] = useState<ChatMediaUpload | null>(null);
+  const [imageDescription, setImageDescription] = useState("");
   const [imageSourceVisible, setImageSourceVisible] = useState(false);
-  const recorder = useAudioRecorder({ onRecorded: onSendMedia });
+  const recorder = useAudioRecorder({ onRecorded: (media) => { void onSendMedia(media); } });
   // TTS in-app: cada controle fala o proprio nome ao ser tocado/focado. O
   // gravador ja anuncia inicio/fim pelo canal do leitor nativo
   // (`announceForAccessibility`); os dois canais nunca soam juntos.
@@ -53,47 +60,70 @@ export function ChatComposer({
 
   async function pickImage(source: ImageSource) {
     setImageSourceVisible(false);
+    if (pickingImage.current || sending) return;
+    pickingImage.current = true;
+    try {
+      const permission =
+        source === "camera"
+          ? await ImagePicker.requestCameraPermissionsAsync()
+          : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    const permission =
-      source === "camera"
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        showGlobalToast({
+          title: source === "camera" ? "Câmera bloqueada" : "Galeria bloqueada",
+          message:
+            source === "camera"
+              ? "Autorize o uso da câmera nos ajustes do celular para tirar fotos."
+              : "Autorize o acesso às fotos nos ajustes do celular para enviar imagens.",
+          variant: "warning",
+        });
+        return;
+      }
 
-    if (!permission.granted) {
-      showGlobalToast({
-        title: source === "camera" ? "Câmera bloqueada" : "Galeria bloqueada",
-        message:
-          source === "camera"
-            ? "Autorize o uso da câmera nos ajustes do celular para tirar fotos."
-            : "Autorize o acesso às fotos nos ajustes do celular para enviar imagens.",
-        variant: "warning",
+      const pickerOptions: ImagePicker.ImagePickerOptions = {
+        mediaTypes: ["images"], // SDK 54: array de strings (MediaTypeOptions esta depreciado)
+        quality: 0.8,
+        allowsEditing: false,
+      };
+
+      const result =
+        source === "camera"
+          ? await ImagePicker.launchCameraAsync(pickerOptions)
+          : await ImagePicker.launchImageLibraryAsync(pickerOptions);
+
+      if (result.canceled || !result.assets?.[0]) {
+        return;
+      }
+
+      const asset = result.assets[0];
+
+      setSelectedImage({
+        type: "IMAGE",
+        uri: asset.uri,
+        name: asset.fileName ?? `imagem-${Date.now()}.jpg`,
+        mimeType: asset.mimeType ?? "image/jpeg",
+        file: asset.file,
       });
-      return;
+      setImageDescription("");
+      speak("Imagem selecionada. Você pode descrever a imagem antes de enviar.");
+    } catch {
+      showGlobalToast({ title: "Não foi possível selecionar a imagem", message: "Tente novamente.", variant: "error" });
+    } finally {
+      pickingImage.current = false;
     }
+  }
 
-    const pickerOptions: ImagePicker.ImagePickerOptions = {
-      mediaTypes: ["images"], // SDK 54: array de strings (MediaTypeOptions esta depreciado)
-      quality: 0.8,
-      allowsEditing: false,
-    };
-
-    const result =
-      source === "camera"
-        ? await ImagePicker.launchCameraAsync(pickerOptions)
-        : await ImagePicker.launchImageLibraryAsync(pickerOptions);
-
-    if (result.canceled || !result.assets?.[0]) {
-      return;
+  async function sendSelectedImage() {
+    if (!selectedImage || sending || imageSendInFlight.current) return;
+    imageSendInFlight.current = true;
+    try {
+      if (await onSendMedia({ ...selectedImage, caption: buildChatImageCaption(imageDescription) })) {
+        setSelectedImage(null);
+        setImageDescription("");
+      }
+    } finally {
+      imageSendInFlight.current = false;
     }
-
-    const asset = result.assets[0];
-
-    onSendMedia({
-      type: "IMAGE",
-      uri: asset.uri,
-      name: asset.fileName ?? `imagem-${Date.now()}.jpg`,
-      mimeType: asset.mimeType ?? "image/jpeg",
-    });
   }
 
   async function handleSubmit() {
@@ -182,6 +212,49 @@ export function ChatComposer({
   // ---- texto (ou edicao) ------------------------------------------------
   return (
     <View className="border-t border-[#353534] bg-[#111214]">
+      {selectedImage && !editing ? (
+        <Modal visible animationType="none" onRequestClose={() => {
+          if (!sending && !imageSendInFlight.current) { setSelectedImage(null); setImageDescription(""); }
+        }}>
+          <SafeAreaView className="flex-1 bg-[#111214]" accessibilityViewIsModal>
+            <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : "height"}>
+              <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16 }}>
+                <Text accessibilityRole="header" className="text-[20px] font-bold text-white">Enviar imagem</Text>
+                <PostImage uri={selectedImage.uri} description={imageDescription} authorName="você" authToken={null} />
+                <Text className="mt-3 font-bold text-white">Descrição da imagem (opcional)</Text>
+                <Text className="mt-1 text-[#CAC3D8]">Conte o que aparece para quem não pode ver. A descrição será enviada junto da imagem.</Text>
+                <TextInput
+                  accessibilityLabel="Descrição da imagem"
+                  accessibilityHint="Opcional. Até 240 caracteres. Enviada junto da imagem e lida por voz."
+                  className="mt-2 min-h-[80px] rounded-xl border border-[#494455] p-3 text-white"
+                  editable={!sending}
+                  maxLength={CHAT_IMAGE_DESCRIPTION_MAX_LENGTH}
+                  multiline
+                  onChangeText={setImageDescription}
+                  placeholder="Ex.: Duas pessoas conversando em um parque."
+                  placeholderTextColor="#909099"
+                  value={imageDescription}
+                />
+                <Text className="mt-1 text-right text-[#CAC3D8]">{imageDescription.length} / {CHAT_IMAGE_DESCRIPTION_MAX_LENGTH}</Text>
+                <View className="mt-2 flex-row justify-between">
+                  <Pressable accessibilityRole="button" accessibilityLabel="Remover imagem selecionada"
+                    accessibilityHint="Descarta a imagem e sua descrição. O texto da mensagem permanece."
+                    disabled={sending} accessibilityState={{ disabled: sending }} className="min-h-[44px] justify-center"
+                    onPress={() => { setSelectedImage(null); setImageDescription(""); }}>
+                    <Text className="font-bold text-[#FF8A8A]">Remover imagem</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Enviar imagem selecionada"
+                    accessibilityHint="Envia a imagem com a descrição, se preenchida."
+                    disabled={sending} accessibilityState={{ disabled: sending, busy: sending }} className="min-h-[44px] justify-center px-3"
+                    onPress={() => { void sendSelectedImage(); }}>
+                    <Text className="font-bold text-[#EAEA00]">{sending ? "Enviando…" : "Enviar imagem"}</Text>
+                  </Pressable>
+                </View>
+              </ScrollView>
+            </KeyboardAvoidingView>
+          </SafeAreaView>
+        </Modal>
+      ) : null}
       {editing ? (
         <View className="flex-row items-center gap-2 border-b border-[#353534] px-4 py-2">
           <Ionicons

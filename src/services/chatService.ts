@@ -96,11 +96,15 @@ export const chatService = {
     // request nao injeta `Content-Type` quando o body e FormData, entao o fetch
     // monta o boundary do multipart sozinho (mesmo caminho de
     // `communityService.createCommunity`).
-    formData.append("file", {
-      uri: media.uri,
-      name: media.name,
-      type: media.mimeType,
-    } as unknown as Blob);
+    if (media.file) {
+      formData.append("file", media.file, media.name);
+    } else {
+      formData.append("file", {
+        uri: media.uri,
+        name: media.name,
+        type: media.mimeType,
+      } as unknown as Blob);
+    }
 
     if (media.caption?.trim()) {
       formData.append("caption", media.caption.trim());

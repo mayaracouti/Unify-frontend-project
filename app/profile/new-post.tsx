@@ -29,7 +29,9 @@ import { showGlobalToast } from "../../src/utils/globalToast";
 import { privacyService } from "../../src/services/privacyService";
 import type { UserPrivacySettingsResponse } from "../../src/types/privacy";
 import { personalFeedAudience } from "../../src/utils/privacySummary";
-import { buildPersonalPostBody, PERSONAL_POST_MAX_LENGTH } from "../../src/utils/personalPostContent";
+import { buildPersonalPostBody, PERSONAL_POST_MAX_LENGTH, splitPersonalPostBody } from "../../src/utils/personalPostContent";
+import { PostImage } from "../../src/components/community/post/post-image";
+import { useAuth } from "../../src/context/AuthContext";
 
 const IMAGE_MEDIA_TYPES: ImagePicker.MediaType[] = ["images"];
 const BODY_MAX_LENGTH = PERSONAL_POST_MAX_LENGTH;
@@ -82,12 +84,14 @@ function createUserPostFormData(body: string, asset: ImagePicker.ImagePickerAsse
  */
 export default function ProfileNewPostScreen() {
   const router = useRouter();
+  const { session } = useAuth();
   const { speak } = useTTS();
   const { settings } = useAccessibility();
   const highContrast = settings.highContrast;
   const params = useLocalSearchParams<{
     postId?: string | string[];
     body?: string | string[];
+    mediaUrl?: string | string[];
   }>();
 
   // Ao entrar na tela, o leitor de tela do sistema comeca pelo titulo.
@@ -98,14 +102,16 @@ export default function ProfileNewPostScreen() {
     [params.postId]
   );
   const isEditing = editingPostId !== null;
+  const existingMediaUri = isEditing ? feedService.resolveAssetUrl(normalizeRouteParam(params.mediaUrl)) : null;
+  const initialContent = isEditing && existingMediaUri
+    ? splitPersonalPostBody(normalizeRouteParam(params.body))
+    : { body: isEditing ? normalizeRouteParam(params.body) : "", imageDescription: "" };
 
-  const [body, setBody] = useState(() =>
-    isEditing ? normalizeRouteParam(params.body) : ""
-  );
+  const [body, setBody] = useState(initialContent.body);
   const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(
     null
   );
-  const [imageDescription, setImageDescription] = useState("");
+  const [imageDescription, setImageDescription] = useState(initialContent.imageDescription);
   const [privacy, setPrivacy] = useState<UserPrivacySettingsResponse | null>(null);
   const [privacyLoading, setPrivacyLoading] = useState(true);
   const [imageSourceVisible, setImageSourceVisible] = useState(false);
@@ -123,7 +129,7 @@ export default function ProfileNewPostScreen() {
     return () => { active = false; };
   }, []));
 
-  const publishedBody = buildPersonalPostBody(body, imageDescription, Boolean(selectedImage));
+  const publishedBody = buildPersonalPostBody(body, imageDescription, Boolean(selectedImage || existingMediaUri));
   const contentTooLong = publishedBody.length > BODY_MAX_LENGTH;
   const trimmedBody = useMemo(() => body.trim(), [body]);
   const submitDisabled = trimmedBody.length === 0 || contentTooLong || submitting;
@@ -209,7 +215,7 @@ export default function ProfileNewPostScreen() {
 
     try {
       if (editingPostId) {
-        await feedService.updatePost(editingPostId, trimmedBody);
+        await feedService.updatePost(editingPostId, publishedBody);
 
         showGlobalToast({
           title: "Publicação atualizada",
@@ -370,7 +376,18 @@ export default function ProfileNewPostScreen() {
               </Text>
             </View>
 
-            {/* Edicao e so de texto: a secao de imagem nao aparece. */}
+            {isEditing && existingMediaUri ? (
+              <View className={`mt-6 rounded-[28px] p-6 ${cardBackground}`}>
+                <PostImage uri={existingMediaUri} description={imageDescription} authorName="você" authToken={session?.accessToken ?? null} />
+                <Text className={`mt-3 font-bold ${titleColor}`}>Descrição da imagem (opcional)</Text>
+                <TextInput multiline maxLength={240} value={imageDescription} onChangeText={setImageDescription}
+                  editable={!submitting} accessibilityLabel="Descrição da imagem"
+                  accessibilityHint="Opcional. Até 240 caracteres, dentro do limite total de 600. Salva junto do texto publicado."
+                  placeholder="O que aparece na imagem?" placeholderTextColor="#909099"
+                  className={`mt-3 min-h-[96px] rounded-2xl border border-content-muted p-3 ${titleColor}`} />
+              </View>
+            ) : null}
+            {/* A edição permite alterar a descrição, mantendo a imagem publicada. */}
             {isEditing ? null : (
               <View className={`mt-6 rounded-[28px] p-6 ${cardBackground}`}>
                 <View className="flex-row items-center justify-between">

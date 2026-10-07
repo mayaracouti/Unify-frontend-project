@@ -30,6 +30,7 @@ import {
   presentationAudioNotice,
 } from "../../utils/accessibilityAnnouncements";
 import { describeAudioMessage, formatTimeForSpeech } from "../../utils/chatFormatting";
+import { chatImageCaptionLabel } from "../../utils/chatImageDescription";
 import { describeFeedSuggestion } from "../../utils/feedSource";
 import { getHiddenFields, profileFieldLabel } from "../../utils/profileFieldVisibility";
 
@@ -362,7 +363,7 @@ export function buildUserPostCommentSpeech(
   ]);
 }
 
-/** Comentario: autor + corpo. */
+/** Comentario: autor, corpo completo e descrição da imagem. */
 export function buildCommunityCommentSpeech(
   comment: CommunityCommentResponse | null | undefined
 ): string | null {
@@ -372,7 +373,8 @@ export function buildCommunityCommentSpeech(
 
   return joinSpeechParts([
     comment.author?.name ? `Comentário de ${comment.author.name}` : "Comentário",
-    toConcise(comment.body, 200),
+    comment.body,
+    comment.mediaData && comment.imageDescription?.trim() ? `Descrição da imagem: ${comment.imageDescription.trim()}` : null,
   ]);
 }
 
@@ -532,7 +534,7 @@ export function buildChatMessageSpeech(
     case "TEXT":
       return joinSpeechParts([when, toConcise(message.body, CHAT_MESSAGE_SPEECH_MAX_LENGTH)]);
     case "IMAGE":
-      return joinSpeechParts([`Imagem, ${when}`, caption]);
+      return joinSpeechParts([`Imagem, ${when}`, chatImageCaptionLabel(message.body)]);
     case "AUDIO":
       return joinSpeechParts([`${describeAudioMessage(message.mediaDurationSeconds)}, ${when}`, caption]);
     case "VIDEO":
