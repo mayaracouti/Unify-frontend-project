@@ -1,10 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { FollowPendingIcon } from "../social/follow-pending-icon";
 import { LinearGradient } from "expo-linear-gradient";
-import { memo, useMemo, useState, type ComponentProps } from "react";
+import { memo, useMemo, useRef, useState, type ComponentProps } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { getPersonalPostImageDescription, splitPostSpeech } from "../../utils/personalPostContent";
 
-import { buildActionSpeech, buildFeedPostSpeech, useTTS } from "../../accessibility/tts";
+import { buildActionSpeech, useTTS } from "../../accessibility/tts";
 import { feedService } from "../../services/feedService";
 import type { UserPostResponse } from "../../types/social";
 import { describeFeedSuggestion } from "../../utils/feedSource";
@@ -131,7 +132,13 @@ export const FeedPostCard = memo(function FeedPostCard({
   onCancelFollowRequest,
   onJoinCommunity,
 }: FeedPostCardProps) {
-  const { speak } = useTTS();
+  const { enabled: ttsEnabled, speak, speakSequence, stop } = useTTS();
+  const menuButtonRef = useRef<View | null>(null);
+  const readPost = () => speakSequence([
+    `Publicação de ${authorName}`,
+    ...splitPostSpeech(post.body),
+    `${post.likesCount} curtidas e ${post.commentsCount} comentários`,
+  ]);
   const [menuVisible, setMenuVisible] = useState(false);
 
   const formattedDate = useMemo(() => formatRelativePostDate(post.createdAt), [post.createdAt]);
@@ -388,7 +395,7 @@ export const FeedPostCard = memo(function FeedPostCard({
 
         <Pressable
           className="ml-3 flex-1"
-          onPress={() => speak(buildFeedPostSpeech(post))}
+          onPress={readPost}
           accessibilityRole="button"
           accessibilityLabel={`${summaryLabel}: ${post.body.slice(0, 120)}`}
           accessibilityHint="Lê a publicação em voz alta"
@@ -404,6 +411,7 @@ export const FeedPostCard = memo(function FeedPostCard({
 
         {menuOptions.length > 0 ? (
           <Pressable
+            ref={menuButtonRef}
             className="ml-2 h-9 w-9 items-center justify-center rounded-full"
             onPress={() => {
               speak("Mais opções da publicação");
@@ -432,8 +440,9 @@ export const FeedPostCard = memo(function FeedPostCard({
 
       {/* O cabecalho resume; aqui o leitor nativo recebe o texto completo. */}
       <Pressable
-        onPress={() => speak(buildFeedPostSpeech(post))}
-        accessibilityRole="text"
+        onPress={readPost}
+        accessibilityRole="button"
+        accessibilityHint="Lê o texto completo da publicação em voz alta"
         accessibilityLabel={post.body}
       >
         <Text className={`mt-4 text-[15px] font-semibold leading-6 ${textColor}`}>
@@ -441,10 +450,22 @@ export const FeedPostCard = memo(function FeedPostCard({
         </Text>
       </Pressable>
 
+      {ttsEnabled ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Parar leitura desta publicação"
+          accessibilityHint="Interrompe a leitura por voz do aplicativo"
+          className="mt-2 min-h-[44px] justify-center"
+          onPress={stop}
+        >
+          <Text className={`text-[13px] font-semibold ${secondaryColor}`}>Parar leitura</Text>
+        </Pressable>
+      ) : null}
+
       {mediaUri ? (
         <View className="mt-3 h-56 w-full overflow-hidden rounded-2xl bg-[#2A2A2A]">
           <AuthenticatedRemoteImage
-            accessibilityLabel={`Imagem da publicação de ${authorName}`}
+            accessibilityLabel={getPersonalPostImageDescription(post.body) ?? `Imagem da publicação de ${authorName}, sem descrição` }
             authToken={authToken}
             className="h-full w-full"
             fallback={
@@ -499,6 +520,7 @@ export const FeedPostCard = memo(function FeedPostCard({
       <ActionSheet
         onClose={() => setMenuVisible(false)}
         options={menuOptions}
+        returnFocusRef={menuButtonRef}
         title="Publicação"
         visible={menuVisible}
       />

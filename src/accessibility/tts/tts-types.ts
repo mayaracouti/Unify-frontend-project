@@ -6,6 +6,8 @@
 export type TtsPreference = {
   /** Leitura por voz ligada? Primeiro launch = `true` (acessibilidade por padrao). */
   enabled: boolean;
+  /** Velocidade local da leitura: 0.75, 1 ou 1.25. */
+  rate?: number;
   /** O onboarding de acessibilidade do primeiro launch ja foi concluido? */
   onboardingCompleted: boolean;
 };

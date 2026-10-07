@@ -35,7 +35,7 @@ const FONT_SCALE_OPTIONS: { value: FontScaleOption; label: string }[] = [
 
 export default function AccessibilitySettings() {
   const { settings, isLoading, updateSettings } = useAccessibility();
-  const { enabled: ttsEnabled, setEnabled: setTtsEnabled } = useTTS();
+  const { enabled: ttsEnabled, setEnabled: setTtsEnabled, rate = 1, setRate, stop } = useTTS();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [savedAt, setSavedAt] = useState(0);
@@ -291,6 +291,26 @@ export default function AccessibilitySettings() {
               accessibilityHint="Lê em voz alta conteúdos e ações conforme você navega"
               accessibilityState={{ checked: ttsEnabled }}
             />
+          </View>
+
+          <View className={cardClassName}>
+            <Text accessibilityRole="header" className={titleClassName}>Velocidade da leitura</Text>
+            <View accessibilityRole="radiogroup" accessibilityLabel="Velocidade da leitura" accessibilityHint="Escolha a velocidade da leitura por voz do aplicativo" className="mt-3 flex-row flex-wrap gap-3">
+              {[{ value: 0.75, label: "Lenta" }, { value: 1, label: "Normal" }, { value: 1.25, label: "Rápida" }].map((option) => (
+                <Pressable key={option.value} accessibilityRole="radio" accessibilityLabel={option.label} accessibilityHint="Ajusta a velocidade da leitura por voz"
+                  accessibilityState={{ checked: rate === option.value }}
+                  className={`min-h-[48px] justify-center rounded-2xl border px-4 py-3 ${rate === option.value ? "border-brand-soft" : "border-content-muted"}`}
+                  onPress={() => { setRate(option.value); speak(`Velocidade ${option.label.toLowerCase()}`, { force: true }); }}>
+                  <Text className={titleClassName}>{option.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel="Parar leitura"
+              accessibilityHint="Interrompe a leitura por voz do aplicativo"
+              className="mt-3 min-h-[48px] justify-center rounded-2xl border border-content-muted px-4 py-3" onPress={stop}>
+              <Text className={titleClassName}>Parar leitura</Text>
+            </Pressable>
+            <Text className={`mt-2 ${captionClassName}`}>Com TalkBack ou VoiceOver, ajuste a velocidade nas configurações do aparelho.</Text>
           </View>
 
           <View className={`${cardClassName} flex-row items-center justify-between`}>

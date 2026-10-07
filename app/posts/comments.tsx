@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getCommentDraft, saveCommentDraft } from "../../src/state/comment-drafts";
 
 import {
   buildActionSpeech,
@@ -120,7 +121,7 @@ export default function PersonalPostCommentsScreen() {
   }>();
   const headingRef = useScreenHeadingFocus<Text>();
   const { speak } = useTTS();
-  const { session } = useAuth();
+  const { session, userId } = useAuth();
   const { currentUserProfileId } = useAppShell();
   const authToken = session?.accessToken ?? null;
 
@@ -145,12 +146,20 @@ export default function PersonalPostCommentsScreen() {
   const [comments, setComments] = useState<UserPostCommentResponse[]>([]);
   const [page, setPage] = useState(0);
   const [hasNext, setHasNext] = useState(false);
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(() => userId ? getCommentDraft(userId, postId) : "");
+  useEffect(() => {
+    setDraft(userId ? getCommentDraft(userId, postId) : "");
+  }, [userId, postId]);
+  const updateDraft = useCallback((text: string) => {
+    setDraft(text);
+    if (userId && postId) saveCommentDraft(userId, postId, text);
+  }, [userId, postId]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const submitLock = useRef(false);
   const [deleteTarget, setDeleteTarget] = useState<UserPostCommentResponse | null>(null);
   const [pendingDeleteCommentId, setPendingDeleteCommentId] = useState<string | null>(null);
 
@@ -201,7 +210,7 @@ export default function PersonalPostCommentsScreen() {
             announceForAccessibility(describeLoadedComments(appended.length));
           }
 
-          return [...current, ...appended];
+          return [...current, ...appended].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
         });
       } catch (error) {
         setLoadError(formatApiErrorMessage(error, "Não foi possível carregar os comentários."));
@@ -221,7 +230,7 @@ export default function PersonalPostCommentsScreen() {
   }, [postId]);
 
   const handleSubmitComment = useCallback(async () => {
-    if (submitting || !postId) {
+    if (submitLock.current || !postId) {
       return;
     }
 
@@ -236,12 +245,13 @@ export default function PersonalPostCommentsScreen() {
       return;
     }
 
+    submitLock.current = true;
     setSubmitting(true);
 
     try {
       const created = await feedService.createComment(postId, trimmedDraft);
-      setComments((current) => [...current, created]);
-      setDraft("");
+      setComments((current) => [...current.filter((item) => item.id !== created.id), created].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)));
+      updateDraft("");
       showGlobalToast({
         title: "Comentário publicado",
         variant: "success",
@@ -251,9 +261,10 @@ export default function PersonalPostCommentsScreen() {
     } catch {
       // Global API error toast already explains the failure.
     } finally {
+      submitLock.current = false;
       setSubmitting(false);
     }
-  }, [draft, postId, submitting]);
+  }, [draft, postId, updateDraft]);
 
   const confirmDeleteComment = useCallback(async () => {
     const target = deleteTarget;
@@ -303,7 +314,7 @@ export default function PersonalPostCommentsScreen() {
                 hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                 accessibilityRole="button"
                 accessibilityLabel="Voltar"
-                accessibilityHint="Volta para a tela anterior sem salvar o comentário em edição"
+                accessibilityHint="Volta para a tela anterior e mantém o rascunho nesta sessão"
                 onPress={() => {
                   speak("Voltar");
                   if (router.canGoBack()) {
@@ -520,10 +531,12 @@ export default function PersonalPostCommentsScreen() {
                   placeholderTextColor="#948EA1"
                   textAlignVertical="top"
                   value={draft}
-                  onChangeText={setDraft}
+                  editable={!submitting}
+                  accessibilityState={{ disabled: submitting }}
+                  onChangeText={updateDraft}
                   onFocus={() => speak("Escreva um comentário")}
                   accessibilityLabel="Escreva um comentário"
-                  accessibilityHint="Obrigatório para publicar"
+                  accessibilityHint="Obrigatório para publicar. O rascunho é mantido ao voltar durante esta sessão"
                 />
                 <View className="mt-4 flex-row items-center justify-between">
                   <Text

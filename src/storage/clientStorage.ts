@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import { clearCommentDrafts } from "../state/comment-drafts";
 
 import { clearAuthenticatedRemoteImageCache } from "../components/profile/authenticated-remote-image";
 import { clearOnboardingCompletionCache } from "../services/onboardingCompletionService";
@@ -11,6 +12,7 @@ export async function clearEntireClientStorage() {
   // persistida. No web o `clearEntireWebStorage` ja apaga tudo; no nativo esta
   // e a unica remocao dessa chave.
   const userId = await getUserId();
+  clearCommentDrafts();
 
   await clearAllStoredAuthData({ clearEntireWebStorage: Platform.OS === "web" });
 

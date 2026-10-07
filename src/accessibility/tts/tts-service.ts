@@ -28,7 +28,6 @@ import {
 import type { TtsSpeakOptions, TtsState } from "./tts-types";
 
 const SPEECH_LANGUAGE = "pt-BR";
-const SPEECH_RATE = 1;
 const SPEECH_PITCH = 1;
 
 /** Limite conservador para nao estourar `Speech.maxSpeechInputLength`. */
@@ -50,6 +49,7 @@ function setState(next: Partial<TtsState>): void {
 
   if (
     merged.enabled === state.enabled &&
+    merged.rate === state.rate &&
     merged.onboardingCompleted === state.onboardingCompleted &&
     merged.isReady === state.isReady
   ) {
@@ -166,7 +166,20 @@ export function setTtsEnabled(enabled: boolean): void {
   setState({ enabled });
   void saveStoredTtsPreference({
     enabled,
+    rate: state.rate ?? 1,
     onboardingCompleted: state.onboardingCompleted,
+  });
+}
+
+/** Ajusta a velocidade sem depender da API. */
+export function setTtsRate(rate: number): void {
+  if (![0.75, 1, 1.25].includes(rate)) return;
+  stopSpeaking();
+  setState({ rate });
+  void saveStoredTtsPreference({
+    enabled: state.enabled,
+    onboardingCompleted: state.onboardingCompleted,
+    rate,
   });
 }
 
@@ -177,7 +190,7 @@ export function completeTtsOnboarding(enabled: boolean): void {
   }
 
   setState({ enabled, onboardingCompleted: true });
-  void saveStoredTtsPreference({ enabled, onboardingCompleted: true });
+  void saveStoredTtsPreference({ enabled, rate: state.rate ?? 1, onboardingCompleted: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -263,6 +276,7 @@ function ensurePreferredVoiceLookup(): void {
 // Fala
 // ---------------------------------------------------------------------------
 
+let speechGeneration = 0;
 let lastSpokenText = "";
 let lastSpokenAt = 0;
 
@@ -272,7 +286,7 @@ function speakUtterance(message: string): void {
     Speech.speak(message, {
       language: SPEECH_LANGUAGE,
       voice: preferredVoiceIdentifier,
-      rate: SPEECH_RATE,
+      rate: state.rate ?? 1,
       pitch: SPEECH_PITCH,
     });
   } catch {
@@ -330,9 +344,12 @@ export function speak(
     }
 
     // Politica anti-fila: interrompe a fala corrente antes de falar a nova.
+    const generation = ++speechGeneration;
     void Speech.stop()
       .catch(() => undefined)
-      .then(() => speakUtterance(message));
+      .then(() => {
+        if (generation === speechGeneration) speakUtterance(message);
+      });
   } catch {
     // Nenhum erro de acessibilidade pode quebrar o app.
   }
@@ -363,8 +380,9 @@ export function speakSequence(
       return;
     }
 
+    const generation = options.interrupt === false ? speechGeneration : ++speechGeneration;
     const speakAll = () => {
-      messages.forEach(speakUtterance);
+      if (generation === speechGeneration) messages.forEach(speakUtterance);
     };
 
     if (options.interrupt === false) {
@@ -383,5 +401,8 @@ export function speakSequence(
 }
 
 export function stopSpeaking(): void {
+  speechGeneration += 1;
+  lastSpokenText = "";
+  lastSpokenAt = 0;
   void Speech.stop().catch(() => undefined);
 }

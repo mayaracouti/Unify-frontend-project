@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 import { communityService } from "../../services/communityService";
 import { feedService } from "../../services/feedService";
@@ -32,7 +32,8 @@ export function usePostListActions(
   setPosts: Dispatch<SetStateAction<UserPostResponse[]>>
 ) {
   const router = useRouter();
-  const [likeBusyPostId, setLikeBusyPostId] = useState<string | null>(null);
+  const likeLocks = useRef(new Set<string>());
+  const [likeBusyPostIds, setLikeBusyPostIds] = useState<ReadonlySet<string>>(new Set());
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UserPostResponse | null>(null);
   const [reportTarget, setReportTarget] = useState<UserPostResponse | null>(null);
@@ -73,7 +74,7 @@ export function usePostListActions(
 
   const toggleLike = useCallback(
     (post: UserPostResponse) => {
-      if (likeBusyPostId) {
+      if (likeLocks.current.has(post.id)) {
         return;
       }
 
@@ -83,7 +84,8 @@ export function usePostListActions(
         likesCount: post.likesCount,
       };
 
-      setLikeBusyPostId(post.id);
+      likeLocks.current.add(post.id);
+      setLikeBusyPostIds(new Set(likeLocks.current));
       patchPost(post.id, {
         likedByCurrentUser: nextLiked,
         likesCount: Math.max(0, post.likesCount + (nextLiked ? 1 : -1)),
@@ -121,11 +123,12 @@ export function usePostListActions(
           patchPost(post.id, previousState);
           // Global API error toast already explains the failure.
         } finally {
-          setLikeBusyPostId(null);
+          likeLocks.current.delete(post.id);
+          setLikeBusyPostIds(new Set(likeLocks.current));
         }
       })();
     },
-    [likeBusyPostId, patchPost]
+    [patchPost]
   );
 
   /**
@@ -444,7 +447,7 @@ export function usePostListActions(
     dialogs,
     handlers,
     isAuthorFollowRequested,
-    likeBusyPostId,
+    likeBusyPostIds,
     patchPost,
     suggestionBusyPostId,
   };

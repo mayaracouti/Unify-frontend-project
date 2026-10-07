@@ -6,6 +6,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { clearCommentDrafts } from "../state/comment-drafts";
 
 import { setUserNotFoundHandler } from "../api/session-events";
 import { authService } from "../services/authService";
@@ -65,6 +66,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         return;
       }
 
+      if (!nextSnapshot.session) clearCommentDrafts();
       setSnapshot(nextSnapshot);
     });
 
@@ -75,6 +77,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         return;
       }
 
+      if (!nextSnapshot.session) clearCommentDrafts();
       setSnapshot(nextSnapshot);
 
       if (isMounted) {

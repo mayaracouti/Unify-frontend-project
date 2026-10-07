@@ -12,6 +12,7 @@ import {
   completeTtsOnboarding,
   getTtsState,
   setTtsEnabled,
+  setTtsRate,
   speak,
   speakSequence,
   stopSpeaking,
@@ -24,6 +25,7 @@ export type UseTtsResult = TtsState & {
   speakSequence: (parts: (string | null | undefined)[], options?: TtsSpeakOptions) => void;
   stop: () => void;
   setEnabled: (enabled: boolean) => void;
+  setRate: (rate: number) => void;
   completeOnboarding: (enabled: boolean) => void;
 };
 
@@ -41,6 +43,7 @@ export function useTTS(): UseTtsResult {
       speakSequence,
       stop: stopSpeaking,
       setEnabled: setTtsEnabled,
+      setRate: setTtsRate,
       completeOnboarding: completeTtsOnboarding,
     }),
     [state]

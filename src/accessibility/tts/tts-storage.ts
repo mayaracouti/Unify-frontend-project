@@ -16,6 +16,7 @@ const TTS_PREFERENCE_KEY = "unify.accessibility.tts";
 /** Primeiro launch: leitura por voz LIGADA por padrao, onboarding pendente. */
 export const DEFAULT_TTS_PREFERENCE: TtsPreference = {
   enabled: true,
+  rate: 1,
   onboardingCompleted: false,
 };
 
@@ -49,6 +50,7 @@ export async function getStoredTtsPreference(): Promise<TtsPreference | null> {
           ? parsed.enabled
           : DEFAULT_TTS_PREFERENCE.enabled,
       onboardingCompleted: parsed.onboardingCompleted === true,
+      rate: [0.75, 1, 1.25].includes(parsed.rate ?? 0) ? parsed.rate : 1,
     };
   } catch {
     // Storage corrompido/indisponivel nao pode derrubar o app: cai no default.

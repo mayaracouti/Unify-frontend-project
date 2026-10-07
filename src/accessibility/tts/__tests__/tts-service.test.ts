@@ -150,3 +150,47 @@ describe("tts-service speakSequence()", () => {
     expect(Speech.speak).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("controles da leitura por voz", () => {
+  beforeEach(() => {
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  it("persiste a velocidade e a mantém ao desligar ou concluir o onboarding", async () => {
+    const RN = require("react-native");
+    RN.AccessibilityInfo.isScreenReaderEnabled.mockResolvedValue(false);
+    const Speech = require("expo-speech");
+    const storage = require("../tts-storage");
+    const service = require("../tts-service");
+    await service.initializeTtsService();
+    service.setTtsRate(0.75);
+    service.speak("Leitura lenta");
+    await flushMicrotasks();
+    expect(Speech.speak).toHaveBeenCalledWith("Leitura lenta", expect.objectContaining({ rate: 0.75 }));
+    service.setTtsEnabled(false);
+    expect(storage.saveStoredTtsPreference).toHaveBeenLastCalledWith(expect.objectContaining({ rate: 0.75, enabled: false }));
+    service.completeTtsOnboarding(true);
+    expect(storage.saveStoredTtsPreference).toHaveBeenLastCalledWith(expect.objectContaining({ rate: 0.75, enabled: true }));
+    service.setTtsRate(10);
+    expect(service.getTtsState().rate).toBe(0.75);
+  });
+
+  it("parar cancela inclusive uma fala que aguarda o motor interromper a anterior", async () => {
+    const RN = require("react-native");
+    RN.AccessibilityInfo.isScreenReaderEnabled.mockResolvedValue(false);
+    const Speech = require("expo-speech");
+    const service = require("../tts-service");
+    await service.initializeTtsService();
+    let release!: () => void;
+    Speech.stop.mockImplementationOnce(() => new Promise<void>((resolve) => { release = resolve; }));
+    service.speakSequence(["Uma publicação", "Descrição da imagem"]);
+    service.stopSpeaking();
+    release();
+    await flushMicrotasks();
+    expect(Speech.speak).not.toHaveBeenCalled();
+    service.speak("Uma publicação");
+    await flushMicrotasks();
+    expect(Speech.speak).toHaveBeenCalledTimes(1);
+  });
+});

@@ -55,7 +55,7 @@ export default function Home() {
     dialogs,
     handlers,
     isAuthorFollowRequested,
-    likeBusyPostId,
+    likeBusyPostIds,
     suggestionBusyPostId,
   } = usePostListActions(setPosts);
 
@@ -310,7 +310,7 @@ export default function Home() {
               (currentUserProfileId !== null &&
                 item.author.userProfileId === currentUserProfileId)
             }
-            likeBusy={likeBusyPostId === item.id}
+            likeBusy={likeBusyPostIds.has(item.id)}
             post={item}
             suggestionBusy={suggestionBusyPostId === item.id}
             authorFollowRequested={isAuthorFollowRequested(item)}

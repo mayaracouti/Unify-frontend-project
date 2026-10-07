@@ -56,7 +56,7 @@ export function ProfilePostsSection({
    */
   const [visible, setVisible] = useState(true);
 
-  const { deletingPostId, dialogs, handlers, likeBusyPostId } = usePostListActions(setPosts);
+  const { deletingPostId, dialogs, handlers, likeBusyPostIds } = usePostListActions(setPosts);
 
   const load = useCallback(async () => {
     try {
@@ -245,7 +245,7 @@ export function ProfilePostsSection({
               deleting={deletingPostId === post.id}
               highContrast={highContrast}
               isOwnPost={isOwnProfile}
-              likeBusy={likeBusyPostId === post.id}
+              likeBusy={likeBusyPostIds.has(post.id)}
               post={post}
               {...handlers}
             />

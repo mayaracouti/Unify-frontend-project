@@ -44,6 +44,8 @@ import {
   profileFieldVisibilityLabel,
 } from "../../src/utils/profileFieldVisibility";
 
+import { privacySummary, RESERVED_PRIVACY_SETTINGS } from "../../src/utils/privacySummary";
+
 /** Alvo da folha de modos: uma parte do perfil ou todas de uma vez. */
 type VisibilitySheetTarget = ProfileField | "ALL";
 
@@ -123,6 +125,7 @@ export default function PrivacySettingsScreen() {
   /** Pedidos recebidos pendentes; `null` enquanto carrega ou se a contagem falhar. */
   const [pendingRequestsCount, setPendingRequestsCount] = useState<number | null>(null);
   const [approvalOffConfirmVisible, setApprovalOffConfirmVisible] = useState(false);
+  const [reservedConfirmVisible, setReservedConfirmVisible] = useState(false);
 
   const loadPendingRequestsCount = useCallback(async () => {
     try {
@@ -240,7 +243,7 @@ export default function PrivacySettingsScreen() {
 
   function handleFollowApprovalChange(next: boolean) {
     // Desligar com pedidos pendentes aceita todos eles: confirma antes.
-    if (!next && (pendingRequestsCount ?? 0) > 0) {
+    if (!next && (pendingRequestsCount === null || pendingRequestsCount > 0)) {
       speak(buildActionSpeech("Desativar", "conta privada"));
       setApprovalOffConfirmVisible(true);
       return;
@@ -342,6 +345,26 @@ export default function PrivacySettingsScreen() {
           ) : null}
         </View>
 
+        <View className={cardClassName}>
+          <Text accessibilityRole="header" className={titleClassName}>Sua visibilidade atual</Text>
+          {privacySummary(settings).map((line) => (
+            <Text key={line} className={descriptionClassName}>{line}</Text>
+          ))}
+          <Text className={descriptionClassName}>As opções abaixo valem para o perfil, o Encontros e as publicações pessoais. Comunidades têm regras próprias.</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Aplicar privacidade reforçada"
+            accessibilityHint="Mostra as mudanças antes de aplicar: aprovação de seguidores, posts restritos e ocultação de informações pessoais"
+            accessibilityState={{ disabled: saving }}
+            disabled={saving}
+            className="mt-3 min-h-[48px] justify-center rounded-2xl border border-content-muted px-4 py-3"
+            onPress={() => setReservedConfirmVisible(true)}
+          >
+            <Text className={titleClassName}>Aplicar privacidade reforçada</Text>
+          </Pressable>
+        </View>
+        <Text accessibilityRole="header" className={`mb-3 ${titleClassName}`}>Perfil e seguidores</Text>
+
         {/* Conta privada vem primeiro: e a escolha que mais muda o que os
             outros veem (perfil travado e posts so para seguidores). */}
         <View className={`${cardClassName} flex-row items-center`}>
@@ -362,6 +385,7 @@ export default function PrivacySettingsScreen() {
           />
         </View>
 
+        <Text accessibilityRole="header" className={`mb-3 ${titleClassName}`}>Encontros, idade e distância</Text>
         {TOGGLES.map((toggle) => {
           const value = settings[toggle.key];
 
@@ -392,6 +416,7 @@ export default function PrivacySettingsScreen() {
           );
         })}
 
+        <Text accessibilityRole="header" className={`mb-3 ${titleClassName}`}>Publicações pessoais</Text>
         <View className={cardClassName}>
           <Text accessibilityRole="header" className={titleClassName}>
             Quem pode ver meus posts
@@ -679,6 +704,23 @@ export default function PrivacySettingsScreen() {
       </SafeAreaView>
 
       <ActionSheet
+        visible={reservedConfirmVisible}
+        title="Aplicar privacidade reforçada?"
+        message="Suas publicações pessoais, inclusive as anteriores, ficam restritas a seguidores. Novos seguidores precisam de aprovação. Seu perfil sai da descoberta de Encontros; matches e conversas existentes continuam. Idade, distância, tipo de deficiência, necessidades de acessibilidade e nível de autonomia ficam ocultos. As demais opções não mudam."
+        onClose={() => setReservedConfirmVisible(false)}
+        options={[{
+          key: "reserved-privacy",
+          label: "Aplicar configurações",
+          hint: "Salva as opções de privacidade reforçada. Depois você pode ajustar cada opção",
+          icon: "shield-checkmark-outline",
+          onPress: () => {
+            setReservedConfirmVisible(false);
+            void updateSettings(RESERVED_PRIVACY_SETTINGS, "Privacidade reforçada aplicada.");
+          },
+        }]}
+      />
+
+      <ActionSheet
         message={
           pendingRequestsCount && pendingRequestsCount > 0
             ? `${
@@ -686,7 +728,7 @@ export default function PrivacySettingsScreen() {
                   ? "O pedido pendente será aceito"
                   : `Os ${pendingRequestsCount} pedidos pendentes serão aceitos`
               } e essas pessoas passam a te seguir. Depois, qualquer pessoa pode te seguir sem pedir.`
-            : undefined
+            : "Todos os pedidos pendentes serão aceitos, e novas pessoas poderão seguir você sem aprovação."
         }
         onClose={() => setApprovalOffConfirmVisible(false)}
         options={[
