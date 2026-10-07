@@ -79,6 +79,14 @@ function appendQueryParams(
 }
 
 export const communityService = {
+  describeCommentImage(postId: string, commentId: string) {
+    return customApiCall.post<{ description: string; source: "AI" }>(
+      `${COMMUNITY_POSTS_ENDPOINT}/${encodePathSegment(postId)}/comments/${encodePathSegment(commentId)}/image-description`,
+      undefined,
+      { requiresAuth: true, suppressErrorToast: true, timeoutMs: 60000 }
+    );
+  },
+
   listCategories() {
     return customApiCall.get<CommunityCategoryResponse[]>(
       COMMUNITY_CATEGORIES_ENDPOINT,

@@ -138,6 +138,7 @@ function CommentAvatar({
 }
 
 function CommentCard({
+  postId,
   authToken,
   canDelete,
   comment,
@@ -145,6 +146,7 @@ function CommentCard({
   onDelete,
   onOpenProfile,
 }: {
+  postId: string;
   authToken: string | null;
   canDelete: boolean;
   comment: CommunityCommentResponse;
@@ -212,7 +214,7 @@ function CommentCard({
         </Pressable>
       </View>
       {comment.mediaData ? <PostImage uri={communityService.resolveAssetUrl(comment.mediaData)!}
-        description={comment.imageDescription} authorName={comment.author.name} authToken={authToken} /> : null}
+        description={comment.imageDescription} authorName={comment.author.name} authToken={authToken} analyzeImage={async () => (await communityService.describeCommentImage(postId, comment.id)).description} /> : null}
     </View>
   );
 }
@@ -554,6 +556,7 @@ export default function CommunityCommentsScreen() {
                     comments.map((comment) => (
                       <CommentCard
                         key={comment.id}
+                        postId={postId}
                         authToken={authToken}
                         canDelete={canDeleteComment(comment)}
                         comment={comment}

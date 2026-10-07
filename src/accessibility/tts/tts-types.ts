@@ -20,8 +20,9 @@ export type TtsState = TtsPreference & {
 
 export type TtsSpeakOptions = {
   /**
-   * Fala mesmo com a preferencia desligada. Usado apenas para confirmar ao
-   * usuario que ele acabou de desligar/ligar o proprio recurso.
+   * Fala mesmo com a preferência de leitura automática desligada. Usado em
+   * confirmações da preferência e em controles que pedem reprodução de áudio
+   * explicitamente. Continua respeitando a prioridade do leitor de tela nativo.
    */
   force?: boolean;
   /**

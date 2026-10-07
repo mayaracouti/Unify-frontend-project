@@ -2,14 +2,16 @@ import { Image, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { AuthenticatedRemoteImage } from "../../profile/authenticated-remote-image";
 import { postImageLabel } from "../../../community/post-content";
+import { ImageDescriptionAudio } from "./image-description-audio";
 export interface PostImageProps {
   uri: string;
   description?: string | null;
   authorName: string;
   authToken: string | null;
   version?: string | null;
+  analyzeImage?: () => Promise<string>;
 }
-export function PostImage({ uri, description, authorName, authToken, version }: PostImageProps) {
+export function PostImage({ uri, description, authorName, authToken, version, analyzeImage }: PostImageProps) {
   const label = postImageLabel(description, authorName);
   const local = /^(file:|content:|blob:|data:)/i.test(uri);
   const sourceUri = !local && version ? `${uri}${uri.includes("?") ? "&" : "?"}v=${encodeURIComponent(version)}` : uri;
@@ -22,6 +24,7 @@ export function PostImage({ uri, description, authorName, authToken, version }: 
         )}
       </View>
       {description?.trim() ? <Text className="mt-2 text-[14px] leading-6 text-[#CAC3D8]">Descrição da imagem: {description.trim()}</Text> : null}
+      {analyzeImage ? <ImageDescriptionAudio key={`${uri}:${version ?? ""}:${authToken ?? ""}`} analyzeImage={analyzeImage} /> : null}
     </View>
   );
 }

@@ -11,7 +11,7 @@ a validação com API em execução e leitores de tela em aparelho permanece man
 | Edição de publicação pessoal com imagem | Texto e descrição aparecem em campos separados. A gravação recompõe o formato existente em `body`, sem trocar a imagem. A descrição pode ser alterada ou removida. | Mantém compatibilidade com as publicações já persistidas. |
 | Comentários de publicação pessoal | Mostra a imagem e a descrição da publicação original recebidas da navegação; os comentários continuam apenas textuais. | O botão do post lê o conteúdo completo, inclusive a descrição, sem o corte do builder genérico. Dados do post original são os da navegação, sem consulta dedicada para atualizá-los nesta tela. |
 | Criação e edição de publicação de comunidade | Campo `imageDescription` próprio, com até 240 caracteres. A troca ou remoção de imagem limpa a descrição anterior. | Card da comunidade, aba Para você, feed inicial e comentários usam os componentes e builders comuns de descrição. |
-| Comentários de publicações de comunidade | Câmera ou galeria permite anexar imagem com descrição opcional de até 240 caracteres. Aceita texto, imagem ou ambos; upload multipart mantém o endpoint JSON para comentários apenas textuais. Em caso de falha, conserva o rascunho inteiro. Requer a extensão da API e a migração V21. | A imagem aparece em cada comentário com descrição visível, rótulo acessível e leitura integral do texto e da descrição. O acesso aos bytes exige autenticação e acesso à comunidade. |
+| Comentários de publicações de comunidade | Frontend com câmera/galeria, prévia e descrição opcional de até 240 caracteres. API ajustada ao contrato descrito em `COMMUNITY_COMMENT_IMAGES_API_REQUIREMENTS.md`, mantendo a rota JSON para comentários apenas textuais. É necessário carregar a API atualizada com o esquema da migração V21. | Imagem e descrição manual no comentário, com rótulo acessível. “Ouvir descrição da imagem” usa análise visual por IA na API e lê o resultado gerado; requer `OPENAI_API_KEY` no servidor. API com persistência e download autenticado; a validação integrada com banco e aparelho permanece manual. |
 | Foto e galeria do perfil; fotos nos encontros | Upload de imagens disponível, sem contrato para descrição individual. | Rótulos genéricos ou associados ao nome da pessoa; não são descrições escritas pelo autor. |
 | Ícone de comunidade | Upload disponível na criação e nas configurações, sem campo para descrição do ícone. | Rótulos associados à comunidade. A descrição da comunidade é informação distinta da descrição de sua imagem. |
 
@@ -46,3 +46,13 @@ a validação com API em execução e leitores de tela em aparelho permanece man
    comentário apenas textual. Confirmar a descrição ao reabrir, remover/trocar
    anexos antes do envio e simular falha de rede. Com uma comunidade privada,
    confirmar que uma conta sem acesso não consegue baixar a imagem do comentário.
+
+## Verificação da análise visual nos comentários
+
+1. Com a API atualizada e chave configurada, publicar imagem sem descrição e
+   tocar em “Ouvir descrição da imagem”; conferir o conteúdo descrito e o áudio.
+2. Informar uma legenda diferente do conteúdo visual; conferir que o botão
+   descreve a imagem, independentemente da legenda.
+3. Tocar em “Parar áudio” enquanto a IA analisa: o resultado tardio não deve falar.
+4. Testar falta de chave, indisponibilidade da IA e rede: o app informa o erro e
+   permite tentar novamente. Conferir também com TalkBack/VoiceOver em aparelho.
