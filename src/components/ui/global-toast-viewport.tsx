@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {
+  AccessibilityInfo,
   Animated,
+  Platform,
   Pressable,
   Text,
   View,
@@ -13,7 +15,7 @@ import { useGlobalAccessibilityState } from "../../accessibility/global-text-adj
 import {
   subscribeToGlobalToasts,
   type GlobalToast,
-  type GlobalToastVariant,
+
 } from "../../utils/globalToast";
 
 /**
@@ -22,14 +24,6 @@ import {
  * de 7:1 em todos (WCAG AA pede 4,5:1).
  */
 const TOAST_FOREGROUND = "#111114";
-
-const shadowStyle: ViewStyle = {
-  elevation: 10,
-  shadowColor: "#020617",
-  shadowOffset: { width: 0, height: 12 },
-  shadowOpacity: 0.26,
-  shadowRadius: 24,
-};
 
 const errorStyle: ViewStyle = {
   backgroundColor: "#FB7185",
@@ -72,17 +66,6 @@ const waringStyle: ViewStyle = {
   shadowColor: "#FBBF24",
 }
 
-function getAccentColor(variant: GlobalToastVariant): string {
-  switch (variant) {
-    case "error":
-      return "#FB7185";
-    case "success":
-      return "#34D399";
-    default:
-      return "#38BDF8";
-  }
-}
-
 function GlobalToastCard({
   toast,
   onDismiss,
@@ -120,6 +103,12 @@ function GlobalToastCard({
   }, [onDismiss, opacity, reduceMotion, toast.id, translateY]);
 
   useEffect(() => {
+    if (Platform.OS === "ios") {
+      AccessibilityInfo.announceForAccessibility(`${toast.title}. ${toast.message}`);
+    }
+  }, [toast.message, toast.title]);
+
+  useEffect(() => {
     if (reduceMotion) {
       opacity.setValue(1);
       translateY.setValue(0);
@@ -154,7 +143,16 @@ function GlobalToastCard({
         transform: [{ translateY }],
       }}
     >
+      {/*
+        Regiao viva: o TalkBack le o aviso assim que ele aparece, sem precisar
+        de foco (erros de API, push com o app aberto...). O TTS in-app ja fala
+        o toast em `showGlobalToast`, e se cala quando o leitor do sistema esta
+        ligado — os dois nunca falam juntos. iOS nao tem regiao viva: la o
+        anuncio sai em `useEffect` abaixo.
+      */}
       <View
+        accessibilityLiveRegion={toast.variant === "error" ? "assertive" : "polite"}
+        accessibilityRole={toast.variant === "error" ? "alert" : "summary"}
         className="mb-3 overflow-hidden rounded-[24px] border"
         style={[toast.variant === "error" ? errorStyle : 
               toast.variant === "success" ? successStyle : 

@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 
+import { useOnDemandSpeech } from "../../accessibility/tts";
 import { chatService } from "../../services/chatService";
 import { useAccessibility } from "../../context/AccessibilityContext";
 import type { ChatDeliveryStatus, ChatMessageResponse } from "../../types/chat";
@@ -77,6 +78,50 @@ function buildMessageAccessibilityLabel(
 }
 
 /**
+ * "Ouvir mensagem" (plano 05, 5.9): le em voz alta a mensagem RECEBIDA — com
+ * a leitura por voz do app desligada e tambem com TalkBack. Fica fora do
+ * balao (irmao dele) porque o balao de texto e um unico elemento focavel:
+ * um botao dentro dele ficaria inalcancavel para o leitor de tela.
+ */
+function ListenMessageButton({
+  highContrast,
+  messageId,
+  otherName,
+  text,
+}: {
+  highContrast: boolean;
+  messageId: string;
+  otherName: string;
+  text: string;
+}) {
+  const { speaking, toggle } = useOnDemandSpeech(`chat-message:${messageId}`);
+
+  return (
+    <Pressable
+      className={`h-11 w-11 items-center justify-center rounded-full ${
+        highContrast ? "border border-hc-border bg-hc-surface" : "bg-[#2D2A33]"
+      }`}
+      accessibilityRole="button"
+      accessibilityLabel={speaking ? "Parar leitura da mensagem" : `Ouvir mensagem de ${otherName}`}
+      accessibilityHint={
+        speaking ? "Interrompe a leitura em voz alta" : "Lê o conteúdo desta mensagem em voz alta"
+      }
+      accessibilityState={{ selected: speaking }}
+      onPress={() => {
+        toggle(`Mensagem de ${otherName}. ${text}`);
+      }}
+    >
+      <Ionicons
+        name={speaking ? "stop-circle" : "volume-high-outline"}
+        size={20}
+        color={speaking ? "#9B7BFF" : "#CAC3D8"}
+        importantForAccessibility="no"
+      />
+    </Pressable>
+  );
+}
+
+/**
  * Balao de mensagem. `memo` com comparacao rasa padrao: o polling do chat
  * substitui apenas as mensagens que mudaram, entao as demais nao repintam.
  */
@@ -125,15 +170,21 @@ export const MessageBubble = memo(function MessageBubble({
   const openMenu = canAct ? () => onMessageAction?.(message, "menu") : undefined;
   const actionHint = canAct ? "Toque e segure para editar ou apagar" : undefined;
 
-  const bubbleClassName = `mb-3 max-w-[82%] rounded-[20px] px-4 py-3 ${
+  const bubbleClassName = `shrink rounded-[20px] px-4 py-3 ${
     mine
       ? settings.highContrast
-        ? "self-end bg-hc-accent"
-        : "self-end bg-[#7C4DFF]"
+        ? "bg-hc-accent"
+        : "bg-[#7C4DFF]"
       : settings.highContrast
-        ? "self-start bg-hc-surface border border-hc-border"
-        : "self-start border border-[#3A3545] bg-[#2D2A33]"
+        ? "bg-hc-surface border border-hc-border"
+        : "border border-[#3A3545] bg-[#2D2A33]"
   }`;
+
+  // So mensagens recebidas com texto (corpo ou legenda) ganham "Ouvir".
+  const listenText =
+    !mine && !deleted && message.body?.trim() && message.type !== "AUDIO"
+      ? message.body.trim()
+      : null;
 
   // No alto contraste o balao proprio fica com fundo amarelo (hc-accent): texto
   // branco perderia contraste, entao usamos preto nesse caso.
@@ -148,141 +199,154 @@ export const MessageBubble = memo(function MessageBubble({
   const wholeBubbleFocusable = deleted || message.type === "TEXT" || message.type === "VIDEO";
 
   return (
-    <Pressable
-      accessible={wholeBubbleFocusable}
-      accessibilityRole={wholeBubbleFocusable ? "text" : undefined}
-      accessibilityLabel={wholeBubbleFocusable ? label : undefined}
-      accessibilityHint={wholeBubbleFocusable ? actionHint : undefined}
-      accessibilityActions={wholeBubbleFocusable ? accessibilityActions : undefined}
-      onAccessibilityAction={wholeBubbleFocusable ? handleAccessibilityAction : undefined}
-      className={bubbleClassName}
-      delayLongPress={350}
-      onLongPress={openMenu}
+    <View
+      className={`mb-3 max-w-[92%] flex-row items-center gap-2 ${mine ? "self-end" : "self-start"}`}
     >
-      {deleted ? (
-        <View className="flex-row items-center gap-2">
-          <Ionicons
-            name="ban-outline"
-            size={16}
-            color={mine ? "rgba(255,255,255,0.75)" : "#9F96B8"}
-            importantForAccessibility="no"
-          />
-          <Text
-            className={`text-[15px] italic ${
-              mine ? (settings.highContrast ? "text-black/80" : "text-white/80") : "text-[#9F96B8]"
-            }`}
-          >
-            Mensagem apagada
+      <Pressable
+        accessible={wholeBubbleFocusable}
+        accessibilityRole={wholeBubbleFocusable ? "text" : undefined}
+        accessibilityLabel={wholeBubbleFocusable ? label : undefined}
+        accessibilityHint={wholeBubbleFocusable ? actionHint : undefined}
+        accessibilityActions={wholeBubbleFocusable ? accessibilityActions : undefined}
+        onAccessibilityAction={wholeBubbleFocusable ? handleAccessibilityAction : undefined}
+        className={bubbleClassName}
+        delayLongPress={350}
+        onLongPress={openMenu}
+      >
+        {deleted ? (
+          <View className="flex-row items-center gap-2">
+            <Ionicons
+              name="ban-outline"
+              size={16}
+              color={mine ? "rgba(255,255,255,0.75)" : "#9F96B8"}
+              importantForAccessibility="no"
+            />
+            <Text
+              className={`text-[15px] italic ${
+                mine ? (settings.highContrast ? "text-black/80" : "text-white/80") : "text-[#9F96B8]"
+              }`}
+            >
+              Mensagem apagada
+            </Text>
+          </View>
+        ) : null}
+
+        {!deleted && message.type === "TEXT" ? (
+          <Text className={`text-[16px] ${mine ? ownTextClass : "text-[#E5E2E1]"}`}>
+            {message.body}
           </Text>
-        </View>
-      ) : null}
+        ) : null}
 
-      {!deleted && message.type === "TEXT" ? (
-        <Text className={`text-[16px] ${mine ? ownTextClass : "text-[#E5E2E1]"}`}>
-          {message.body}
-        </Text>
-      ) : null}
-
-      {!deleted && message.type === "IMAGE" && mediaUrl ? (
-        <Pressable
-          accessible
-          accessibilityRole="imagebutton"
-          accessibilityLabel={label}
-          accessibilityHint={
-            canAct
-              ? "Toque para abrir em tela cheia. Toque e segure para apagar"
-              : "Toque para abrir em tela cheia"
-          }
-          accessibilityActions={accessibilityActions}
-          onAccessibilityAction={handleAccessibilityAction}
-          className="h-52 w-56 overflow-hidden rounded-[14px] bg-[#2D2A33]"
-          delayLongPress={350}
-          onLongPress={openMenu}
-          onPress={() => onOpenImage?.(mediaUrl, imageLabel)}
-        >
-          {/* o rotulo do botao ja descreve a imagem: aqui ela e decorativa */}
-          <AuthenticatedRemoteImage
-            authToken={authToken}
-            className="h-full w-full"
-            fallback={
-              <View className="flex-1 items-center justify-center">
-                <Ionicons name="image-outline" size={32} color="#CAC3D8" />
-              </View>
+        {!deleted && message.type === "IMAGE" && mediaUrl ? (
+          <Pressable
+            accessible
+            accessibilityRole="imagebutton"
+            accessibilityLabel={label}
+            accessibilityHint={
+              canAct
+                ? "Toque para abrir em tela cheia. Toque e segure para apagar"
+                : "Toque para abrir em tela cheia"
             }
-            resizeMode="cover"
+            accessibilityActions={accessibilityActions}
+            onAccessibilityAction={handleAccessibilityAction}
+            className="h-52 w-56 overflow-hidden rounded-[14px] bg-[#2D2A33]"
+            delayLongPress={350}
+            onLongPress={openMenu}
+            onPress={() => onOpenImage?.(mediaUrl, imageLabel)}
+          >
+            {/* o rotulo do botao ja descreve a imagem: aqui ela e decorativa */}
+            <AuthenticatedRemoteImage
+              authToken={authToken}
+              className="h-full w-full"
+              fallback={
+                <View className="flex-1 items-center justify-center">
+                  <Ionicons name="image-outline" size={32} color="#CAC3D8" />
+                </View>
+              }
+              resizeMode="cover"
+              uri={mediaUrl}
+            />
+            <View
+              className="absolute bottom-2 right-2 h-8 w-8 items-center justify-center rounded-full bg-black/55"
+              importantForAccessibility="no-hide-descendants"
+            >
+              <Ionicons name="expand-outline" size={16} color="#FFFFFF" />
+            </View>
+          </Pressable>
+        ) : null}
+
+        {!deleted && message.type === "AUDIO" && mediaUrl ? (
+          <AudioMessagePlayer
+            accessibilityActions={accessibilityActions}
+            messageLabel={label}
+            authToken={authToken}
+            durationSeconds={message.mediaDurationSeconds}
+            messageId={message.id}
+            mine={mine}
+            onAccessibilityAction={handleAccessibilityAction}
+            onLongPress={openMenu}
             uri={mediaUrl}
           />
-          <View
-            className="absolute bottom-2 right-2 h-8 w-8 items-center justify-center rounded-full bg-black/55"
-            importantForAccessibility="no-hide-descendants"
-          >
-            <Ionicons name="expand-outline" size={16} color="#FFFFFF" />
-          </View>
-        </Pressable>
-      ) : null}
+        ) : null}
 
-      {!deleted && message.type === "AUDIO" && mediaUrl ? (
-        <AudioMessagePlayer
-          accessibilityActions={accessibilityActions}
-          messageLabel={label}
-          authToken={authToken}
-          durationSeconds={message.mediaDurationSeconds}
-          messageId={message.id}
-          mine={mine}
-          onAccessibilityAction={handleAccessibilityAction}
-          onLongPress={openMenu}
-          uri={mediaUrl}
-        />
-      ) : null}
+        {!deleted && message.type === "VIDEO" ? (
+          <Text className="text-[14px] font-semibold text-[#FFD28A]">
+            Vídeo ainda não é suportado nesta versão.
+          </Text>
+        ) : null}
 
-      {!deleted && message.type === "VIDEO" ? (
-        <Text className="text-[14px] font-semibold text-[#FFD28A]">
-          Vídeo ainda não é suportado nesta versão.
-        </Text>
-      ) : null}
-
-      {!deleted && message.body && message.type !== "TEXT" ? (
-        <Text
-          className={`mt-2 text-[14px] ${
-            mine ? (settings.highContrast ? "text-black/90" : "text-white/90") : "text-[#CAC3D8]"
-          }`}
-        >
-          {message.body}
-        </Text>
-      ) : null}
-
-      {/* metadados visuais — ja cobertos pelo accessibilityLabel do balao */}
-      <View
-        className="mt-1 flex-row items-center justify-end gap-1"
-        importantForAccessibility="no-hide-descendants"
-      >
-        {message.editedAt && !deleted ? (
+        {!deleted && message.body && message.type !== "TEXT" ? (
           <Text
-            className={`text-[11px] italic ${
+            className={`mt-2 text-[14px] ${
+              mine ? (settings.highContrast ? "text-black/90" : "text-white/90") : "text-[#CAC3D8]"
+            }`}
+          >
+            {message.body}
+          </Text>
+        ) : null}
+
+        {/* metadados visuais — ja cobertos pelo accessibilityLabel do balao */}
+        <View
+          className="mt-1 flex-row items-center justify-end gap-1"
+          importantForAccessibility="no-hide-descendants"
+        >
+          {message.editedAt && !deleted ? (
+            <Text
+              className={`text-[11px] italic ${
+                mine ? (settings.highContrast ? "text-black/70" : "text-white/70") : "text-[#9F96B8]"
+              }`}
+            >
+              editada ·
+            </Text>
+          ) : null}
+          <Text
+            className={`text-[11px] ${
               mine ? (settings.highContrast ? "text-black/70" : "text-white/70") : "text-[#9F96B8]"
             }`}
           >
-            editada ·
+            {new Date(message.createdAt).toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
           </Text>
-        ) : null}
-        <Text
-          className={`text-[11px] ${
-            mine ? (settings.highContrast ? "text-black/70" : "text-white/70") : "text-[#9F96B8]"
-          }`}
-        >
-          {new Date(message.createdAt).toLocaleTimeString("pt-BR", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </Text>
-        {mine && !deleted ? (
-          <Ionicons
-            name={STATUS_ICON[resolveDeliveryStatus(message)]}
-            size={14}
-            color={STATUS_COLOR[resolveDeliveryStatus(message)]}
-          />
-        ) : null}
-      </View>
-    </Pressable>
+          {mine && !deleted ? (
+            <Ionicons
+              name={STATUS_ICON[resolveDeliveryStatus(message)]}
+              size={14}
+              color={STATUS_COLOR[resolveDeliveryStatus(message)]}
+            />
+          ) : null}
+        </View>
+      </Pressable>
+
+      {listenText ? (
+        <ListenMessageButton
+          highContrast={settings.highContrast}
+          messageId={message.id}
+          otherName={otherName}
+          text={listenText}
+        />
+      ) : null}
+    </View>
   );
 });

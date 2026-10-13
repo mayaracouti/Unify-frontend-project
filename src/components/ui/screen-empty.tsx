@@ -57,7 +57,7 @@ export function ScreenEmpty({
 
       {action ? (
         <Pressable
-          className="mt-6 rounded-full bg-accent px-6 py-3"
+          className="mt-6 min-h-[44px] justify-center rounded-full bg-accent px-6 py-3"
           onPress={() => {
             speak(action.label);
             action.onPress();

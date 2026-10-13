@@ -4,8 +4,12 @@ import { Stack, useRootNavigationState } from "expo-router";
 import { Platform, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
-import { applyGlobalTextAdjustmentsPatch } from "../src/accessibility/global-text-adjustments";
+import {
+  applyGlobalTextAdjustmentsPatch,
+  useGlobalAccessibilityState,
+} from "../src/accessibility/global-text-adjustments";
 import { TtsProvider, useTTS } from "../src/accessibility/tts";
+import { PushNotificationRouter } from "../src/components/notifications/push-notification-router";
 import { AuthLoadingScreen } from "../src/components/ui/auth-loading-screen";
 import { GlobalToastViewport } from "../src/components/ui/global-toast-viewport";
 import { ScreenError } from "../src/components/ui/screen-error";
@@ -15,6 +19,7 @@ import {
 } from "../src/context/AccessibilityContext";
 import { AppShellProvider } from "../src/context/AppShellContext";
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
+import { NotificationProvider } from "../src/context/NotificationContext";
 import { useHeadingFocusOnMount } from "../src/hooks/use-screen-heading-focus";
 import { useOnboardingCompletionGate } from "../src/hooks/useOnboardingCompletionGate";
 
@@ -61,7 +66,8 @@ function RootNavigator() {
   // de cor de texto do patch global, e o que garante o contraste maximo sem
   // precisar editar as telas uma a uma.
   const backgroundColor = settings.highContrast ? "#000000" : "#201233";
-  const reduceMotion = settings.reduceMotion;
+  // Preferencia do app OU "remover animacoes" do sistema (AccessibilityContext).
+  const { reduceMotion } = useGlobalAccessibilityState();
 
   // O onboarding de acessibilidade (TTS ligado por padrao) acontece ANTES de
   // qualquer outra coisa, autenticado ou nao — inclusive antes do gate.
@@ -174,9 +180,13 @@ function RootNavigator() {
             <Stack.Screen name="profile/accessibility-settings" />
             <Stack.Screen name="profile/privacy" />
             <Stack.Screen name="profile/follow-requests" />
+            <Stack.Screen name="notifications/index" />
           </Stack.Protected>
         </Stack.Protected>
       </Stack>
+
+      {/* Toque em push: so com as rotas autenticadas montadas no Stack. */}
+      {hasCompletedOnboarding ? <PushNotificationRouter /> : null}
     </View>
   );
 }
@@ -188,7 +198,9 @@ export default function RootLayout() {
         <AuthProvider>
           <AccessibilityProvider>
             <AppShellProvider>
-              <RootNavigator />
+              <NotificationProvider>
+                <RootNavigator />
+              </NotificationProvider>
             </AppShellProvider>
           </AccessibilityProvider>
           <GlobalToastViewport />

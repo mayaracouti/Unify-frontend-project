@@ -95,7 +95,7 @@ export default function ForgotPassword() {
           <TextInput
             className="mb-5 rounded-md bg-[#F4F4F5] px-4 py-4 text-[15px] text-zinc-900"
             placeholder="nome@example.com"
-            placeholderTextColor="#8C8F99"
+            placeholderTextColor="#6C6F7A"
             autoCapitalize="none"
             keyboardType="email-address"
             value={email}
@@ -167,7 +167,7 @@ export default function ForgotPassword() {
           </Pressable>
 
           <Pressable
-            className="mt-6 items-center justify-center rounded-md border border-white/35 py-3"
+            className="mt-6 min-h-[44px] items-center justify-center rounded-md border border-white/35 py-3"
             onPress={() => {
               speak("Voltar para o login");
               router.replace("/auth/login");

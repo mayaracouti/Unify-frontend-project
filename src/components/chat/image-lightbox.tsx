@@ -2,6 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Modal, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useGlobalAccessibilityState } from "../../accessibility/global-text-adjustments";
 import { AuthenticatedRemoteImage } from "../profile/authenticated-remote-image";
 
 /**
@@ -20,9 +21,12 @@ export function ImageLightbox({
   /** Nulo = fechado. */
   uri: string | null;
 }) {
+  // `reduceMotion`: abre/fecha sem o fade.
+  const { reduceMotion } = useGlobalAccessibilityState();
+
   return (
     <Modal
-      animationType="fade"
+      animationType={reduceMotion ? "none" : "fade"}
       onRequestClose={onClose}
       statusBarTranslucent
       visible={Boolean(uri)}

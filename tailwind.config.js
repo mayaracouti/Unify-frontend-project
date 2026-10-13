@@ -23,6 +23,10 @@ module.exports = {
           DEFAULT: "#8752FF",
           strong: "#5328AA",
           soft: "#DCD5FF",
+          // Roxo da marca legivel como TEXTO pequeno no tema escuro (semana 05):
+          // >= 5,1:1 em todas as superficies escuras do app, onde #7C4DFF/#8752FF
+          // ficam entre 3,4:1 e 4,4:1 (so passam como texto grande/icone).
+          text: "#9B7BFF",
         },
         // Acao / destaque
         accent: {

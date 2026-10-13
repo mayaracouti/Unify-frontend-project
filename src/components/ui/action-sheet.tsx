@@ -1,6 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
+import { useGlobalAccessibilityState } from "../../accessibility/global-text-adjustments";
+
 export type ActionSheetOption = {
   key: string;
   label: string;
@@ -38,10 +40,12 @@ export function ActionSheet({
 }) {
   // Com fonte grande, muitas opcoes nao cabem: a lista rola e "Cancelar" fica fixo.
   const { height: windowHeight } = useWindowDimensions();
+  // `reduceMotion`: a folha aparece/some sem o fade.
+  const { reduceMotion } = useGlobalAccessibilityState();
 
   return (
     <Modal
-      animationType="fade"
+      animationType={reduceMotion ? "none" : "fade"}
       onRequestClose={onClose}
       statusBarTranslucent
       transparent
@@ -127,6 +131,7 @@ export function ActionSheet({
             accessible
             accessibilityRole="button"
             accessibilityLabel={cancelLabel}
+            accessibilityHint="Fecha as opções sem escolher nenhuma"
             className="mt-1 items-center rounded-[16px] border border-[#353534] px-4 py-4"
             onPress={onClose}
           >

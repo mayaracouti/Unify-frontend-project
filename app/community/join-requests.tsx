@@ -82,7 +82,12 @@ function JoinRequestCard({
   return (
     <View className="rounded-[24px] border border-[#353534] bg-surface-alt p-4">
       <View className="flex-row items-center gap-3">
-        <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-[#CDBDFF] bg-[#353534]">
+        {/* Avatar decorativo: o nome de quem pediu vem logo ao lado. */}
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          className="h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-[#CDBDFF] bg-[#353534]"
+        >
           {avatarUrl ? (
             <AuthenticatedRemoteImage
               uri={avatarUrl}
@@ -96,7 +101,11 @@ function JoinRequestCard({
                   end={{ x: 1, y: 1 }}
                   style={{ alignItems: "center", height: "100%", justifyContent: "center", width: "100%" }}
                 >
-                  <Text allowFontScaling={false} className="text-[14px] font-black text-white">
+                  <Text
+                    maxFontSizeMultiplier={1.3}
+                    numberOfLines={1}
+                    className="text-[14px] font-black text-white"
+                  >
                     {getInitials(requesterName) || "?"}
                   </Text>
                 </LinearGradient>
@@ -109,7 +118,11 @@ function JoinRequestCard({
               end={{ x: 1, y: 1 }}
               style={{ alignItems: "center", height: "100%", justifyContent: "center", width: "100%" }}
             >
-              <Text allowFontScaling={false} className="text-[14px] font-black text-white">
+              <Text
+                maxFontSizeMultiplier={1.3}
+                numberOfLines={1}
+                className="text-[14px] font-black text-white"
+              >
                 {getInitials(requesterName) || "?"}
               </Text>
             </LinearGradient>
@@ -334,7 +347,7 @@ export default function CommunityJoinRequestsScreen() {
         <View className="h-16 flex-row items-center justify-between border-b border-[#2A2A2A] px-6">
           <View className="flex-row items-center">
             <Pressable
-              className="mr-3 h-10 w-10 items-center justify-center rounded-full"
+              className="mr-3 h-11 w-11 items-center justify-center rounded-full"
               onPress={() => {
                 speak("Voltar");
                 router.back();
@@ -435,7 +448,7 @@ export default function CommunityJoinRequestsScreen() {
 
             {requests.content.length > 0 && requests.hasNext ? (
               <Pressable
-                className="mt-6 items-center justify-center rounded-[24px] border border-[#3A3246] bg-[#17181C] px-5 py-2"
+                className="mt-6 min-h-[44px] items-center justify-center rounded-[24px] border border-[#3A3246] bg-[#17181C] px-5 py-2"
                 onPress={() => {
                   speak("Carregar mais solicitações");
                   void loadRequests({ append: true });

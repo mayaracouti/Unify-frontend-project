@@ -295,6 +295,35 @@ export default function AccessibilitySettings() {
 
           <View className={`${cardClassName} flex-row items-center justify-between`}>
             <View className="flex-1 pr-4">
+              <Text className={`mb-1 ${titleClassName}`}>
+                Tocar apresentação automaticamente
+              </Text>
+              <Text className={captionClassName}>
+                No Encontros, o áudio de apresentação toca depois da leitura
+                do perfil. Não toca com TalkBack ou VoiceOver ligado.
+              </Text>
+            </View>
+            <Switch
+              value={settings.autoplayPresentationAudio === true}
+              disabled={saving}
+              onValueChange={(value) => {
+                speak(buildSwitchSpeech("Tocar apresentação automaticamente", value));
+                void persist({ autoplayPresentationAudio: value });
+              }}
+              trackColor={{ false: "#5F6068", true: "#F2F500" }}
+              thumbColor="#FFFFFF"
+              accessibilityRole="switch"
+              accessibilityLabel="Tocar apresentação automaticamente"
+              accessibilityHint="No Encontros, toca o áudio de apresentação da pessoa depois da leitura do perfil"
+              accessibilityState={{
+                checked: settings.autoplayPresentationAudio === true,
+                disabled: saving,
+              }}
+            />
+          </View>
+
+          <View className={`${cardClassName} flex-row items-center justify-between`}>
+            <View className="flex-1 pr-4">
               <Text className={`mb-1 ${titleClassName}`}>Reduzir movimento</Text>
               <Text className={captionClassName}>
                 Menos animações e transições

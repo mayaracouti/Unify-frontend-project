@@ -12,7 +12,7 @@ import {
 import { showGlobalToast } from "../../utils/globalToast";
 import { feedSourceAfterFollow } from "../../utils/feedSource";
 import { followOutcomeAnnouncement } from "../../utils/followRelation";
-import { formatRelativePostDate } from "../../utils/postFormatting";
+import { buildPostCommentsHref } from "../../utils/postRoutes";
 import { buildUserProfileHref } from "../../utils/userProfileRoute";
 import { ReportModal } from "../report/report-modal";
 import { CancelFollowRequestSheet } from "../social/cancel-follow-request-sheet";
@@ -276,36 +276,7 @@ export function usePostListActions(
 
   const openComments = useCallback(
     (post: UserPostResponse) => {
-      if (post.origin === "COMMUNITY" && post.community) {
-        // Tela de comentarios da comunidade: o post so chega ao feed quando
-        // sou membro, entao `isMember` e verdadeiro; moderacao fica a cargo da
-        // propria comunidade.
-        router.push({
-          pathname: "/community/comments",
-          params: {
-            communityId: post.community.id,
-            communityName: post.community.name,
-            postId: post.id,
-            authorName: post.author.name,
-            postBody: post.body,
-            publishedAt: formatRelativePostDate(post.createdAt),
-            isMember: "true",
-            canModerate: "false",
-          },
-        });
-        return;
-      }
-
-      router.push({
-        pathname: "/posts/comments",
-        params: {
-          postId: post.id,
-          authorName: post.author.name,
-          authorUserProfileId: post.author.userProfileId ?? "",
-          postBody: post.body,
-          createdAt: post.createdAt,
-        },
-      });
+      router.push(buildPostCommentsHref(post));
     },
     [router]
   );

@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "expo-router";
 
 import { joinSpeechParts, useTTS } from "../../accessibility/tts";
 import { useAppShell } from "../../context/AppShellContext";
+import { CountBadge } from "../ui/count-badge";
 import { navigationTabs } from "./navigation-tabs";
 
 export function GlobalBottomNav() {
@@ -63,6 +64,7 @@ export function GlobalBottomNav() {
                     }`
                   : tab.label
               }
+              accessibilityHint={active ? "Aba atual" : `Abre a aba ${tab.label}`}
               accessibilityState={{ selected: active }}
             >
               {active ? (
@@ -81,18 +83,26 @@ export function GlobalBottomNav() {
                   color={active ? "#7C4DFF" : "#CAC3D8"}
                 />
 
-                {badgeValue ? (
-                  <View className="absolute -right-4 -top-1 rounded-full bg-[#814DFF] px-1.5 py-0.5">
-                    <Text className="text-[7px] font-black text-white">{badgeValue}</Text>
-                  </View>
-                ) : null}
+                {/* Badge amarelo do app (13,9:1): o antigo, texto de 7px em roxo, era ilegivel. */}
+                <CountBadge
+                  count={
+                    tab.badgeKey === "matches"
+                      ? unseenProfilesCount
+                      : tab.badgeKey === "chats"
+                        ? unreadChatCount
+                        : 0
+                  }
+                  size="sm"
+                  className="absolute -right-4 -top-1"
+                />
               </View>
               <Text
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 importantForAccessibility="no"
+                // #9B7BFF: o roxo da marca da 4,4:1 no preto, abaixo de 4,5:1 para texto pequeno.
                 className={`mt-1 text-[11px] font-black ${
-                  active ? "text-[#7C4DFF]" : "text-[#CAC3D8]"
+                  active ? "text-brand-text" : "text-[#CAC3D8]"
                 }`}
               >
                 {tab.label}

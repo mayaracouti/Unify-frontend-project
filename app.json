@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Unify-frontend",
+    "name": "Unify",
     "slug": "Unify-frontend",
     "scheme": "unify-frontend",
     "version": "1.0.0",
@@ -13,7 +13,8 @@
       "backgroundColor": "#4D52B5"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "br.com.app.unify"
     },
     "android": {
       "adaptiveIcon": {
@@ -23,7 +24,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.Unifyfrontend"
+      "package": "br.com.app.unify"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -49,6 +50,14 @@
         "expo-audio",
         {
           "microphonePermission": "Permita que a Unify use o microfone para você gravar mensagens de áudio nas suas conversas."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#7C4DFF",
+          "defaultChannel": "default"
         }
       ]
     ]

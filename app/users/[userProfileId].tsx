@@ -422,6 +422,7 @@ export default function UserPublicProfileScreen() {
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Foto anterior"
+                accessibilityHint="Mostra a foto anterior do perfil"
               >
                 <Ionicons name="chevron-back" size={22} color="#FFFFFF" importantForAccessibility="no" />
               </Pressable>
@@ -440,6 +441,7 @@ export default function UserPublicProfileScreen() {
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Próxima foto"
+                accessibilityHint="Mostra a próxima foto do perfil"
               >
                 <Ionicons name="chevron-forward" size={22} color="#FFFFFF" importantForAccessibility="no" />
               </Pressable>

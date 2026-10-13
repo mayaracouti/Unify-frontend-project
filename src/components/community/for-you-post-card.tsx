@@ -61,11 +61,11 @@ function FeedAction({
       {loading ? (
         <ActivityIndicator color="#7C4DFF" size="small" />
       ) : (
-        <Ionicons name={icon} size={22} color={active ? "#7C4DFF" : "#CAC3D8"} />
+        <Ionicons name={icon} size={22} color={active ? "#9B7BFF" : "#CAC3D8"} />
       )}
       {typeof count === "number" ? (
         <Text
-          className={`text-[15px] font-bold ${active ? "text-[#7C4DFF]" : "text-[#E5E2E1]"}`}
+          className={`text-[15px] font-bold ${active ? "text-brand-text" : "text-[#E5E2E1]"}`}
         >
           {count}
         </Text>
@@ -104,7 +104,11 @@ export function CommunityForYouPostCard({
       end={{ x: 1, y: 1 }}
       style={{ alignItems: "center", height: "100%", justifyContent: "center", width: "100%" }}
     >
-      <Text allowFontScaling={false} className="text-[13px] font-black text-white">
+      <Text
+        maxFontSizeMultiplier={1.3}
+        numberOfLines={1}
+        className="text-[13px] font-black text-white"
+      >
         {getInitials(post.author.name) || "?"}
       </Text>
     </LinearGradient>
@@ -113,7 +117,10 @@ export function CommunityForYouPostCard({
   const avatar = (
     <View
       className="h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 border-[#CDBDFF] bg-[#353534]"
-      importantForAccessibility={authorProfileId ? "no-hide-descendants" : "auto"}
+      // Sempre decorativo: o nome do autor vem no elemento ao lado e, quando
+      // ha perfil, o Pressable pai ja tem o rotulo.
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
     >
       {avatarUrl ? (
         <AuthenticatedRemoteImage

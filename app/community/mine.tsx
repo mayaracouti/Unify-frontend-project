@@ -149,7 +149,7 @@ export default function MyCommunitiesScreen() {
     };
 
     void loadDirectory();
-  }, [authToken, isFocused]);
+  }, [authToken, isFocused, setDirectory, setLoadError]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -261,7 +261,7 @@ export default function MyCommunitiesScreen() {
                 </View>
 
                 <Pressable
-                  className="mt-4 flex-row items-center justify-center gap-2 rounded-[24px] border border-[#3A3246] bg-[#17181C] px-4 py-3"
+                  className="mt-4 min-h-[44px] flex-row items-center justify-center gap-2 rounded-[24px] border border-[#3A3246] bg-[#17181C] px-4 py-3"
                   onPress={() => {
                     speak("Explorar comunidades");
                     router.push("/community");
@@ -322,7 +322,7 @@ export default function MyCommunitiesScreen() {
 
               {directory.communities.length > 0 && directory.hasNext ? (
                 <Pressable
-                  className="mt-2 items-center justify-center rounded-[24px] border border-[#3A3246] bg-[#17181C] px-5 py-2"
+                  className="mt-2 min-h-[44px] items-center justify-center rounded-[24px] border border-[#3A3246] bg-[#17181C] px-5 py-2"
                   onPress={() => {
                     speak("Carregar mais comunidades");
                     void handleLoadMore();

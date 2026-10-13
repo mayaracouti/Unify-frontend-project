@@ -117,7 +117,7 @@ export function ProfilePostsSection({
 
         {posts.length > 0 ? (
           <Pressable
-            className="flex-row items-center rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-2"
+            className="min-h-[44px] flex-row items-center rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-2"
             onPress={() => {
               speak(buildActionSpeech("Ver todas as postagens"));
               onSeeAll();
@@ -163,7 +163,7 @@ export function ProfilePostsSection({
             {loadError}
           </Text>
           <Pressable
-            className="mt-4 self-start rounded-full border border-[#494455] px-4 py-2"
+            className="mt-4 min-h-[44px] justify-center self-start rounded-full border border-[#494455] px-4 py-2"
             onPress={() => {
               speak("Tentar novamente");
               setLoading(true);
@@ -171,6 +171,7 @@ export function ProfilePostsSection({
             }}
             accessibilityRole="button"
             accessibilityLabel="Tentar novamente"
+            accessibilityHint="Carrega as publicações outra vez"
           >
             <Text className="text-[13px] font-black text-white">Tentar novamente</Text>
           </Pressable>
@@ -222,7 +223,7 @@ export function ProfilePostsSection({
 
           {isOwnProfile && onCreatePost ? (
             <Pressable
-              className="mt-4 flex-row items-center self-start rounded-full bg-[#7C4DFF] px-5 py-3"
+              className="mt-4 min-h-[44px] flex-row items-center self-start rounded-full bg-[#7C4DFF] px-5 py-3"
               onPress={() => {
                 speak(buildActionSpeech("Criar publicação"));
                 onCreatePost();
@@ -253,7 +254,7 @@ export function ProfilePostsSection({
 
           {hasMore ? (
             <Pressable
-              className="items-center rounded-full border border-[#494455] bg-[#1A1C1F] px-5 py-3"
+              className="min-h-[44px] items-center justify-center rounded-full border border-[#494455] bg-[#1A1C1F] px-5 py-3"
               onPress={() => {
                 speak(buildActionSpeech("Ver todas as postagens"));
                 onSeeAll();

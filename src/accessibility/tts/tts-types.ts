@@ -27,4 +27,12 @@ export type TtsSpeakOptions = {
    * recente tenha prioridade (politica anti-fila para toques rapidos).
    */
   interrupt?: boolean;
+  /**
+   * Chamado quando a fala termina normalmente — ou na hora, quando nada e
+   * falado (leitura por voz desligada, leitor do sistema ativo, duplicata).
+   * NAO e chamado se a fala for interrompida por outra (toque novo): quem
+   * espera o fim da fala para tocar algo (autoplay do audio de apresentacao)
+   * entende a interrupcao como "a pessoa esta interagindo, nao toque".
+   */
+  onDone?: () => void;
 };

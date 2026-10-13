@@ -364,7 +364,7 @@ export default function PersonalPostCommentsScreen() {
                   }: ${postBody.slice(0, 200)}`}
                   accessibilityHint="Lê a publicação original em voz alta"
                 >
-                  <Text className="text-[14px] font-bold uppercase tracking-[1.4px] text-[#7C4DFF]">
+                  <Text className="text-[14px] font-bold uppercase tracking-[1.4px] text-brand-text">
                     Publicação original
                   </Text>
                   <Text className="mt-4 text-[22px] font-black text-white">{authorName}</Text>

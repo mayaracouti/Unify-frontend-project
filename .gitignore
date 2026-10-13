@@ -40,3 +40,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Firebase (cada dev baixa do console; ver README "Notificações push")
+google-services.json
+GoogleService-Info.plist

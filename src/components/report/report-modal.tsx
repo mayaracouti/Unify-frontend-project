@@ -180,7 +180,7 @@ export function ReportModal({
             </View>
 
             <Pressable
-              className="h-10 w-10 items-center justify-center rounded-full bg-[#2A2430]"
+              className="h-11 w-11 items-center justify-center rounded-full bg-[#2A2430]"
               onPress={onClose}
               disabled={submitting}
               accessibilityRole="button"
@@ -218,12 +218,13 @@ export function ReportModal({
                   {reasonsError}
                 </Text>
                 <Pressable
-                  className="mt-3 self-start rounded-full border border-[#494455] px-4 py-2"
+                  className="mt-3 min-h-[44px] justify-center self-start rounded-full border border-[#494455] px-4 py-2"
                   onPress={() => {
                     void loadReasons();
                   }}
                   accessibilityRole="button"
                   accessibilityLabel="Tentar carregar os motivos novamente"
+                  accessibilityHint="Busca a lista de motivos de denúncia outra vez"
                 >
                   <Text className="text-[13px] font-bold text-white">Tentar novamente</Text>
                 </Pressable>
@@ -325,6 +326,7 @@ export function ReportModal({
               disabled={submitting}
               accessibilityRole="button"
               accessibilityLabel="Cancelar denúncia"
+              accessibilityHint="Fecha a denúncia sem enviar"
               accessibilityState={{ disabled: submitting }}
             >
               <Text className="text-[15px] font-bold text-white">Cancelar</Text>

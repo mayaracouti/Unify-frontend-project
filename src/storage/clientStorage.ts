@@ -4,6 +4,7 @@ import { clearAuthenticatedRemoteImageCache } from "../components/profile/authen
 import { clearOnboardingCompletionCache } from "../services/onboardingCompletionService";
 import { clearCachedAccessibilitySettings } from "./accessibilitySettingsStorage";
 import { clearAllStoredMatchDiscoveryState } from "./matchDiscoveryStorage";
+import { clearPushRegistration } from "./pushRegistrationStorage";
 import { clearAllStoredAuthData, getUserId } from "./tokenStorage";
 
 export async function clearEntireClientStorage() {
@@ -21,4 +22,7 @@ export async function clearEntireClientStorage() {
   clearAuthenticatedRemoteImageCache();
   await clearOnboardingCompletionCache(userId);
   await clearCachedAccessibilitySettings();
+  // O token do aparelho ja foi descadastrado no logout (AuthContext); aqui so
+  // some a referencia local (tambem no logout forcado por USER_NOT_FOUND).
+  await clearPushRegistration();
 }

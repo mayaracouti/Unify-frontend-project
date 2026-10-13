@@ -146,7 +146,7 @@ export default function CommunityManageMemberScreen() {
         <View className="h-16 flex-row items-center justify-between border-b border-[#2A2A2A] px-6">
           <View className="flex-row items-center">
             <Pressable
-              className="mr-3 h-10 w-10 items-center justify-center rounded-full"
+              className="mr-3 h-11 w-11 items-center justify-center rounded-full"
               onPress={() => {
                 speak("Voltar para a comunidade");
                 handleBack();
@@ -169,7 +169,7 @@ export default function CommunityManageMemberScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View className="rounded-[28px] bg-[#111214] p-6">
-            <Text className="text-[14px] font-bold uppercase tracking-[1.4px] text-[#7C4DFF]">
+            <Text className="text-[14px] font-bold uppercase tracking-[1.4px] text-brand-text">
               Gestão de cargos
             </Text>
             <Text

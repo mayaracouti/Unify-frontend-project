@@ -30,6 +30,7 @@ import {
   buildPublicProfileSpeech,
   buildVisibleProfilePartsSpeech,
   LOCKED_PROFILE_NOTICE,
+  isSystemScreenReaderEnabled,
   LOCKED_PROFILE_PARTIAL_NOTICE,
   PRIVATE_PROFILE_FIELDS_NOTICE,
   stopSpeaking,
@@ -42,6 +43,7 @@ import {
 import { GlobalBottomNav } from "../../src/components/navigation/global-bottom-nav";
 import { BlockUserSheet, type BlockUserTarget } from "../../src/components/privacy/block-user-sheet";
 import { GlobalTopNav } from "../../src/components/navigation/global-top-nav";
+import { useAccessibility } from "../../src/context/AccessibilityContext";
 import {
   AuthenticatedRemoteImage,
   preloadAuthenticatedRemoteImages,
@@ -582,6 +584,7 @@ export default function Matches() {
   const isFocused = useIsFocused();
   const router = useRouter();
   const { speak } = useTTS();
+  const { settings: accessibilitySettings } = useAccessibility();
   const [queuedProfileIds, setQueuedProfileIds] = useState<string[]>([]);
   const [seenProfileIds, setSeenProfileIds] = useState<string[]>([]);
   const [currentProfile, setCurrentProfile] = useState<MatchProfile | null>(null);
@@ -690,6 +693,12 @@ export default function Matches() {
   // recarregar): fala o conteudo semantico do perfil em exibicao — dado de
   // runtime vindo do backend, nunca string fixa.
   const spokenProfileIdRef = useRef<string | null>(null);
+  // Perfil em exibicao e foco atuais, lidos quando a fala termina (o callback
+  // do TTS chega depois do render que o agendou).
+  const visibleProfileIdRef = useRef<string | null>(null);
+  const isFocusedRef = useRef(isFocused);
+  visibleProfileIdRef.current = currentProfile?.id ?? null;
+  isFocusedRef.current = isFocused;
 
   useEffect(() => {
     if (!isFocused || !currentProfile) {
@@ -701,6 +710,17 @@ export default function Matches() {
     }
 
     spokenProfileIdRef.current = currentProfile.id;
+
+    // Autoplay opt-in (plano 05, 5.9 item 4b): so com a preferencia ligada,
+    // so DEPOIS da fala do perfil (nunca por cima) e nunca com o leitor de
+    // tela do sistema ativo. Tocar/trocar de card antes do fim cancela: a
+    // fala interrompida nao chama `onDone`.
+    const profileId = currentProfile.id;
+    const shouldAutoplay =
+      accessibilitySettings.autoplayPresentationAudio === true &&
+      Boolean(currentProfile.presentationAudio) &&
+      !isSystemScreenReaderEnabled();
+
     // Projecao explicita: o card guarda as partes em outro formato, e as de
     // perfil travado ja vem prontas em `visibleParts`.
     speak(
@@ -713,7 +733,16 @@ export default function Matches() {
         hiddenFields: currentProfile.hiddenFields,
         locked: currentProfile.locked,
         visibleParts: currentProfile.visibleParts,
-      })
+      }),
+      shouldAutoplay
+        ? {
+            onDone: () => {
+              if (visibleProfileIdRef.current === profileId && isFocusedRef.current) {
+                audioPlayerRef.current?.play();
+              }
+            },
+          }
+        : undefined
     );
     // Canal do leitor de tela do sistema: o `speak` acima fica mudo quando o
     // TalkBack/VoiceOver esta ligado, entao os dois nunca falam juntos.
@@ -727,7 +756,7 @@ export default function Matches() {
         currentProfile.visibleParts.length > 0
       )
     );
-  }, [currentProfile, isFocused, speak]);
+  }, [accessibilitySettings.autoplayPresentationAudio, currentProfile, isFocused, speak]);
 
   // Audio de apresentacao: nunca toca sozinho e para ao sair da aba. A troca
   // de card remonta o player (chave = id do perfil), o que ja encerra o som.

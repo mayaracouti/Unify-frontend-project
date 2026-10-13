@@ -126,5 +126,18 @@ export const feedService = {
     );
   },
 
+  /**
+   * Um post so, pessoal ou de comunidade, no formato do feed (destino de
+   * notificacao de curtida/comentario). 404 quando sumiu ou deixou de ser
+   * visivel: `silent` deixa a tela decidir o aviso.
+   */
+  getPost(postId: string, options?: { silent?: boolean }) {
+    return customApiCall.get<UserPostResponse>(
+      `${USER_POSTS_ENDPOINT}/${encodePathSegment(postId)}`,
+      undefined,
+      { requiresAuth: true, suppressErrorToast: options?.silent ?? false }
+    );
+  },
+
   resolveAssetUrl: resolveFeedAssetUrl,
 };

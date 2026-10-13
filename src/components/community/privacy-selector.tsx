@@ -44,11 +44,12 @@ export function CommunityPrivacySelector({
           return (
             <Pressable
               key={option.key}
-              className={`flex-1 flex-row items-center justify-center gap-2 rounded-xl px-4 py-3 ${
+              className={`min-h-[44px] flex-1 flex-row items-center justify-center gap-2 rounded-xl px-4 py-3 ${
                 isActive ? "bg-[#7C4DFF]" : "bg-transparent"
               }`}
               accessibilityRole="radio"
               accessibilityLabel={`Comunidade ${option.label.toLowerCase()}`}
+              accessibilityHint={`Define a comunidade como ${option.label.toLowerCase()}`}
               accessibilityState={{ selected: isActive }}
               onPress={() => {
                 speak(`Comunidade ${option.label.toLowerCase()}. ${option.description}`);

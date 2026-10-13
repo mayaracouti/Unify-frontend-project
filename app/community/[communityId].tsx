@@ -15,6 +15,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useGlobalAccessibilityState } from "../../src/accessibility/global-text-adjustments";
 import {
   buildActionSpeech,
   buildCommunityMemberSpeech,
@@ -280,7 +281,10 @@ function AuthorAvatar({
   const content = (
     <View
       className="h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-[#CDBDFF] bg-[#353534]"
-      importantForAccessibility={canOpenProfile ? "no-hide-descendants" : "auto"}
+      // Sempre decorativo: o nome do autor vem no elemento ao lado e, quando
+      // ha perfil, o Pressable pai ja tem o rotulo.
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
     >
       {avatarUrl ? (
         <AuthenticatedRemoteImage
@@ -295,7 +299,13 @@ function AuthorAvatar({
               end={{ x: 1, y: 1 }}
               style={{ alignItems: "center", height: "100%", justifyContent: "center", width: "100%" }}
             >
-              <Text allowFontScaling={false} className="text-[16px] font-black text-white">{initials || "?"}</Text>
+              <Text
+                maxFontSizeMultiplier={1.3}
+                numberOfLines={1}
+                className="text-[16px] font-black text-white"
+              >
+                {initials || "?"}
+              </Text>
             </LinearGradient>
           }
         />
@@ -306,7 +316,13 @@ function AuthorAvatar({
           end={{ x: 1, y: 1 }}
           style={{ alignItems: "center", height: "100%", justifyContent: "center", width: "100%" }}
         >
-          <Text allowFontScaling={false} className="text-[16px] font-black text-white">{initials || "?"}</Text>
+          <Text
+            maxFontSizeMultiplier={1.3}
+            numberOfLines={1}
+            className="text-[16px] font-black text-white"
+          >
+            {initials || "?"}
+          </Text>
         </LinearGradient>
       )}
     </View>
@@ -372,13 +388,14 @@ function PostAction({
         <Ionicons
           name={icon}
           size={26}
-          color={active ? "#7C4DFF" : "#CAC3D8"}
+          // #9B7BFF: o roxo da marca (#7C4DFF) fica em 2,98:1 sobre o card #2A2A2A.
+          color={active ? "#9B7BFF" : "#CAC3D8"}
         />
       )}
       {typeof count === "number" ? (
         <Text
           className={`text-[16px] font-bold ${
-            active ? "text-[#7C4DFF]" : "text-[#E5E2E1]"
+            active ? "text-brand-text" : "text-[#E5E2E1]"
           }`}
         >
           {count}
@@ -459,51 +476,6 @@ function MemberButton({
   );
 }
 
-function CommunityOwnerCard({
-  authToken,
-  community,
-}: {
-  authToken: string | null;
-  community: CommunitySummaryResponse;
-}) {
-  const avatarUrl = communityService.resolveAssetUrl(community.owner?.avatarData);
-
-  return (
-    <View className="mt-6 rounded-2xl border border-[#353534] bg-[#17181C] px-4 py-4">
-      <View className="flex-row items-center gap-3">
-        <View className="h-12 w-12 overflow-hidden rounded-full bg-[#2C2834]">
-          {avatarUrl ? (
-            <AuthenticatedRemoteImage
-              uri={avatarUrl}
-              authToken={authToken}
-              className="h-full w-full"
-              resizeMode="cover"
-              fallback={
-                <View className="flex-1 items-center justify-center bg-[#2C2834]">
-                  <Ionicons name="person" size={18} color="#E5E2E1" />
-                </View>
-              }
-            />
-          ) : (
-            <View className="flex-1 items-center justify-center bg-[#2C2834]">
-              <Ionicons name="person" size={18} color="#E5E2E1" />
-            </View>
-          )}
-        </View>
-
-        <View className="flex-1">
-          <Text className="text-[13px] font-semibold text-content-secondary">Criador</Text>
-          <Text className="text-[16px] font-black text-white">
-            {community.owner?.name ?? "Criador não informado"}
-          </Text>
-        </View>
-
-        <CommunityRoleBadge isOwner={community.isOwner} role={community.currentUserRole} />
-      </View>
-    </View>
-  );
-}
-
 function CommunityHeader({
   activeTab,
   authToken,
@@ -535,7 +507,7 @@ function CommunityHeader({
         <View className="flex-row items-center gap-2">
           {community.privacy === "PRIVATE" && canModerateRole(community.currentUserRole) ? (
             <Pressable
-              className="rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-3"
+              className="min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-3"
               onPress={onOpenJoinRequests}
               accessibilityRole="button"
               accessibilityLabel="Solicitações de entrada"
@@ -547,7 +519,7 @@ function CommunityHeader({
 
           {community.isOwner || community.currentUserRole === "ADMIN" ? (
             <Pressable
-              className="rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-3"
+              className="min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-3"
               onPress={onOpenSettings}
               accessibilityRole="button"
               accessibilityLabel="Configurações da comunidade"
@@ -566,8 +538,8 @@ function CommunityHeader({
       <View className="mt-3 flex-row items-center gap-4">
         {memberCountLabel ? (
           <View className="flex-row items-center gap-2">
-            <Ionicons name="person" size={16} color="#7C4DFF" />
-            <Text className="text-[16px] font-black text-[#7C4DFF]">
+            <Ionicons name="person" size={16} color="#9B7BFF" />
+            <Text className="text-[16px] font-black text-brand-text">
               {memberCountLabel}
             </Text>
           </View>
@@ -768,6 +740,7 @@ function CommunityPostCard({
               setMenuVisible(true);
             }}
             disabled={deleting}
+            // 36dp visuais + hitSlop = area de toque de 48dp.
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             accessibilityRole="button"
             accessibilityLabel="Mais opções da publicação"
@@ -927,19 +900,30 @@ function CommunityContentTabs({
     <View className="mt-6">
       <View className="flex-row rounded-2xl border border-[#3A3246] bg-[#1A1C1F] p-1.5">
         {[
-          { key: "posts", label: "Publicações", icon: "newspaper-outline" },
-          { key: "members", label: membersLabel, icon: "people-outline" },
+          {
+            key: "posts",
+            label: "Publicações",
+            icon: "newspaper-outline",
+            hint: "Mostra as publicações da comunidade",
+          },
+          {
+            key: "members",
+            label: membersLabel,
+            icon: "people-outline",
+            hint: "Mostra a lista de membros da comunidade",
+          },
         ].map((tab) => {
           const isActive = activeTab === tab.key;
 
           return (
             <Pressable
               key={tab.key}
-              className={`flex-1 flex-row items-center justify-center gap-2 rounded-xl px-4 py-3 ${
+              className={`min-h-[44px] flex-1 flex-row items-center justify-center gap-2 rounded-xl px-4 py-3 ${
                 isActive ? "bg-[#7C4DFF]" : "bg-transparent"
               }`}
               accessibilityRole="tab"
               accessibilityLabel={tab.label}
+              accessibilityHint={tab.hint}
               accessibilityState={{ selected: isActive }}
               onPress={() => {
                 // O rotulo inclui a contagem real de membros do backend.
@@ -1019,9 +1003,10 @@ function CommunityMemberCard({
 
         {canManageRole ? (
           <Pressable
-            className="rounded-full border border-[#46708A] bg-[#16232C] px-4 py-3"
+            className="min-h-[44px] justify-center rounded-full border border-[#46708A] bg-[#16232C] px-4 py-3"
             accessibilityRole="button"
             accessibilityLabel={`Gerenciar cargo de ${member.name}`}
+            accessibilityHint="Abre a tela para alterar o cargo deste membro"
             onPress={() => {
               speak(buildActionSpeech("Gerenciar cargo de", member.name));
               onManageRole();
@@ -1055,6 +1040,7 @@ export default function CommunityDetailScreen() {
   const { speak } = useTTS();
   const { session } = useAuth();
   const { currentUserId, currentUserProfileId } = useAppShell();
+  const { reduceMotion } = useGlobalAccessibilityState();
 
   const requestedCommunityId = useMemo(
     () => normalizeRouteParam(params.communityId).trim(),
@@ -1246,10 +1232,11 @@ export default function CommunityDetailScreen() {
 
       scrollViewRef.current.scrollTo({
         y: Math.max(contentStartOffsetRef.current - 16, 0),
-        animated: true,
+        // `reduceMotion`: pula direto para o conteudo da aba, sem rolagem animada.
+        animated: !reduceMotion,
       });
     });
-  }, []);
+  }, [reduceMotion]);
 
   const handleToggleMembership = useCallback(async () => {
     const communityId = feed?.community?.id ?? requestedCommunityId;
@@ -1691,7 +1678,6 @@ export default function CommunityDetailScreen() {
   const community = feed?.community ?? null;
   const posts = feed?.posts ?? [];
   const canParticipate = canParticipateInCommunity(community);
-  const canManageRoles = canModerateRole(getEffectiveCommunityRole(community));
   const isRequestedCommunityVisible =
     !requestedCommunityId || !community || community.id === requestedCommunityId;
 
@@ -1721,7 +1707,7 @@ export default function CommunityDetailScreen() {
             >
               <View>
                 <Pressable
-                  className="self-start w-full border-[#494455] bg-[#1A1C1F] px-4 py-3"
+                  className="min-h-[44px] w-full justify-center self-start border-[#494455] bg-[#1A1C1F] px-4 py-3"
                   onPress={() => {
                     speak("Voltar para comunidades");
                     router.replace("/community");

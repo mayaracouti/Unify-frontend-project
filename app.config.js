@@ -1,3 +1,6 @@
+const fs = require("node:fs");
+const path = require("node:path");
+
 const appJson = require("./app.json");
 
 const HTTP_CLEAR_TEXT_PROFILES = new Set(["dev", "dev-avd-localhost"]);
@@ -8,6 +11,20 @@ function readTrimmedEnv(name) {
   return typeof value === "string" && value.trim().length > 0
     ? value.trim()
     : undefined;
+}
+
+/**
+ * `google-services.json` (Firebase → Configuracoes do projeto → app Android
+ * `br.com.app.unify`) liga o FCM no build nativo. Fica opcional: sem ele o
+ * app continua buildando e rodando (Expo Go, web, dev build sem push) e so o
+ * registro do token de push falha. `GOOGLE_SERVICES_JSON` permite apontar
+ * para outro arquivo (ex.: segredo de arquivo do EAS).
+ */
+function resolveGoogleServicesFile() {
+  const configuredPath = readTrimmedEnv("GOOGLE_SERVICES_JSON") ?? "./google-services.json";
+  const absolutePath = path.resolve(__dirname, configuredPath);
+
+  return fs.existsSync(absolutePath) ? configuredPath : undefined;
 }
 
 function shouldAllowAndroidCleartextTraffic(appProfile, apiBaseUrl) {
@@ -26,12 +43,14 @@ module.exports = () => {
     appProfile,
     apiBaseUrl
   );
+  const googleServicesFile = resolveGoogleServicesFile();
 
   return {
     ...expoConfig,
     android: {
       ...(expoConfig.android ?? {}),
       usesCleartextTraffic,
+      ...(googleServicesFile ? { googleServicesFile } : {}),
     },
     extra: {
       ...(expoConfig.extra ?? {}),

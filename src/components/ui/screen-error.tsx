@@ -65,7 +65,7 @@ export function ScreenError({
 
       {onRetry ? (
         <Pressable
-          className="mt-6 flex-row items-center justify-center rounded-full border border-content-muted/40 bg-surface-muted px-6 py-3"
+          className="mt-6 min-h-[44px] flex-row items-center justify-center rounded-full border border-content-muted/40 bg-surface-muted px-6 py-3"
           onPress={() => {
             speak("Tentar novamente");
             onRetry();

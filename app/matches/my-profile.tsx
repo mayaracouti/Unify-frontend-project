@@ -2,7 +2,6 @@ import { type PropsWithChildren, useEffect, useRef, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import {
-  ActivityIndicator,
   Modal,
   PanResponder,
   Pressable,
@@ -146,12 +145,9 @@ function DiscoverySlider({
         accessible
         accessibilityRole="adjustable"
         accessibilityLabel={accessibilityLabel}
-        accessibilityValue={{
-          min,
-          max,
-          now: values ? values[0] : (value ?? min),
-          text: formatValue(values ?? value ?? min),
-        }}
+        // So `text`: o leitor de tela fala o valor formatado ("18 a 30 anos",
+        // "37 km") em vez de uma porcentagem que nao representa a faixa dupla.
+        accessibilityValue={{ text: formatValue(values ?? value ?? min) }}
         accessibilityActions={[
           { name: "increment", label: "Aumentar" },
           { name: "decrement", label: "Diminuir" },
@@ -211,6 +207,7 @@ function DiscoverySlider({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Diminuir ${accessibilityLabel}`}
+          accessibilityHint="Reduz o valor em um passo"
           className="h-11 w-11 items-center justify-center rounded-full bg-[#1D1F24]"
           onPress={() => adjust(-1)}
         >
@@ -225,6 +222,7 @@ function DiscoverySlider({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Aumentar ${accessibilityLabel}`}
+          accessibilityHint="Aumenta o valor em um passo"
           className="h-11 w-11 items-center justify-center rounded-full bg-[#1D1F24]"
           onPress={() => adjust(1)}
         >
@@ -257,6 +255,7 @@ function DiscoveryToggle({
       onPress={() => onValueChange(!value)}
       accessibilityRole="switch"
       accessibilityLabel={accessibilityLabel}
+      accessibilityHint={value ? "Desativa esta opção" : "Ativa esta opção"}
       accessibilityState={{ checked: value }}
       style={{
         alignItems: "center",
@@ -364,6 +363,7 @@ function MultiOptionModal({
                   onPress={() => toggleOption(option)}
                   accessibilityRole="checkbox"
                   accessibilityLabel={option}
+                  accessibilityHint={selected ? "Remove esta opção da seleção" : "Adiciona esta opção à seleção"}
                   accessibilityState={{ checked: selected }}
                 >
                   <Text className="text-[16px] font-bold text-white">{option}</Text>
@@ -396,6 +396,7 @@ function MultiOptionModal({
             }}
             accessibilityRole="button"
             accessibilityLabel="Salvar seleção"
+            accessibilityHint="Aplica as opções marcadas e fecha a janela"
           >
             <Text className="text-[16px] font-black text-white">Salvar seleção</Text>
           </Pressable>
@@ -480,6 +481,7 @@ function LocationModal({
             }}
             accessibilityRole="button"
             accessibilityLabel="Salvar local"
+            accessibilityHint="Aplica a localização digitada e fecha a janela"
           >
             <Text className="text-[16px] font-black text-white">Salvar local</Text>
           </Pressable>
@@ -625,13 +627,14 @@ export default function MatchMyProfile() {
         >
           <View className="flex-row items-center justify-between">
             <Pressable
-              className="h-10 w-10 items-center justify-center rounded-full bg-[#17181C]"
+              className="h-11 w-11 items-center justify-center rounded-full bg-[#17181C]"
               onPress={() => {
                 speak("Voltar para Encontros");
                 router.replace("/matches");
               }}
               accessibilityRole="button"
               accessibilityLabel="Voltar para encontros"
+              accessibilityHint="Retorna para a tela de Encontros"
             >
               <Ionicons
                 name="chevron-back"
@@ -642,13 +645,14 @@ export default function MatchMyProfile() {
             </Pressable>
 
             <Pressable
-              className="h-10 w-10 items-center justify-center rounded-full bg-[#17181C]"
+              className="h-11 w-11 items-center justify-center rounded-full bg-[#17181C]"
               onPress={() => {
                 speak("Editar preferências de match");
                 router.push("/profile/edit-match-preferences");
               }}
               accessibilityRole="button"
               accessibilityLabel="Editar preferências de match"
+              accessibilityHint="Abre a tela de preferências de match"
             >
               <Ionicons
                 name="settings"
@@ -723,6 +727,7 @@ export default function MatchMyProfile() {
                   }}
                   accessibilityRole="button"
                   accessibilityLabel={`Editar perfil de ${displayName}`}
+                  accessibilityHint="Abre a edição dos dados do seu perfil"
                 >
                   <Ionicons
                     name="pencil"
@@ -769,7 +774,7 @@ export default function MatchMyProfile() {
               </Text>
 
               <Pressable
-                className="mt-5 flex-row items-center"
+                className="mt-5 min-h-[44px] flex-row items-center"
                 onPress={() => {
                   // Fala o local atual (dado dinamico) ao abrir a edicao.
                   speak(
@@ -797,6 +802,8 @@ export default function MatchMyProfile() {
 
               <Pressable
                 className="mt-5"
+                // ~24dp visuais + hitSlop = area de toque de 44dp sem mexer no layout.
+                hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
                 onPress={() => {
                   speak("Adicionar novo local");
                   setLocationModalOpen(true);

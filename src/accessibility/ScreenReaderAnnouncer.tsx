@@ -6,7 +6,7 @@ import { usePathname } from "expo-router";
 import { useEffect, useRef } from "react";
 
 import { announceForAccessibility } from "../utils/accessibilityAnnouncements";
-import { isSystemScreenReaderEnabled, speak } from "./tts";
+import { isSystemScreenReaderEnabled, speak, stopOnDemandSpeech } from "./tts";
 
 /** Nome amigavel (pt-BR) de cada rota real do diretorio `app/`. */
 const ROUTE_LABELS: Record<string, string> = {
@@ -38,6 +38,7 @@ const ROUTE_LABELS: Record<string, string> = {
   "/profile/accessibility-settings": "Configurações de acessibilidade",
   "/profile/privacy": "Privacidade e bloqueios",
   "/profile/follow-requests": "Pedidos para seguir",
+  "/notifications": "Notificações",
   "/onboarding/profile": "Complete seu perfil",
   "/onboarding/match-preferences": "Preferências de match",
   "/auth/login": "Entrar na Unify",
@@ -69,7 +70,11 @@ const USER_PROFILE_PATTERN = /^\/users\/[^/]+$/;
  * so o nome da rota aqui seria cortado no meio pela sequencia da tela.
  */
 function isSelfAnnouncingRoute(normalizedPathname: string): boolean {
-  return normalizedPathname === "/chats" || CHAT_DETAIL_PATTERN.test(normalizedPathname);
+  return (
+    normalizedPathname === "/chats" ||
+    normalizedPathname === "/notifications" ||
+    CHAT_DETAIL_PATTERN.test(normalizedPathname)
+  );
 }
 
 function normalizePathname(pathname: string): string {
@@ -127,6 +132,8 @@ export function ScreenReaderAnnouncer() {
     }
 
     lastAnnouncedPathname.current = pathname;
+    // "Ouvir mensagem/publicacao" nao continua falando em outra tela.
+    stopOnDemandSpeech();
 
     // O onboarding de acessibilidade fala a propria introducao completa;
     // anunciar o nome da rota por cima interromperia essa fala.

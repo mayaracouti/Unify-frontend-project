@@ -7,6 +7,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { AccessibilityInfo, Platform } from "react-native";
 
 import { setGlobalTextAdjustments } from "../accessibility/global-text-adjustments";
 import { ScreenReaderAnnouncer } from "../accessibility/ScreenReaderAnnouncer";
@@ -27,6 +28,7 @@ const DEFAULT_SETTINGS: UserAccessibilitySettingsResponse = {
   fontScaleMultiplier: 1,
   highContrast: false,
   reduceMotion: false,
+  autoplayPresentationAudio: false,
 };
 
 type AccessibilityContextValue = {
@@ -46,6 +48,32 @@ export function AccessibilityProvider({ children }: PropsWithChildren) {
   const [settings, setSettings] =
     useState<UserAccessibilitySettingsResponse>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
+  // "Remover animacoes" do SISTEMA (Android/iOS) vale junto com a preferencia
+  // do app: qualquer um dos dois ligado reduz o movimento.
+  const [systemReduceMotion, setSystemReduceMotion] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      return;
+    }
+
+    let active = true;
+
+    void AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        if (active) {
+          setSystemReduceMotion(enabled);
+        }
+      })
+      .catch(() => undefined);
+
+    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setSystemReduceMotion);
+
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -102,9 +130,9 @@ export function AccessibilityProvider({ children }: PropsWithChildren) {
     setGlobalTextAdjustments({
       fontScaleMultiplier: settings.fontScaleMultiplier,
       highContrast: settings.highContrast,
-      reduceMotion: settings.reduceMotion,
+      reduceMotion: settings.reduceMotion || systemReduceMotion,
     });
-  }, [settings]);
+  }, [settings, systemReduceMotion]);
 
   const updateSettings = useCallback(
     async (patch: Partial<UserAccessibilitySettingsUpsertRequest>) => {
@@ -112,6 +140,8 @@ export function AccessibilityProvider({ children }: PropsWithChildren) {
         fontScale: patch.fontScale ?? settings.fontScale,
         highContrast: patch.highContrast ?? settings.highContrast,
         reduceMotion: patch.reduceMotion ?? settings.reduceMotion,
+        autoplayPresentationAudio:
+          patch.autoplayPresentationAudio ?? settings.autoplayPresentationAudio ?? false,
       };
 
       const updated = await accessibilityService.saveSettings(nextRequest);

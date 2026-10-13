@@ -41,10 +41,6 @@ function validatePasswordField(value: string): string | null {
 }
 
 
-const webTitleShadowStyle = {
-  textShadow: "0px 4px 6px rgba(0,0,0,0.22)",
-} as unknown as TextStyle;
-
 const nativeTitleShadowStyle: TextStyle = {
   textShadowColor: "rgba(0,0,0,0.22)",
   textShadowOffset: { width: 0, height: 4 },
@@ -133,7 +129,9 @@ export default function Login() {
 
   return (
     <LinearGradient
-      colors={["#4D52B5", "#724BCE", "#906DDE"]}
+      // Ultima parada escurecida de #906DDE para #845DDA (mesma matiz): texto
+      // branco pequeno no rodape ficava em ~4,2:1 (WCAG AA pede 4,5:1).
+      colors={["#4D52B5", "#724BCE", "#845DDA"]}
       locations={[0, 0.55, 0.96]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
@@ -204,7 +202,7 @@ export default function Login() {
               <WormRiseWrapText
                 text="Faça login para acessar sua comunidade inclusiva."
                 className="mb-6"
-                textClassName="text-[14px] font-semibold leading-5 text-white/70 text-nowrap"
+                textClassName="text-[14px] font-semibold leading-5 text-white/90 text-nowrap"
                 segmentStyle={nativeTitleShadowStyle}
                 autoPlay={isFocused}
                 delay={340}
@@ -236,7 +234,7 @@ export default function Login() {
 
             <WormRiseText
               text="Faça login para acessar sua comunidade inclusiva."
-              className="mb-6 text-[14px] font-semibold leading-5 text-white/70"
+              className="mb-6 text-[14px] font-semibold leading-5 text-white/90"
               delay={340}
               stagger={20}
               duration={460}
@@ -255,7 +253,7 @@ export default function Login() {
             <FormField
               ref={emailFieldRef}
               label="Endereço de E-mail"
-              labelClassName="mb-2 text-[12px] font-extrabold text-white/80"
+              labelClassName="mb-2 text-[12px] font-extrabold text-white/90"
               containerClassName="mb-4"
               value={email}
               onChangeText={(value) => {
@@ -267,7 +265,7 @@ export default function Login() {
               validator={validateEmailField}
               hint="Use o mesmo e-mail cadastrado na sua conta Unify."
               placeholder="nome@example.com"
-              placeholderTextColor="#A1A1AA"
+              placeholderTextColor="#6D6D79"
               autoCapitalize="none"
               autoComplete="email"
               keyboardType="email-address"
@@ -277,7 +275,7 @@ export default function Login() {
             <FormField
               ref={passwordFieldRef}
               label="Senha"
-              labelClassName="mb-2 text-[12px] font-extrabold text-white/80"
+              labelClassName="mb-2 text-[12px] font-extrabold text-white/90"
               containerClassName="mb-4"
               value={password}
               onChangeText={(value) => {
@@ -289,18 +287,23 @@ export default function Login() {
               validator={validatePasswordField}
               hint="Informe a senha da sua conta."
               placeholder="••••••••"
-              placeholderTextColor="#A1A1AA"
+              placeholderTextColor="#6D6D79"
               secureTextEntry={!showPassword}
               disabled={loading}
               rightElement={
                 <Pressable
-                  className="ml-3 rounded px-2 py-1"
+                  className="ml-3 min-h-[44px] min-w-[44px] items-center justify-center rounded px-2"
                   onPress={() => {
                     speak(showPassword ? "Senha oculta" : "Senha visível");
                     setShowPassword((value) => !value);
                   }}
                   accessibilityRole="button"
                   accessibilityLabel={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                  accessibilityHint={
+                    showPassword
+                      ? "Esconde os caracteres digitados no campo de senha"
+                      : "Exibe os caracteres digitados no campo de senha"
+                  }
                 >
                   <Text className="text-[12px] font-semibold text-[#2B1257]">
                     {showPassword ? "Ocultar" : "Mostrar"}
@@ -321,6 +324,8 @@ export default function Login() {
 
             <Pressable
               className="mb-6 self-end"
+              // ~16dp visuais + hitSlop = area de toque de 44dp sem mexer no layout.
+              hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
               onPress={() => {
                 speak("Recuperar senha");
                 router.push("/auth/forgot-password");
@@ -343,6 +348,7 @@ export default function Login() {
               disabled={loading}
               accessibilityRole="button"
               accessibilityLabel={loading ? "Entrando…" : "Entrar"}
+              accessibilityHint="Acessa sua conta com o e-mail e a senha informados"
               accessibilityState={{ disabled: loading, busy: loading }}
             >
               {loading ? (
@@ -358,13 +364,13 @@ export default function Login() {
           <View className="pb-12 pt-8">
             <View className="mb-8 flex-row items-center">
               <View className="h-px flex-1 bg-white/50" />
-              <Text className="mx-5 text-[12px] font-semibold uppercase tracking-[1.5px] text-white/90">
+              <Text className="mx-5 text-[12px] font-semibold uppercase tracking-[1.5px] text-white">
                 ou
               </Text>
               <View className="h-px flex-1 bg-white/50" />
             </View>
 
-            <Text className="mb-4 text-center text-[12px] font-semibold text-white/65">
+            <Text className="mb-4 text-center text-[12px] font-semibold text-white">
               Não tem uma conta?
             </Text>
 

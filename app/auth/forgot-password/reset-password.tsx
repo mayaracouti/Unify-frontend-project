@@ -149,7 +149,7 @@ export default function ResetPassword() {
               <TextInput
                 className="mb-5 rounded-md bg-[#F4F4F5] px-4 py-4 text-[15px] text-zinc-900"
                 placeholder="••••••••"
-                placeholderTextColor="#8C8F99"
+                placeholderTextColor="#6C6F7A"
                 secureTextEntry
                 value={password}
                 onFocus={() => speak("Nova senha")}
@@ -171,7 +171,7 @@ export default function ResetPassword() {
               <TextInput
                 className="mb-5 rounded-md bg-[#F4F4F5] px-4 py-4 text-[15px] text-zinc-900"
                 placeholder="••••••••"
-                placeholderTextColor="#8C8F99"
+                placeholderTextColor="#6C6F7A"
                 secureTextEntry
                 value={confirmPassword}
                 onFocus={() => speak("Confirmar nova senha")}
@@ -212,7 +212,7 @@ export default function ResetPassword() {
           ) : null}
 
           <Pressable
-            className="mt-6 items-center justify-center rounded-md border border-white/35 py-3"
+            className="mt-6 min-h-[44px] items-center justify-center rounded-md border border-white/35 py-3"
             onPress={() => {
               speak(
                 successMessage || isTokenMissing
@@ -237,7 +237,7 @@ export default function ResetPassword() {
           </Pressable>
 
           <Pressable
-            className="mt-4 items-center justify-center rounded-md border border-white/20 py-3"
+            className="mt-4 min-h-[44px] items-center justify-center rounded-md border border-white/20 py-3"
             onPress={() => {
               speak("Ir para o login");
               router.replace("/auth/login");

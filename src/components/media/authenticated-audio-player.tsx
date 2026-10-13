@@ -12,6 +12,8 @@ import {
   View,
 } from "react-native";
 
+import { registerAudioPlayer, stopAllAudioPlayback } from "../../accessibility/audio-focus";
+import { stopOnDemandSpeech } from "../../accessibility/tts";
 import {
   accessibilityAnnouncements,
   announceForAccessibility,
@@ -74,6 +76,11 @@ async function resolveLocalAudioUri(
 export type AuthenticatedAudioPlayerHandle = {
   /** Para a reproducao (e um download pendente) sem anunciar nada. */
   stop: () => void;
+  /**
+   * Comeca a tocar (baixando antes, se preciso) como se a pessoa tocasse no
+   * botao. So para o autoplay opt-in do Encontros; nao faz nada se ja toca.
+   */
+  play: () => void;
 };
 
 export type AudioPlayerLabelState = {
@@ -173,11 +180,32 @@ export const AuthenticatedAudioPlayer = forwardRef<
     onPlaybackStartRef.current = onPlaybackStart;
   }, [onPlaybackStart]);
 
+  const stopPlayback = useCallback(() => {
+    stopGenerationRef.current += 1;
+    setPlayRequested(false);
+
+    try {
+      if (player.playing) {
+        player.pause();
+      }
+      if (player.currentTime > 0) {
+        void player.seekTo(0);
+      }
+    } catch {
+      // Player ja liberado (tela saindo): nada a parar.
+    }
+  }, [player]);
+
+  // Um canal de som por vez: outro player ou o "Ouvir" de um texto param este.
+  useEffect(() => registerAudioPlayer(stopPlayback), [stopPlayback]);
+
   const startPlayback = useCallback(() => {
+    stopAllAudioPlayback(stopPlayback);
+    stopOnDemandSpeech();
     onPlaybackStartRef.current?.();
     player.play();
     announceForAccessibility(accessibilityAnnouncements.audioPlaybackStarted());
-  }, [player]);
+  }, [player, stopPlayback]);
 
   // Toque no play antes do download terminar: assim que o player novo existe
   // (fonte = arquivo local), a reproducao comeca.
@@ -189,28 +217,6 @@ export const AuthenticatedAudioPlayer = forwardRef<
     setPlayRequested(false);
     startPlayback();
   }, [localUri, playRequested, startPlayback]);
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      stop: () => {
-        stopGenerationRef.current += 1;
-        setPlayRequested(false);
-
-        try {
-          if (player.playing) {
-            player.pause();
-          }
-          if (player.currentTime > 0) {
-            void player.seekTo(0);
-          }
-        } catch {
-          // Player ja liberado (tela saindo): nada a parar.
-        }
-      },
-    }),
-    [player]
-  );
 
   const handleToggle = useCallback(async () => {
     if (playing) {
@@ -249,6 +255,26 @@ export const AuthenticatedAudioPlayer = forwardRef<
 
     startPlayback();
   }, [authToken, cacheKey, localUri, player, playing, startPlayback, status, uri]);
+
+  const handleToggleRef = useRef(handleToggle);
+  const playingRef = useRef(playing);
+  useEffect(() => {
+    handleToggleRef.current = handleToggle;
+    playingRef.current = playing;
+  }, [handleToggle, playing]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      stop: stopPlayback,
+      play: () => {
+        if (!playingRef.current) {
+          void handleToggleRef.current();
+        }
+      },
+    }),
+    [stopPlayback]
+  );
 
   // Duracao conhecida: a informada ou, se faltar, a que o player descobriu ao
   // carregar. Sem nenhuma das duas o cronometro mostra "0:00" — nunca um texto

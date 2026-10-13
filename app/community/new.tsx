@@ -212,7 +212,7 @@ export default function CommunityCreateScreen() {
           <View className="h-16 flex-row items-center justify-between border-b border-[#2A2A2A] px-6">
             <View className="flex-row items-center">
               <Pressable
-                className="mr-3 h-10 w-10 items-center justify-center rounded-full"
+                className="mr-3 h-11 w-11 items-center justify-center rounded-full"
                 onPress={() => {
                   speak("Voltar");
                   router.back();
@@ -227,7 +227,7 @@ export default function CommunityCreateScreen() {
             </View>
 
             <Pressable
-              className={`rounded-full px-4 py-2 ${
+              className={`min-h-[44px] justify-center rounded-full px-4 py-2 ${
                 trimmedName.length > 0 && !submitting ? "bg-[#EAEA00]" : "bg-[#3B3841]"
               }`}
               onPress={() => {
@@ -346,7 +346,7 @@ export default function CommunityCreateScreen() {
                 </View>
 
                 <Pressable
-                  className="rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-3"
+                  className="min-h-[44px] justify-center rounded-full border border-[#494455] bg-[#1A1C1F] px-4 py-3"
                   onPress={() => {
                     speak(selectedImage ? "Trocar ícone" : "Selecionar ícone");
                     void handlePickImage();
@@ -384,6 +384,8 @@ export default function CommunityCreateScreen() {
                       {selectedImage.fileName ?? "Ícone selecionado"}
                     </Text>
                     <Pressable
+                      // ~19dp visuais + hitSlop = area de toque de 44dp (cabe no py-4 da linha).
+                      hitSlop={{ top: 13, bottom: 13, left: 8, right: 8 }}
                       onPress={() => {
                         speak("Ícone removido");
                         setSelectedImage(null);

@@ -287,7 +287,7 @@ function GalleryImageCard({
 
       <Pressable
         accessible
-        className="mt-3 h-10 flex-row items-center justify-center rounded-full border border-[#494455] bg-[#1A1C1F]"
+        className="mt-3 h-11 flex-row items-center justify-center rounded-full border border-[#494455] bg-[#1A1C1F]"
         hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         onPress={onRemove}
         disabled={removing}
@@ -420,7 +420,7 @@ export default function Profile() {
 
       setLoading(false);
     }
-  }, [syncProfileSummary]);
+  }, [setActionError, setProfile, syncProfileSummary]);
 
   useEffect(() => {
     void loadProfile();
@@ -649,6 +649,7 @@ export default function Profile() {
                 disabled={uploadingTarget !== null}
                 accessibilityRole="button"
                 accessibilityLabel="Tirar foto"
+                accessibilityHint="Abre a câmera para enviar uma nova foto"
                 accessibilityState={{
                   disabled: uploadingTarget !== null,
                   busy: uploadingTarget !== null,
@@ -676,6 +677,7 @@ export default function Profile() {
                 disabled={uploadingTarget !== null}
                 accessibilityRole="button"
                 accessibilityLabel="Escolher da galeria"
+                accessibilityHint="Abre a galeria para escolher uma imagem"
                 accessibilityState={{
                   disabled: uploadingTarget !== null,
                   busy: uploadingTarget !== null,
@@ -701,6 +703,7 @@ export default function Profile() {
                 disabled={uploadingTarget !== null}
                 accessibilityRole="button"
                 accessibilityLabel="Cancelar"
+                accessibilityHint="Fecha esta janela sem enviar foto"
                 accessibilityState={{
                   disabled: uploadingTarget !== null,
                   busy: uploadingTarget !== null,
@@ -1021,6 +1024,7 @@ export default function Profile() {
                     onPress={() => speak(joinSpeechParts([card.title, card.subtitle]))}
                     accessibilityRole="button"
                     accessibilityLabel={`${card.title}. ${card.subtitle}`}
+                    accessibilityHint="Lê em voz alta este item de acessibilidade"
                   >
                     <View className="flex-row items-center justify-between">
                       <View className="flex-row flex-1 items-center">
@@ -1084,6 +1088,7 @@ export default function Profile() {
               }
               accessibilityRole="button"
               accessibilityLabel="Comunicação e interesses"
+              accessibilityHint="Lê em voz alta suas formas de comunicação e interesses"
             >
               <Text
                 accessibilityRole="header"

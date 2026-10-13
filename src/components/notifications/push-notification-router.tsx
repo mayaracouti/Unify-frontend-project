@@ -1,0 +1,76 @@
+import * as Notifications from "expo-notifications";
+import { useRouter } from "expo-router";
+import { useCallback, useEffect, useRef } from "react";
+import { Platform } from "react-native";
+
+import { useNotifications } from "../../context/NotificationContext";
+import { notificationService } from "../../services/notificationService";
+import { openNotificationTarget, parsePushData } from "../../utils/notificationNavigation";
+
+/**
+ * Toque numa notificacao do sistema (app em segundo plano, fechado ou
+ * aberto) leva direto ao destino. Montado em `app/_layout.tsx` SO quando as
+ * rotas autenticadas ja existem no `Stack` — antes disso `router.push` cairia
+ * no `+not-found`. Quando o toque abriu o app do zero, a resposta fica
+ * guardada pelo `expo-notifications` e e consumida aqui ao montar.
+ *
+ * Nao renderiza nada.
+ */
+export function PushNotificationRouter() {
+  const router = useRouter();
+  const { refreshUnreadCount } = useNotifications();
+  const handledRef = useRef(new Set<string>());
+
+  const handleResponse = useCallback(
+    async (response: Notifications.NotificationResponse) => {
+      const key = `${response.notification.request.identifier}:${response.notification.date}`;
+
+      if (handledRef.current.has(key)) {
+        return;
+      }
+
+      handledRef.current.add(key);
+      Notifications.clearLastNotificationResponse();
+
+      const data = parsePushData(response.notification.request.content.data);
+
+      if (!data) {
+        return;
+      }
+
+      if (data.notificationId) {
+        // Tocar e "ler": o aviso sai do sino mesmo que o destino nao exista mais.
+        await notificationService.markAsRead(data.notificationId).catch(() => undefined);
+      }
+
+      const result = await openNotificationTarget(router, data);
+
+      if (result === "none") {
+        router.push("/notifications");
+      }
+
+      void refreshUnreadCount();
+    },
+    [refreshUnreadCount, router]
+  );
+
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      return;
+    }
+
+    const launchResponse = Notifications.getLastNotificationResponse();
+
+    if (launchResponse) {
+      void handleResponse(launchResponse);
+    }
+
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      void handleResponse(response);
+    });
+
+    return () => subscription.remove();
+  }, [handleResponse]);
+
+  return null;
+}

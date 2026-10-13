@@ -20,6 +20,7 @@ import type {
   CommunitySummaryResponse,
 } from "../../types/community";
 import type { MutualMatchSummaryResponse } from "../../types/match";
+import type { NotificationResponse } from "../../types/notification";
 import type { LookupOptionResponse, UserPublicProfileResponse } from "../../types/profile";
 import type { UserPostCommentResponse, UserPostResponse } from "../../types/social";
 import type { ProfileField } from "../../types/privacy";
@@ -642,4 +643,48 @@ export function buildActionSpeech(
   const trimmedTarget = target?.trim();
 
   return trimmedTarget ? `${trimmedAction} ${trimmedTarget}` : trimmedAction;
+}
+
+// ---------------------------------------------------------------------------
+// Notificacoes (semana 05)
+// ---------------------------------------------------------------------------
+
+export const NOTIFICATIONS_SCREEN_NAME = "Notificações";
+
+/** Quantas notificacoes nao lidas a entrada da tela le uma a uma. */
+const NOTIFICATIONS_ENTRY_MAX_ITEMS = 5;
+
+/**
+ * Sequencia de entrada da tela de notificacoes (rota "self-announcing", como
+ * as conversas): nome da tela, quantas nao lidas e as mais recentes nao
+ * lidas ("titulo: texto"). Uma parte por frase, para `speakSequence`.
+ */
+export function buildNotificationListEntrySpeech(
+  notifications: Pick<NotificationResponse, "read" | "title" | "body">[],
+  unreadCount: number
+): string[] {
+  const parts = [NOTIFICATIONS_SCREEN_NAME];
+
+  if (notifications.length === 0) {
+    parts.push("Você ainda não tem notificações");
+    return parts;
+  }
+
+  parts.push(
+    unreadCount <= 0
+      ? "Nenhuma notificação não lida"
+      : unreadCount === 1
+        ? "1 notificação não lida"
+        : `${unreadCount} notificações não lidas`
+  );
+
+  for (const notification of notifications
+    .filter((item) => !item.read)
+    .slice(0, NOTIFICATIONS_ENTRY_MAX_ITEMS)) {
+    const title = notification.title?.trim();
+    const body = toConcise(notification.body, CHAT_MESSAGE_SPEECH_MAX_LENGTH);
+    parts.push([title, body].filter(Boolean).join(": "));
+  }
+
+  return parts;
 }

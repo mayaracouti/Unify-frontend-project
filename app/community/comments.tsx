@@ -96,7 +96,7 @@ function CommentAvatar({
               end={{ x: 1, y: 1 }}
               style={{ alignItems: "center", height: "100%", justifyContent: "center", width: "100%" }}
             >
-              <Text allowFontScaling={false} className="text-[14px] font-black text-white">{initials || "?"}</Text>
+              <Text maxFontSizeMultiplier={1.3} numberOfLines={1} className="text-[14px] font-black text-white">{initials || "?"}</Text>
             </LinearGradient>
           }
         />
@@ -107,7 +107,7 @@ function CommentAvatar({
           end={{ x: 1, y: 1 }}
           style={{ alignItems: "center", height: "100%", justifyContent: "center", width: "100%" }}
         >
-          <Text allowFontScaling={false} className="text-[14px] font-black text-white">{initials || "?"}</Text>
+          <Text maxFontSizeMultiplier={1.3} numberOfLines={1} className="text-[14px] font-black text-white">{initials || "?"}</Text>
         </LinearGradient>
       )}
     </View>
@@ -183,6 +183,8 @@ function CommentCard({
               {canDelete ? (
                 <Pressable
                   className="h-9 w-9 items-center justify-center rounded-full bg-[#221820]"
+                  // 36dp visuais + hitSlop = area de toque de 44dp.
+                  hitSlop={4}
                   onPress={onDelete}
                   disabled={deleting}
                   accessibilityRole="button"
@@ -435,7 +437,7 @@ export default function CommunityCommentsScreen() {
           <View className="h-16 flex-row items-center justify-between border-b border-[#2A2A2A] px-6">
             <View className="flex-row items-center">
               <Pressable
-                className="mr-3 h-10 w-10 items-center justify-center rounded-full"
+                className="mr-3 h-11 w-11 items-center justify-center rounded-full"
                 accessibilityRole="button"
                 accessibilityLabel="Voltar para a comunidade"
                 accessibilityHint="Volta para a comunidade sem salvar o comentário em edição"
@@ -498,7 +500,7 @@ export default function CommunityCommentsScreen() {
                   accessibilityLabel={`Publicação de ${authorName}`}
                   accessibilityHint="Lê a publicação original em voz alta"
                 >
-                  <Text className="text-[14px] font-bold uppercase tracking-[1.4px] text-[#7C4DFF]">
+                  <Text className="text-[14px] font-bold uppercase tracking-[1.4px] text-brand-text">
                     Publicação original
                   </Text>
                   {communityName ? (

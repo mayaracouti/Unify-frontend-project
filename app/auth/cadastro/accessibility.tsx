@@ -21,11 +21,11 @@ import {
   useTTS,
 } from "../../../src/accessibility/tts";
 
-const FONT_SCALE_OPTIONS: Array<{
+const FONT_SCALE_OPTIONS: {
   value: FontScaleOption;
   label: string;
   previewSize: number;
-}> = [
+}[] = [
   { value: "SMALL", label: "Pequena", previewSize: 12 },
   { value: "MEDIUM", label: "Média", previewSize: 14 },
   { value: "LARGE", label: "Grande", previewSize: 17 },
@@ -200,7 +200,7 @@ export default function CadastroAccessibility() {
               >
                 A
               </Text>
-              <View className="relative h-8 flex-1 justify-center">
+              <View className="relative h-11 flex-1 justify-center">
                 <View
                   className={`absolute left-0 right-0 h-2 rounded-full ${
                     highContrast ? "bg-hc-border" : "bg-[#3B3B40]"
@@ -213,7 +213,7 @@ export default function CadastroAccessibility() {
                     return (
                       <Pressable
                         key={option.value}
-                        className="h-8 w-8 items-center justify-center"
+                        className="h-11 w-11 items-center justify-center"
                         onPress={() => {
                           speak(
                             buildOptionToggleSpeech(
@@ -252,7 +252,13 @@ export default function CadastroAccessibility() {
               </Text>
             </View>
 
-            <View className="mb-4 flex-row justify-between">
+            {/* Atalho visual dos mesmos radios acima (que ja tem 44dp): fica fora
+                da arvore de acessibilidade para o leitor nao repetir as 4 opcoes. */}
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              className="mb-4 flex-row justify-between"
+            >
               {FONT_SCALE_OPTIONS.map((option) => {
                 const selected = fontScale === option.value;
 

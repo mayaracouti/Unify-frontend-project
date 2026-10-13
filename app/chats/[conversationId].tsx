@@ -22,6 +22,7 @@ import {
   speak,
   speakSequence,
 } from "../../src/accessibility/tts";
+import { getGlobalTextAdjustments } from "../../src/accessibility/global-text-adjustments";
 import { ChatComposer } from "../../src/components/chat/chat-composer";
 import { ImageLightbox } from "../../src/components/chat/image-lightbox";
 import { MessageBubble, type MessageAction } from "../../src/components/chat/message-bubble";
@@ -31,6 +32,7 @@ import { useProfileFollowToggle } from "../../src/components/social/use-profile-
 import { ActionSheet, type ActionSheetOption } from "../../src/components/ui/action-sheet";
 import { useAppShell } from "../../src/context/AppShellContext";
 import { useAuth } from "../../src/context/AuthContext";
+import { useNotifications } from "../../src/context/NotificationContext";
 import { useChatMessages } from "../../src/hooks/useChatMessages";
 import { useScreenHeadingFocus } from "../../src/hooks/use-screen-heading-focus";
 import { chatService } from "../../src/services/chatService";
@@ -44,6 +46,7 @@ import {
 import { formatApiErrorMessage } from "../../src/utils/auth";
 import { followStateFromStats, type FollowState } from "../../src/utils/followRelation";
 import { showGlobalToast } from "../../src/utils/globalToast";
+import { setActiveConversationId } from "../../src/utils/pushNotifications";
 import { buildUserProfileHref } from "../../src/utils/userProfileRoute";
 
 type Lightbox = { uri: string; label: string };
@@ -104,6 +107,8 @@ export default function ConversationScreen() {
   const isFocused = useIsFocused();
   const { session } = useAuth();
   const { refreshUnreadChatCount } = useAppShell();
+  // Ler a conversa tambem tira o aviso agrupado dela do sino (backend).
+  const { refreshUnreadCount: refreshUnreadNotifications } = useNotifications();
   const { conversationId, name, otherUserProfileId, otherUserPhotoUrl } =
     useLocalSearchParams<{
       conversationId?: string;
@@ -122,11 +127,13 @@ export default function ConversationScreen() {
   }));
   const otherName = partner.name ?? "essa pessoa";
   const partnerProfileId = partner.userProfileId;
+  const partnerName = partner.name;
 
-  // Deep link sem params: nao ha "get conversation", entao a lista de
-  // conversas (uma chamada, silenciosa) resolve quem esta do outro lado.
+  // Deep link sem params (ou toque no push, que traz o perfil mas nao o
+  // nome): nao ha "get conversation", entao a lista de conversas (uma
+  // chamada, silenciosa) resolve quem esta do outro lado.
   useEffect(() => {
-    if (!resolvedConversationId || partnerProfileId) {
+    if (!resolvedConversationId || (partnerProfileId && partnerName)) {
       return;
     }
 
@@ -161,7 +168,7 @@ export default function ConversationScreen() {
     return () => {
       active = false;
     };
-  }, [partnerProfileId, resolvedConversationId]);
+  }, [partnerName, partnerProfileId, resolvedConversationId]);
 
   // ---- seguir / deixar de seguir a pessoa da conversa --------------------
   const [followState, setFollowState] = useState<FollowState | null>(null);
@@ -243,7 +250,7 @@ export default function ConversationScreen() {
           : accessibilityAnnouncements.newMessages(incoming.length, otherName)
       );
       // Auto-scroll: a lista e `inverted`, entao o fim da conversa e o offset 0.
-      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+      listRef.current?.scrollToOffset({ offset: 0, animated: !getGlobalTextAdjustments().reduceMotion });
       // Chegou mensagem com a tela aberta: marcar como lida imediatamente.
       if (resolvedConversationId) {
         void chatService.markAsRead(resolvedConversationId);
@@ -302,19 +309,26 @@ export default function ConversationScreen() {
 
     void chatService.markAsRead(initialLoad.conversationId).finally(() => {
       void refreshUnreadChatCount();
+      void refreshUnreadNotifications();
     });
-  }, [initialLoad, refreshUnreadChatCount, resolvedConversationId]);
+  }, [initialLoad, refreshUnreadChatCount, refreshUnreadNotifications, resolvedConversationId]);
 
   // Ao sair da tela o badge de nao lidas precisa refletir o que foi lido aqui.
+  // Enquanto a conversa esta aberta, push de mensagem DELA nao vira banner (a
+  // mensagem ja aparece aqui e a propria tela anuncia).
   useEffect(() => {
     if (!resolvedConversationId || !isFocused) {
       return;
     }
 
+    setActiveConversationId(resolvedConversationId);
+
     return () => {
+      setActiveConversationId(null);
       void refreshUnreadChatCount();
+      void refreshUnreadNotifications();
     };
-  }, [isFocused, refreshUnreadChatCount, resolvedConversationId]);
+  }, [isFocused, refreshUnreadChatCount, refreshUnreadNotifications, resolvedConversationId]);
 
   // A mensagem em edicao foi apagada/alterada por outro caminho (polling): sai da edicao.
   useEffect(() => {
@@ -354,7 +368,7 @@ export default function ConversationScreen() {
     try {
       const message = await chatService.sendTextMessage(resolvedConversationId, body);
       upsertLocalMessage(message);
-      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+      listRef.current?.scrollToOffset({ offset: 0, animated: !getGlobalTextAdjustments().reduceMotion });
       announceForAccessibility(accessibilityAnnouncements.messageSent());
     } catch (nextError) {
       showSendError(nextError, "Tente novamente em instantes.");
@@ -372,7 +386,7 @@ export default function ConversationScreen() {
     try {
       const message = await chatService.sendMediaMessage(resolvedConversationId, media);
       upsertLocalMessage(message);
-      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+      listRef.current?.scrollToOffset({ offset: 0, animated: !getGlobalTextAdjustments().reduceMotion });
       announceForAccessibility(media.type === "AUDIO" ? "Áudio enviado." : "Imagem enviada.");
     } catch (nextError) {
       showSendError(nextError, "Verifique o tamanho do arquivo e tente de novo.");

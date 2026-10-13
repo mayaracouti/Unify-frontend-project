@@ -121,6 +121,7 @@ export function CommunityDirectoryCard({
       }}
       accessibilityRole="button"
       accessibilityLabel={`Abrir ${community.name}`}
+      accessibilityHint="Abre a página desta comunidade"
     >
       {/* Linha 1: identidade da comunidade (icone, nome e selo de papel). */}
       <View className="flex-row items-center gap-4">

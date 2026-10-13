@@ -20,6 +20,8 @@
 import * as Speech from "expo-speech";
 import { AccessibilityInfo, Platform } from "react-native";
 
+import { stopAllAudioPlayback } from "../audio-focus";
+
 import {
   DEFAULT_TTS_PREFERENCE,
   getStoredTtsPreference,
@@ -266,17 +268,29 @@ function ensurePreferredVoiceLookup(): void {
 let lastSpokenText = "";
 let lastSpokenAt = 0;
 
+type UtteranceCallbacks = Pick<Speech.SpeechOptions, "onDone" | "onStopped" | "onError">;
+
 /** Entrega uma frase ja normalizada ao motor de fala (enfileira, nao interrompe). */
-function speakUtterance(message: string): void {
+function speakUtterance(message: string, callbacks: UtteranceCallbacks = {}): void {
   try {
     Speech.speak(message, {
       language: SPEECH_LANGUAGE,
       voice: preferredVoiceIdentifier,
       rate: SPEECH_RATE,
       pitch: SPEECH_PITCH,
+      ...callbacks,
     });
   } catch {
     // Falha do motor de fala nunca propaga para a acao de negocio.
+  }
+}
+
+/** `onDone` seguro: erro de quem escuta nunca derruba a fala. */
+function notifyDone(onDone: (() => void) | undefined): void {
+  try {
+    onDone?.();
+  } catch {
+    // Callback de quem chamou nao pode quebrar o servico.
   }
 }
 
@@ -321,18 +335,23 @@ export function speak(
     const message = normalizeSpeechText(text ?? null);
 
     if (!message || !shouldSpeak(message, options)) {
+      notifyDone(options.onDone);
       return;
     }
 
+    const callbacks: UtteranceCallbacks = options.onDone
+      ? { onDone: () => notifyDone(options.onDone) }
+      : {};
+
     if (options.interrupt === false) {
-      speakUtterance(message);
+      speakUtterance(message, callbacks);
       return;
     }
 
     // Politica anti-fila: interrompe a fala corrente antes de falar a nova.
     void Speech.stop()
       .catch(() => undefined)
-      .then(() => speakUtterance(message));
+      .then(() => speakUtterance(message, callbacks));
   } catch {
     // Nenhum erro de acessibilidade pode quebrar o app.
   }
@@ -364,7 +383,7 @@ export function speakSequence(
     }
 
     const speakAll = () => {
-      messages.forEach(speakUtterance);
+      messages.forEach((message) => speakUtterance(message));
     };
 
     if (options.interrupt === false) {
@@ -384,4 +403,143 @@ export function speakSequence(
 
 export function stopSpeaking(): void {
   void Speech.stop().catch(() => undefined);
+}
+
+// ---------------------------------------------------------------------------
+// Leitura sob demanda ("Ouvir mensagem" / "Ouvir publicacao")
+// ---------------------------------------------------------------------------
+
+/**
+ * Item sendo lido agora (chave escolhida por quem pediu, ex.: `post:<id>`).
+ * Assinavel: o botao do item mostra "Parar leitura" enquanto e a vez dele.
+ */
+let onDemandKey: string | null = null;
+/** Invalida callbacks de leituras antigas (o `stop` dispara `onStopped` delas). */
+let onDemandGeneration = 0;
+const onDemandListeners = new Set<() => void>();
+
+function setOnDemandKey(key: string | null): void {
+  if (onDemandKey === key) {
+    return;
+  }
+
+  onDemandKey = key;
+  onDemandListeners.forEach((listener) => {
+    try {
+      listener();
+    } catch {
+      // Um assinante quebrado nao impede os demais.
+    }
+  });
+}
+
+export function getOnDemandSpeechKey(): string | null {
+  return onDemandKey;
+}
+
+export function subscribeToOnDemandSpeech(listener: () => void): () => void {
+  onDemandListeners.add(listener);
+
+  return () => {
+    onDemandListeners.delete(listener);
+  };
+}
+
+/**
+ * Quebra um texto longo em partes de ate `maxLength` (fim de frase, senao
+ * espaco), para caber no limite do motor de fala e ser lido INTEIRO — ao
+ * contrario de `speak`, que resume em uma frase.
+ */
+export function splitSpeechChunks(text: string, maxLength = MAX_SPEECH_LENGTH): string[] {
+  const chunks: string[] = [];
+  let rest = text.trim();
+
+  while (rest.length > maxLength) {
+    const window = rest.slice(0, maxLength);
+    const sentenceEnd = Math.max(
+      window.lastIndexOf(". "),
+      window.lastIndexOf("! "),
+      window.lastIndexOf("? "),
+      window.lastIndexOf("\n")
+    );
+    const cut =
+      sentenceEnd > maxLength / 2
+        ? sentenceEnd + 1
+        : window.lastIndexOf(" ") > 0
+          ? window.lastIndexOf(" ")
+          : maxLength;
+
+    chunks.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trim();
+  }
+
+  if (rest.length > 0) {
+    chunks.push(rest);
+  }
+
+  return chunks;
+}
+
+/**
+ * Le `text` em voz alta porque a PESSOA pediu (botao "Ouvir"). Diferente de
+ * `speak`: vale com a leitura por voz desligada e com TalkBack/VoiceOver
+ * ligado (o leitor ja terminou de anunciar o botao quando o toque acontece),
+ * le o texto completo em partes e para qualquer audio tocando antes — um
+ * canal de som por vez. Devolve `false` quando nao ha o que ler.
+ */
+export function speakOnDemand(key: string, text: string | null | undefined): boolean {
+  try {
+    const cleaned =
+      typeof text === "string" ? text.replace(URL_PATTERN, "").replace(/\s+/g, " ").trim() : "";
+
+    if (!cleaned) {
+      return false;
+    }
+
+    const chunks = splitSpeechChunks(cleaned);
+    const generation = ++onDemandGeneration;
+    const finish = () => {
+      if (generation === onDemandGeneration) {
+        setOnDemandKey(null);
+      }
+    };
+
+    stopAllAudioPlayback();
+    setOnDemandKey(key);
+    // Pedido explicito: repetir o mesmo texto e intencional, sem deduplicar.
+    lastSpokenText = "";
+    ensurePreferredVoiceLookup();
+
+    void Speech.stop()
+      .catch(() => undefined)
+      .then(() => {
+        if (generation !== onDemandGeneration) {
+          return;
+        }
+
+        chunks.forEach((chunk, index) => {
+          speakUtterance(chunk, {
+            onDone: index === chunks.length - 1 ? finish : undefined,
+            onStopped: finish,
+            onError: finish,
+          });
+        });
+      });
+
+    return true;
+  } catch {
+    setOnDemandKey(null);
+    return false;
+  }
+}
+
+/** Para a leitura sob demanda em andamento (se houver). */
+export function stopOnDemandSpeech(): void {
+  if (onDemandKey === null) {
+    return;
+  }
+
+  onDemandGeneration += 1;
+  setOnDemandKey(null);
+  stopSpeaking();
 }

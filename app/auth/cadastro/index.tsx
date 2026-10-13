@@ -147,13 +147,6 @@ export default function Cadastro() {
 
   const passwordChecks = useMemo(() => checkPasswordRequirements(password), [password]);
 
-  const isPasswordValid =
-    passwordChecks.minLength &&
-    passwordChecks.hasUppercase &&
-    passwordChecks.hasLowercase &&
-    passwordChecks.hasNumber &&
-    passwordChecks.hasSpecialCharacter;
-
   const birthdateForApi = birthdate ? formatBirthdateForApi(birthdate) : "";
 
   function handleBirthdateChange(
@@ -287,7 +280,7 @@ export default function Cadastro() {
               fieldClassName="border-b border-white/35 bg-black/24 px-4"
               inputClassName="py-4 text-[14px] text-white"
               placeholder="Nome"
-              placeholderTextColor="#8F90A0"
+              placeholderTextColor="#A1A2AF"
               value={name}
               onChangeText={(value) => {
                 setName(value);
@@ -305,7 +298,7 @@ export default function Cadastro() {
               fieldClassName="border-b border-white/35 bg-black/24 px-4"
               inputClassName="py-4 text-[14px] text-white"
               placeholder="Sobrenome"
-              placeholderTextColor="#8F90A0"
+              placeholderTextColor="#A1A2AF"
               value={lastName}
               onChangeText={(value) => {
                 setLastName(value);
@@ -324,7 +317,7 @@ export default function Cadastro() {
             fieldClassName="border-b border-[#8BFFF3] bg-black/24 px-4"
             inputClassName="py-4 text-[14px] text-white"
             placeholder="E-mail"
-            placeholderTextColor="#8F90A0"
+            placeholderTextColor="#A1A2AF"
             autoCapitalize="none"
             autoComplete="email"
             keyboardType="email-address"
@@ -360,7 +353,7 @@ export default function Cadastro() {
           >
             <Text
               className={`flex-1 text-[14px] ${
-                birthdate ? "text-white" : "text-[#8F90A0]"
+                birthdate ? "text-white" : "text-[#A1A2AF]"
               }`}
             >
               {birthdate
@@ -391,7 +384,7 @@ export default function Cadastro() {
             fieldClassName="flex-row items-center border-b border-white/35 bg-black/24 px-4"
             inputClassName="flex-1 py-4 text-[14px] text-white"
             placeholder="Senha"
-            placeholderTextColor="#8F90A0"
+            placeholderTextColor="#A1A2AF"
             secureTextEntry={!showPassword}
             value={password}
             onChangeText={(value) => {
@@ -403,12 +396,18 @@ export default function Cadastro() {
             disabled={loading}
             rightElement={
               <Pressable
+                className="ml-3 min-h-[44px] min-w-[44px] items-center justify-center px-2"
                 onPress={() => {
                   speak(showPassword ? "Senha oculta" : "Senha visível");
                   setShowPassword((value) => !value);
                 }}
                 accessibilityRole="button"
                 accessibilityLabel={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                accessibilityHint={
+                  showPassword
+                    ? "Esconde os caracteres digitados no campo de senha"
+                    : "Exibe os caracteres digitados no campo de senha"
+                }
               >
                 <Text className="text-[12px] font-bold text-[#B7A8D8]">
                   {showPassword ? "Ocultar" : "Ver"}
@@ -465,6 +464,7 @@ export default function Cadastro() {
             }}
             accessibilityRole="button"
             accessibilityLabel={loading ? "Cadastrando…" : "Cadastrar"}
+            accessibilityHint="Cria sua conta com os dados informados"
             accessibilityState={{ disabled: loading, busy: loading }}
           >
             {loading ? (
@@ -477,7 +477,7 @@ export default function Cadastro() {
           </Pressable>
 
           <Pressable
-            className="items-center justify-center rounded-md border border-white/35 py-3"
+            className="min-h-[44px] items-center justify-center rounded-md border border-white/35 py-3"
             onPress={() => {
               speak("Voltar para o login");
               router.replace("/auth/login");

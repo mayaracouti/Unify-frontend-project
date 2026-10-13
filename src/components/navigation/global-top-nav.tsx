@@ -3,11 +3,14 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePathname, useRouter } from "expo-router";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 
+import { useGlobalAccessibilityState } from "../../accessibility/global-text-adjustments";
 import { buildActionSpeech, joinSpeechParts, useTTS } from "../../accessibility/tts";
 import { useAppShell } from "../../context/AppShellContext";
 import { useAuth } from "../../context/AuthContext";
+import { useNotifications } from "../../context/NotificationContext";
 import { useFollowRequestsCount } from "../../hooks/use-follow-requests-count";
 import { followRequestsAccessLabel } from "../../utils/followRequests";
+import { notificationBellLabel } from "../../utils/notificationFormatting";
 import { AuthenticatedRemoteImage } from "../profile/authenticated-remote-image";
 import { CountBadge } from "../ui/count-badge";
 import { navigationTabs } from "./navigation-tabs";
@@ -27,6 +30,7 @@ const PROFILE_ROUTE = "/profile";
 const HOME_ROUTE = "/home";
 const CREATE_POST_ROUTE = "/profile/new-post";
 const FOLLOW_REQUESTS_ROUTE = "/profile/follow-requests";
+const NOTIFICATIONS_ROUTE = "/notifications";
 
 type GlobalTopNavProps = {
   settingsRoute?: string | null;
@@ -46,6 +50,8 @@ export function GlobalTopNav({
   const { session, signOut } = useAuth();
   const { speak } = useTTS();
   const { currentUserName, currentUserPhotoUrl, unseenProfilesCount } = useAppShell();
+  const { unreadCount: unreadNotifications } = useNotifications();
+  const { reduceMotion } = useGlobalAccessibilityState();
   const [menuOpen, setMenuOpen] = useState(false);
   // Pedidos recebidos aguardando: badge no item do menu e ponto no hamburguer.
   const { pendingCount: pendingFollowRequests, refresh: refreshFollowRequests } =
@@ -59,6 +65,10 @@ export function GlobalTopNav({
   // Nova publicacao pessoal vive no topo do Inicio (e nao na barra inferior):
   // a barra inferior fica so com abas, e o "+" aparece no contexto do feed.
   const shouldShowCreatePostShortcut = pathname === HOME_ROUTE;
+  // Sino nas telas principais (com menu). Na propria tela de notificacoes ele
+  // sairia redundante: o contador ja esta no cabecalho dela.
+  const shouldShowNotificationsBell = showMenu && pathname !== NOTIFICATIONS_ROUTE;
+  const bellLabel = notificationBellLabel(unreadNotifications);
   // O cartao do usuario ja leva ao perfil: manter o item "Perfil" duplicaria a rota no menu.
   const menuTabs = useMemo(
     () => navigationTabs.filter((tab) => tab.route !== PROFILE_ROUTE),
@@ -92,11 +102,23 @@ export function GlobalTopNav({
 
   return (
     <>
-      <View className="h-16 flex-row items-center justify-between border-b border-[#262037] bg-[#090B18] px-6">
+      <View className="h-16 flex-row items-center justify-between border-b border-[#262037] bg-[#090B18] px-4">
+        {/*
+          Titulo centralizado de forma absoluta: com o sino, os lados podem ter
+          larguras diferentes e "UNIFY" sairia do centro. `pointerEvents` none
+          para nao roubar toque dos botoes.
+        */}
+        <View
+          pointerEvents="none"
+          className="absolute bottom-0 left-0 right-0 top-0 items-center justify-center"
+        >
+          <Text className="text-[26px] font-black tracking-[2px] text-[#7C4DFF]">UNIFY</Text>
+        </View>
+
         <View className="flex-row items-center">
           {backRoute ? (
             <Pressable
-              className="mr-1 h-10 w-10 items-center justify-center rounded-full"
+              className="mr-1 h-11 w-11 items-center justify-center rounded-full"
               onPress={() => {
                 speak(backLabel);
                 // `replace` (e nao `back`): a tela pode ser aberta por deep link,
@@ -105,8 +127,9 @@ export function GlobalTopNav({
               }}
               accessibilityRole="button"
               accessibilityLabel={backLabel}
+              accessibilityHint="Volta para a tela anterior"
             >
-              <Ionicons name="arrow-back" size={24} color="#A270FF" />
+              <Ionicons name="arrow-back" size={24} color="#A270FF" importantForAccessibility="no" />
             </Pressable>
           ) : null}
 
@@ -143,18 +166,36 @@ export function GlobalTopNav({
               ) : null}
             </Pressable>
           ) : backRoute ? null : (
-            // Sem menu e sem voltar o lado esquerdo ficaria vazio e o titulo
-            // "UNIFY" sairia do centro: o espacador ocupa o lugar do botao.
-            <View className="h-10 w-10" />
+            <View className="h-11 w-11" />
           )}
         </View>
 
-        <Text className="text-[26px] font-black tracking-[2px] text-[#7C4DFF]">UNIFY</Text>
+        <View className="flex-row items-center gap-1">
+          {shouldShowNotificationsBell ? (
+            <Pressable
+              className="relative h-11 w-11 items-center justify-center rounded-full"
+              onPress={() => {
+                speak(bellLabel);
+                router.push(NOTIFICATIONS_ROUTE);
+              }}
+              accessibilityRole="button"
+              // O numero do badge e decorativo: a contagem vai no rotulo.
+              accessibilityLabel={bellLabel}
+              accessibilityHint="Abre a lista de notificações"
+            >
+              <Ionicons
+                name={unreadNotifications > 0 ? "notifications" : "notifications-outline"}
+                size={24}
+                color="#A270FF"
+                importantForAccessibility="no"
+              />
+              <CountBadge count={unreadNotifications} size="sm" className="absolute -right-0.5 top-0" />
+            </Pressable>
+          ) : null}
 
         {shouldShowCreatePostShortcut ? (
           <Pressable
-            className="h-10 w-10 items-center justify-center rounded-full border-2 border-[#CDBDFF] bg-[#7C4DFF]"
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            className="h-11 w-11 items-center justify-center rounded-full border-2 border-[#CDBDFF] bg-[#7C4DFF]"
             onPress={() => {
               speak(buildActionSpeech("Criar publicação"));
               router.push(CREATE_POST_ROUTE);
@@ -167,35 +208,38 @@ export function GlobalTopNav({
           </Pressable>
         ) : shouldShowMutualMatchesShortcut ? (
           <Pressable
-            className="h-10 w-10 items-center justify-center rounded-full"
+            className="h-11 w-11 items-center justify-center rounded-full"
             onPress={() => {
               speak("Abrir lista de matches");
               router.push("/matches/mutual");
             }}
             accessibilityRole="button"
             accessibilityLabel="Abrir lista de matches"
+            accessibilityHint="Mostra as pessoas com quem você deu match"
           >
-            <Ionicons name="heart-circle-outline" size={30} color="#A270FF" />
+            <Ionicons name="heart-circle-outline" size={30} color="#A270FF" importantForAccessibility="no" />
           </Pressable>
         ) : settingsRoute ? (
           <Pressable
-            className="h-10 w-10 items-center justify-center rounded-full"
+            className="h-11 w-11 items-center justify-center rounded-full"
             onPress={() => {
               speak("Abrir configurações");
               router.push(settingsRoute);
             }}
             accessibilityRole="button"
             accessibilityLabel="Abrir configurações"
+            accessibilityHint="Abre as configurações desta tela"
           >
-            <Ionicons name="settings-outline" size={24} color="#A270FF" />
+            <Ionicons name="settings-outline" size={24} color="#A270FF" importantForAccessibility="no" />
           </Pressable>
-        ) : (
-          <View className="h-10 w-10" />
+        ) : shouldShowNotificationsBell ? null : (
+          <View className="h-11 w-11" />
         )}
+        </View>
       </View>
 
       <Modal
-        animationType="fade"
+        animationType={reduceMotion ? "none" : "fade"}
         transparent
         visible={menuOpen}
         onRequestClose={() => setMenuOpen(false)}
@@ -205,15 +249,16 @@ export function GlobalTopNav({
             <View className="flex-row items-center justify-between">
               <Text className="text-[20px] font-black tracking-[1.5px] text-[#7C4DFF]">UNIFY</Text>
               <Pressable
-                className="h-10 w-10 items-center justify-center rounded-full bg-[#181A24]"
+                className="h-11 w-11 items-center justify-center rounded-full bg-[#181A24]"
                 onPress={() => {
                   speak("Menu fechado");
                   setMenuOpen(false);
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Fechar menu"
+                accessibilityHint="Volta para a tela que estava aberta"
               >
-                <Ionicons name="close" size={22} color="#E5E2E1" />
+                <Ionicons name="close" size={22} color="#E5E2E1" importantForAccessibility="no" />
               </Pressable>
             </View>
 
@@ -233,13 +278,13 @@ export function GlobalTopNav({
                     resizeMode="cover"
                     fallback={
                       <View className="flex-1 items-center justify-center bg-[#2D2A33]">
-                        <Text allowFontScaling={false} className="text-[20px] font-black text-white">{initials || "?"}</Text>
+                        <Text maxFontSizeMultiplier={1.3} numberOfLines={1} className="text-[20px] font-black text-white">{initials || "?"}</Text>
                       </View>
                     }
                   />
                 ) : (
                   <View className="flex-1 items-center justify-center bg-[#2D2A33]">
-                    <Text allowFontScaling={false} className="text-[20px] font-black text-white">{initials || "?"}</Text>
+                    <Text maxFontSizeMultiplier={1.3} numberOfLines={1} className="text-[20px] font-black text-white">{initials || "?"}</Text>
                   </View>
                 )}
               </View>
@@ -253,7 +298,7 @@ export function GlobalTopNav({
                 </Text>
               </View>
 
-              <Ionicons name="chevron-forward" size={20} color="#6F7181" />
+              <Ionicons name="chevron-forward" size={20} color="#8E90A2" importantForAccessibility="no" />
             </Pressable>
 
             <ScrollView className="mt-8 flex-1" showsVerticalScrollIndicator={false}>
@@ -282,7 +327,10 @@ export function GlobalTopNav({
                       }
                     }}
                     accessibilityRole="button"
-                    accessibilityLabel={tab.label}
+                    accessibilityLabel={
+                      badgeValue ? `${tab.label}, ${badgeValue} novos perfis` : tab.label
+                    }
+                    accessibilityHint={`Abre a seção ${tab.label}`}
                     accessibilityState={{ selected: active }}
                   >
                     <View className="relative h-11 w-11 items-center justify-center rounded-full bg-[#1B1E2A]">
@@ -292,22 +340,28 @@ export function GlobalTopNav({
                         color={active ? "#7C4DFF" : "#CAC3D8"}
                       />
 
-                      {badgeValue ? (
-                        <View className="absolute -right-2 -top-1 rounded-full bg-[#814DFF] px-1.5 py-0.5">
-                          <Text className="text-[9px] font-black text-white">{badgeValue}</Text>
-                        </View>
-                      ) : null}
+                      <CountBadge
+                        count={tab.badgeKey === "matches" ? unseenProfilesCount : 0}
+                        size="sm"
+                        className="absolute -right-2 -top-1"
+                      />
                     </View>
 
+                    {/* #9B7BFF: o roxo da marca (#7C4DFF) da 3,8:1 neste fundo, abaixo de 4,5:1 para texto. */}
                     <Text
                       className={`ml-4 flex-1 text-[17px] font-black ${
-                        active ? "text-[#7C4DFF]" : "text-white"
+                        active ? "text-brand-text" : "text-white"
                       }`}
                     >
                       {tab.label}
                     </Text>
 
-                    <Ionicons name="chevron-forward" size={20} color="#6F7181" />
+                    <Ionicons
+                      name="chevron-forward"
+                      size={20}
+                      color="#8E90A2"
+                      importantForAccessibility="no"
+                    />
                   </Pressable>
                 );
               })}
@@ -337,7 +391,7 @@ export function GlobalTopNav({
 
                 <Text
                   className={`ml-4 flex-1 text-[17px] font-black ${
-                    followRequestsActive ? "text-[#7C4DFF]" : "text-white"
+                    followRequestsActive ? "text-brand-text" : "text-white"
                   }`}
                 >
                   Pedidos para seguir
@@ -346,7 +400,7 @@ export function GlobalTopNav({
                 <Ionicons
                   name="chevron-forward"
                   size={20}
-                  color="#6F7181"
+                  color="#8E90A2"
                   importantForAccessibility="no"
                 />
               </Pressable>
@@ -359,13 +413,20 @@ export function GlobalTopNav({
               }}
               accessibilityRole="button"
               accessibilityLabel="Sair da conta"
+              accessibilityHint="Encerra a sessão e volta para a tela de entrada"
             >
-              <Ionicons name="log-out-outline" size={22} color="#FF8FAB" />
+              <Ionicons name="log-out-outline" size={22} color="#FF8FAB" importantForAccessibility="no" />
               <Text className="ml-3 text-[16px] font-black text-[#FFCCD8]">Sair</Text>
             </Pressable>
           </View>
 
-          <Pressable className="flex-1" onPress={() => setMenuOpen(false)} />
+          {/* Area escura fora do menu: so toque. Para leitor de tela o "Fechar menu" ja existe. */}
+          <Pressable
+            className="flex-1"
+            onPress={() => setMenuOpen(false)}
+            accessible={false}
+            importantForAccessibility="no"
+          />
         </View>
       </Modal>
     </>

@@ -55,6 +55,15 @@ export const LOCKED_PROFILE_NOTICE = "Conta privada. Siga para ver o perfil.";
 export const LOCKED_PROFILE_PARTIAL_NOTICE = "Conta privada. Siga para ver o perfil completo.";
 
 export const accessibilityAnnouncements = {
+  notificationsEntry: (unread: number) =>
+    unread <= 0
+      ? "Notificações. Nenhuma notificação não lida."
+      : `Notificações. ${unread === 1 ? "1 notificação não lida" : `${unread} notificações não lidas`}.`,
+  notificationsAllRead: () => "Todas as notificações foram marcadas como lidas.",
+  notificationMarkedRead: () => "Notificação marcada como lida.",
+  pushEnabled: () => "Notificações no celular ativadas.",
+  pushStillDisabled: () =>
+    "As notificações continuam desligadas. Ative nos ajustes do aparelho para receber avisos com o app fechado.",
   newMutualMatch: (name: string) =>
     `Novo match com ${name}. Vocês demonstraram interesse mútuo. Agora dá para conversar.`,
 

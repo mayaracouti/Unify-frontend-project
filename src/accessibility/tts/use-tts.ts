@@ -6,15 +6,19 @@
  * `useSyncExternalStore` para os componentes que precisam re-renderizar
  * quando a preferencia muda (switch de configuracoes, gate de onboarding).
  */
-import { useMemo, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 
 import {
   completeTtsOnboarding,
+  getOnDemandSpeechKey,
   getTtsState,
   setTtsEnabled,
   speak,
+  speakOnDemand,
   speakSequence,
+  stopOnDemandSpeech,
   stopSpeaking,
+  subscribeToOnDemandSpeech,
   subscribeToTtsState,
 } from "./tts-service";
 import type { TtsSpeakOptions, TtsState } from "./tts-types";
@@ -45,4 +49,31 @@ export function useTTS(): UseTtsResult {
     }),
     [state]
   );
+}
+
+/**
+ * Botao "Ouvir" de um item (mensagem, publicacao): `speaking` enquanto ESTE
+ * item esta sendo lido e `toggle` le/para. A troca de rota para a leitura
+ * (ScreenReaderAnnouncer), entao nada fica falando em outra tela.
+ */
+export function useOnDemandSpeech(key: string) {
+  const activeKey = useSyncExternalStore(
+    subscribeToOnDemandSpeech,
+    getOnDemandSpeechKey,
+    getOnDemandSpeechKey
+  );
+
+  const toggle = useCallback(
+    (text: string | null | undefined) => {
+      if (getOnDemandSpeechKey() === key) {
+        stopOnDemandSpeech();
+        return false;
+      }
+
+      return speakOnDemand(key, text);
+    },
+    [key]
+  );
+
+  return { speaking: activeKey === key, toggle };
 }

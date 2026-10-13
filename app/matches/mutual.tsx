@@ -1,7 +1,7 @@
 import { useIsFocused } from "@react-navigation/native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -78,18 +78,6 @@ function collectMutualMatchImageUrls(page: MutualMatchPageResponse) {
     .filter((value): value is string => typeof value === "string" && value.length > 0);
 }
 
-function formatMatchSummary(totalElements: number) {
-  if (totalElements <= 0) {
-    return "Nenhum match confirmado ainda. Quando uma curtida for recíproca, a pessoa aparecerá aqui.";
-  }
-
-  if (totalElements === 1) {
-    return "1 pessoa confirmou interesse em você.";
-  }
-
-  return `${totalElements.toLocaleString("pt-BR")} pessoas confirmaram interesse em você.`;
-}
-
 function formatAgeLabel(age: number | null) {
   return typeof age === "number" ? `${age} anos` : "Idade não informada";
 }
@@ -146,6 +134,7 @@ function MutualMatchCard({
         accessible
         accessibilityRole="summary"
         accessibilityLabel={`${displayName}, ${ageLabel}. Match confirmado.`}
+        accessibilityHint="Lê em voz alta o resumo deste match"
         className="flex-row items-center gap-4"
         // Toque no resumo fala o match (nome e idade vindos do backend).
         onPress={() => speak(buildMutualMatchSpeech(match) ?? displayName)}
@@ -395,22 +384,6 @@ export default function MutualMatchesScreen() {
     }
   };
 
-  const matchesSummary = useMemo(
-    () => formatMatchSummary(matchesPage.totalElements),
-    [matchesPage.totalElements]
-  );
-
-  const paginationSummary = useMemo(() => {
-    if (matchesPage.totalElements <= 0) {
-      return "Puxe para atualizar quando quiser revisar a lista.";
-    }
-
-    return `Página ${(matchesPage.page + 1).toLocaleString("pt-BR")} de ${Math.max(
-      matchesPage.totalPages,
-      1
-    ).toLocaleString("pt-BR")}.`;
-  }, [matchesPage.page, matchesPage.totalElements, matchesPage.totalPages]);
-
   return (
     <View className="flex-1 bg-[#1F2023]">
       <SafeAreaView className="flex-1">
@@ -424,7 +397,8 @@ export default function MutualMatchesScreen() {
                 router.replace("/matches");
               }}
               accessibilityRole="button"
-              accessibilityLabel="Voltar para encontros">
+              accessibilityLabel="Voltar para encontros"
+              accessibilityHint="Retorna para a tela de Encontros">
               <Ionicons
                 name="arrow-back"
                 size={22}
@@ -465,18 +439,6 @@ export default function MutualMatchesScreen() {
               }
               showsVerticalScrollIndicator={false}
             >
-              {/* <View className="rounded-[28px] border border-[#353534] bg-[#111214] px-5 py-4">
-                <Text className="text-[13px] font-black uppercase tracking-[1.1px] text-[#CDBDFF]">
-                  Matches confirmados
-                </Text>
-                <Text className="mt-2 text-[15px] font-semibold leading-6 text-[#CAC3D8]">
-                  {matchesSummary}
-                </Text>
-                <Text className="mt-2 text-[13px] font-semibold text-[#9F96B8]">
-                  {paginationSummary}
-                </Text>
-              </View> */}
-
               {loadError && matchesPage.matches.length > 0 ? (
                 <View
                   accessible
@@ -529,6 +491,7 @@ export default function MutualMatchesScreen() {
                   disabled={loadingMore}
                   accessibilityRole="button"
                   accessibilityLabel="Carregar mais matches"
+                  accessibilityHint="Adiciona a próxima página de matches ao fim da lista"
                   accessibilityState={{ disabled: loadingMore, busy: loadingMore }}
                 >
                   {loadingMore ? (

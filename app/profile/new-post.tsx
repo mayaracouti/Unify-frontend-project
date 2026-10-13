@@ -234,8 +234,8 @@ export default function ProfileNewPostScreen() {
           >
             <View className="flex-row items-center">
               <Pressable
-                className="mr-3 h-10 w-10 items-center justify-center rounded-full"
-                // 40dp visuais + hitSlop = area de toque de 48dp.
+                className="mr-3 h-11 w-11 items-center justify-center rounded-full"
+                // 44dp visuais + hitSlop = area de toque de 52dp.
                 hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                 onPress={() => {
                   speak("Voltar");
@@ -344,7 +344,7 @@ export default function ProfileNewPostScreen() {
                   </Text>
 
                   <Pressable
-                    className={`rounded-full border px-4 py-3 ${
+                    className={`min-h-[44px] justify-center rounded-full border px-4 py-3 ${
                       highContrast
                         ? "border-hc-border bg-hc-bg"
                         : "border-[#494455] bg-[#1A1C1F]"

@@ -168,6 +168,7 @@ export function MultiChoice({
   showOptionIcons?: boolean;
 }) {
   const { speak } = useTTS();
+  const selectedCount = options.filter((option) => values.includes(option.id)).length;
 
   return (
     <View className="mb-8">
@@ -177,10 +178,13 @@ export function MultiChoice({
       >
         {title}
       </Text>
-      {/* Selecao multipla: o rotulo do grupo avisa que mais de uma opcao vale. */}
+      {/* Selecao multipla: o rotulo do grupo avisa que mais de uma opcao vale
+          e quantas ja estao marcadas (roteiro TalkBack, passo 6). */}
       <View
         accessibilityRole="none"
-        accessibilityLabel={`${title}. Seleção múltipla.`}
+        accessibilityLabel={`${title}. Seleção múltipla, ${
+          selectedCount === 1 ? "1 selecionada" : `${selectedCount} selecionadas`
+        }.`}
         className="flex-row flex-wrap gap-3"
       >
         {options.map((option) => (

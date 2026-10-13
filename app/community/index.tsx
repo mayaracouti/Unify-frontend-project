@@ -1,6 +1,6 @@
 import { useIsFocused } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -337,6 +337,8 @@ export default function CommunityDirectoryScreen() {
     deferredSearchQuery,
     isFocused,
     selectedCategoryId,
+    setDirectory,
+    setLoadError,
     speak,
   ]);
 
@@ -584,18 +586,6 @@ export default function CommunityDirectoryScreen() {
     }
   };
 
-  const directorySummaryLabel = useMemo(() => {
-    if (directory.totalElements <= 0) {
-      return deferredSearchQuery
-        ? `Nenhuma comunidade encontrada para "${deferredSearchQuery}".`
-        : "Nenhuma comunidade disponível no momento.";
-    }
-
-    return deferredSearchQuery
-      ? `${directory.totalElements.toLocaleString("pt-BR")} comunidades encontradas para "${deferredSearchQuery}".`
-      : `${directory.totalElements.toLocaleString("pt-BR")} comunidades disponíveis.`;
-  }, [deferredSearchQuery, directory.totalElements]);
-
   return (
     <View className="flex-1 bg-[#0D0D0E]">
       <SafeAreaView className="flex-1 bg-black">
@@ -676,7 +666,7 @@ export default function CommunityDirectoryScreen() {
 
                 {forYouFeed.content.length > 0 && forYouFeed.hasNext ? (
                   <Pressable
-                    className="mt-6 items-center justify-center rounded-[24px] border border-[#3A3246] bg-[#17181C] px-5 py-2"
+                    className="mt-6 min-h-[44px] items-center justify-center rounded-[24px] border border-[#3A3246] bg-[#17181C] px-5 py-2"
                     onPress={() => {
                       speak("Carregar mais publicações");
                       void loadForYouFeed({ append: true });
@@ -744,6 +734,8 @@ export default function CommunityDirectoryScreen() {
                     {searchQuery.trim().length > 0 ? (
                       <Pressable
                         className="h-8 w-8 items-center justify-center rounded-full bg-[#2A2A2A]"
+                        // 32dp visuais + hitSlop = area de toque de 44dp (cabe no py-3 da caixa).
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                         onPress={() => {
                           speak("Busca limpa");
                           setSearchQuery("");
@@ -759,7 +751,7 @@ export default function CommunityDirectoryScreen() {
                 </View>
 
                 <Pressable
-                  className="mt-4 flex-row items-center justify-center gap-2 rounded-[24px] border border-[#3A3246] bg-[#17181C] px-4 py-3"
+                  className="mt-4 min-h-[44px] flex-row items-center justify-center gap-2 rounded-[24px] border border-[#3A3246] bg-[#17181C] px-4 py-3"
                   onPress={() => {
                     speak("Minhas comunidades");
                     router.push("/community/mine");
@@ -778,15 +770,6 @@ export default function CommunityDirectoryScreen() {
                   onSelect={setSelectedCategoryId}
                   allOptionLabel="Todas"
                 />
-
-                {/* <View className="mt-5 rounded-2xl border border-[#353534] bg-[#17181C] px-4 py-4">
-                  <Text className="text-[13px] font-bold uppercase tracking-[1.1px] text-[#7C4DFF]">
-                    Resultado atual
-                  </Text>
-                  <Text className="mt-2 text-[14px] font-semibold leading-6 text-content-secondary">
-                    {directorySummaryLabel}
-                  </Text>
-                </View> */}
               </View>
 
               {loadError && directory.communities.length > 0 ? (
@@ -833,7 +816,7 @@ export default function CommunityDirectoryScreen() {
 
               {directory.communities.length > 0 && directory.hasNext ? (
                 <Pressable
-                  className="mt-2 items-center justify-center rounded-[24px] border border-[#3A3246] bg-[#17181C] px-5 py-2"
+                  className="mt-2 min-h-[44px] items-center justify-center rounded-[24px] border border-[#3A3246] bg-[#17181C] px-5 py-2"
                   onPress={() => {
                     speak("Carregar mais comunidades");
                     void handleLoadMore();

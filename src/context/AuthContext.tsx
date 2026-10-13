@@ -30,6 +30,7 @@ import type {
 } from "../types/auth";
 import { createAuthSession, isApiError } from "../types/auth";
 import { normalizeEmail } from "../utils/auth";
+import { unregisterPushRegistration } from "../utils/pushNotifications";
 
 type AuthContextValue = {
   isAuthenticated: boolean;
@@ -174,6 +175,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const signOut = async () => {
     try {
       if (snapshot.session) {
+        // Antes do logout: a remocao do token de push exige o access token, e
+        // num aparelho compartilhado ninguem deve receber os avisos de quem saiu.
+        await unregisterPushRegistration();
         await authService.logout();
       }
     } catch {

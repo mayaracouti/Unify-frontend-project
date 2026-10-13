@@ -146,7 +146,7 @@ export default function EmailCode() {
             maxLength={6}
             autoFocus
             placeholder="000000"
-            placeholderTextColor="#A1A1AA"
+            placeholderTextColor="#6D6D79"
             value={code}
             accessibilityLabel="Código de verificação de 6 dígitos"
             accessibilityHint="Digite o código enviado para seu e-mail"
@@ -190,6 +190,8 @@ export default function EmailCode() {
 
           <Pressable
             className="mb-10 self-start"
+            // ~24dp visuais + hitSlop = area de toque de 44dp sem mexer no layout.
+            hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
             onPress={() => {
               speak("Reenviar código");
               void handleResendCode();

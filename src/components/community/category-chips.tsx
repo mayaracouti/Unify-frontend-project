@@ -45,7 +45,7 @@ export function CommunityCategoryChips({
     >
       {allOptionLabel ? (
         <Pressable
-          className={`rounded-full border px-4 py-2 ${
+          className={`min-h-[44px] justify-center rounded-full border px-4 py-2 ${
             selectedCategoryId === null
               ? "border-[#EAEA00] bg-[#EAEA00]"
               : "border-[#3A3246] bg-[#17181C]"
@@ -56,6 +56,7 @@ export function CommunityCategoryChips({
           }}
           accessibilityRole="radio"
           accessibilityLabel="Todas as categorias"
+          accessibilityHint="Remove o filtro de categoria"
           accessibilityState={{ selected: selectedCategoryId === null }}
         >
           <Text
@@ -76,7 +77,7 @@ export function CommunityCategoryChips({
         return (
           <Pressable
             key={category.id}
-            className={`rounded-full border px-4 py-2 ${
+            className={`min-h-[44px] justify-center rounded-full border px-4 py-2 ${
               selected ? "border-[#EAEA00] bg-[#EAEA00]" : "border-[#3A3246] bg-[#17181C]"
             }`}
             onPress={() => {
@@ -86,6 +87,7 @@ export function CommunityCategoryChips({
             }}
             accessibilityRole="radio"
             accessibilityLabel={category.description}
+            accessibilityHint={selected ? "Desmarca esta categoria" : "Seleciona esta categoria"}
             accessibilityState={{ selected }}
           >
             <Text

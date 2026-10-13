@@ -176,6 +176,57 @@ Sem essa resposta no backend, o navegador bloqueia a chamada antes de o `POST /a
 
 ---
 
+## Notificações push (Firebase) — build nativo
+
+Desde a semana 05 o app tem central de notificações (sino no topo, tela
+`/notifications`) e push via **Firebase Cloud Messaging**. O pacote Android e
+o bundle iOS são `br.com.app.unify`.
+
+- **Expo Go continua funcionando** para o dia a dia, com o sino e a lista
+  in-app. Push remoto **não existe no Expo Go** (removido no SDK 53): lá o
+  registro do token é ignorado em silêncio.
+- **Para testar push** é preciso um build nativo de debug:
+  1. Firebase Console → ⚙ Configurações do projeto → Geral → app Android
+     `br.com.app.unify` → baixar `google-services.json` e salvar na raiz deste
+     projeto (o `app.config.js` só liga o FCM quando o arquivo existe;
+     `GOOGLE_SERVICES_JSON` aponta para outro caminho).
+  2. JDK 17 + Android SDK instalados (`JAVA_HOME` apontando para o JDK 17).
+  3. `npx expo run:android` (gera `android/`, ignorada pelo git, instala no
+     emulador/aparelho conectado e sobe o Metro). Emulador precisa de imagem
+     **com Google Play** (o FCM depende do Google Play Services).
+  4. No primeiro acesso depois do onboarding o Android pede a permissão de
+     notificações. Recusou? A tela de notificações mostra "Ativar
+     notificações", que pede de novo ou abre os ajustes do aparelho.
+- **Windows: caminho longo quebra o C++.** Com o projeto em uma pasta funda,
+  o `ninja` 1.10 do CMake 3.22.1 (padrão do SDK) falha com
+  `ninja: error: mkdir(...)` / `build.ninja still dirty after 100 tries`.
+  Com `LongPathsEnabled=1` no Windows, use o CMake 3.31.6 (ninja 1.12):
+  instale "CMake 3.31.6" no SDK Manager do Android Studio (SDK Tools → Show
+  Package Details), adicione `cmake.dir=C:/Users/<você>/AppData/Local/Android/Sdk/cmake/3.31.6`
+  em `android/local.properties` e rode o build com `CMAKE_VERSION=3.31.6`
+  (reanimated/worklets fixam a versão por essa variável).
+- **Rede da prefeitura bloqueia o push no aparelho.** O Google Play não
+  alcança `android.clients.google.com` (token) nem `mtalk.google.com`
+  (entrega, portas 5228-5230/443): o token falha com `SERVICE_NOT_AVAILABLE`.
+  Teste o push com o celular no 4G (ligado por USB, `adb reverse tcp:8081
+  tcp:8081` e `adb reverse tcp:8080 tcp:8080` com
+  `EXPO_PUBLIC_API_BASE_URL=http://127.0.0.1:8080`). O emulador também herda
+  `HTTP_PROXY` do ambiente: com proxy, `10.0.2.2` não chega ao PC — use
+  `adb reverse` ou abra o emulador sem essa variável.
+- O backend precisa da conta de serviço do Firebase (ver README do
+  `unify-api`, seção "Notificações push").
+- iOS: o token nativo é de APNs, não FCM — push em iOS exige conta Apple
+  Developer e chave APNs no Firebase (fora do escopo por enquanto).
+
+Peças principais: `src/utils/pushNotifications.ts` (permissão, token, canal
+Android, banner com o app aberto), `src/context/NotificationContext.tsx`
+(badge, registro do token, push recebido), `src/components/notifications/push-notification-router.tsx`
+(toque no push → destino) e `src/utils/notificationNavigation.ts` (ponto único
+de deep link, usado também pela lista in-app).
+
+Acessibilidade: `npm run lint:a11y` roda as regras `react-native-a11y` +
+`unify-a11y/interactive-accessibility-hint` com zero avisos tolerados.
+
 ## Tokens de cor, tipografia e contraste (WCAG AA)
 
 > Ref.: `plano-implementacao/00-DIAGNOSTICO-E-FUNDACAO.md` §4.3. Antes desta fundação, `tailwind.config.js` tinha `theme.extend` vazio e todas as telas hardcodavam hex direto nas classes (`bg-[#111111]`, `text-[#F2F500]`, …), sem garantia de contraste.
@@ -192,6 +243,7 @@ Sem essa resposta no backend, o navegador bloqueia a chamada antes de o `POST /a
 | Marca | `brand` (DEFAULT) | `#8752FF` |
 | Marca | `brand-strong` | `#5328AA` |
 | Marca | `brand-soft` | `#DCD5FF` |
+| Marca | `brand-text` | `#9B7BFF` (semana 05: roxo legível como texto pequeno) |
 | Ação | `accent` (DEFAULT) | `#F2F500` |
 | Ação | `accent-muted` | `#BFC200` |
 | Texto | `content` (DEFAULT) | `#FFFFFF` |
@@ -265,6 +317,11 @@ Método: luminância relativa e razão de contraste calculadas exatamente pela f
 | `text-info` | `bg-surface-muted` | `#9DDCFF` | `#28282B` | 9.88:1 | AA texto normal |
 | `text-info` | `bg-surface-alt` | `#9DDCFF` | `#111214` | 12.60:1 | AA texto normal |
 | `#1D1D00` (texto escuro em botão) | `bg-accent` | `#1D1D00` | `#F2F500` | 14.52:1 | AA texto normal |
+| `text-brand-text` | `bg-surface` | `#9B7BFF` | `#111111` | 6.00:1 | AA texto normal |
+| `text-brand-text` | `bg-surface-raised` | `#9B7BFF` | `#19191C` | 5.57:1 | AA texto normal |
+| `text-brand-text` | `bg-surface-sunken` | `#9B7BFF` | `#070B1D` | 6.21:1 | AA texto normal |
+| `text-brand-text` | `bg-surface-muted` | `#9B7BFF` | `#28282B` | 4.67:1 | AA texto normal |
+| `text-brand-text` | `bg-surface-alt` | `#9B7BFF` | `#111214` | 5.95:1 | AA texto normal |
 
 **Todos os pares aprovam no critério mínimo aplicável** (4,5:1 para texto normal, 3:1 para texto grande). A única restrição de uso é `brand` (`#8752FF`) como cor de **texto**: sozinho ele só atinge AA para **texto grande** (≥18px, ou ≥14px em negrito) ou para elementos não textuais (ícones, bordas, indicadores). Para texto pequeno com a cor de marca, usar `brand-soft` (`#DCD5FF`), que aprova com folga em todas as superfícies.
 

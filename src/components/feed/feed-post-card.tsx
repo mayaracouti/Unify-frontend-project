@@ -4,7 +4,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { memo, useMemo, useState, type ComponentProps } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
-import { buildActionSpeech, buildFeedPostSpeech, useTTS } from "../../accessibility/tts";
+import {
+  buildActionSpeech,
+  buildFeedPostSpeech,
+  joinSpeechParts,
+  useOnDemandSpeech,
+  useTTS,
+} from "../../accessibility/tts";
 import { feedService } from "../../services/feedService";
 import type { UserPostResponse } from "../../types/social";
 import { describeFeedSuggestion } from "../../utils/feedSource";
@@ -91,11 +97,49 @@ function FeedCounterAction({
       )}
       {/* Numero solto nao e lido: a contagem ja vai embutida no label do botao. */}
       <Text
-        className={`text-[15px] font-bold ${active ? "text-[#7C4DFF]" : "text-[#E5E2E1]"}`}
+        className={`text-[15px] font-bold ${active ? "text-brand-text" : "text-[#E5E2E1]"}`}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       >
         {count}
+      </Text>
+    </Pressable>
+  );
+}
+
+/**
+ * "Ouvir publicacao" (plano 05, 5.9): le o texto inteiro em voz alta para
+ * qualquer pessoa — com a leitura por voz do app desligada e tambem com
+ * TalkBack. Tocar de novo para; trocar de tela para sozinho.
+ */
+function FeedListenAction({ authorName, post }: { authorName: string; post: UserPostResponse }) {
+  const { speaking, toggle } = useOnDemandSpeech(`post:${post.id}`);
+
+  return (
+    <Pressable
+      className="min-h-[44px] flex-1 flex-row items-center justify-center gap-2 rounded-lg"
+      accessibilityRole="button"
+      accessibilityLabel={speaking ? "Parar leitura da publicação" : "Ouvir publicação"}
+      accessibilityHint={
+        speaking ? "Interrompe a leitura em voz alta" : "Lê o texto desta publicação em voz alta"
+      }
+      accessibilityState={{ selected: speaking }}
+      onPress={() => {
+        toggle(joinSpeechParts([`Publicação de ${authorName}`, post.body]));
+      }}
+    >
+      <Ionicons
+        name={speaking ? "stop-circle" : "volume-high-outline"}
+        size={22}
+        color={speaking ? "#9B7BFF" : "#CAC3D8"}
+        importantForAccessibility="no"
+      />
+      <Text
+        className={`text-[15px] font-bold ${speaking ? "text-brand-text" : "text-[#E5E2E1]"}`}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        {speaking ? "Parar" : "Ouvir"}
       </Text>
     </Pressable>
   );
@@ -435,6 +479,7 @@ export const FeedPostCard = memo(function FeedPostCard({
         onPress={() => speak(buildFeedPostSpeech(post))}
         accessibilityRole="text"
         accessibilityLabel={post.body}
+        accessibilityHint="Com a leitura por voz do app ligada, toque para ouvir"
       >
         <Text className={`mt-4 text-[15px] font-semibold leading-6 ${textColor}`}>
           {post.body}
@@ -494,6 +539,7 @@ export const FeedPostCard = memo(function FeedPostCard({
             onOpenComments(post);
           }}
         />
+        <FeedListenAction authorName={authorName} post={post} />
       </View>
 
       <ActionSheet
