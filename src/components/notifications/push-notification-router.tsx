@@ -1,11 +1,11 @@
-import * as Notifications from "expo-notifications";
+import type { NotificationResponse } from "expo-notifications";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef } from "react";
-import { Platform } from "react-native";
 
 import { useNotifications } from "../../context/NotificationContext";
 import { notificationService } from "../../services/notificationService";
 import { openNotificationTarget, parsePushData } from "../../utils/notificationNavigation";
+import { loadNotifications } from "../../utils/pushNotifications";
 
 /**
  * Toque numa notificacao do sistema (app em segundo plano, fechado ou
@@ -22,7 +22,7 @@ export function PushNotificationRouter() {
   const handledRef = useRef(new Set<string>());
 
   const handleResponse = useCallback(
-    async (response: Notifications.NotificationResponse) => {
+    async (response: NotificationResponse) => {
       const key = `${response.notification.request.identifier}:${response.notification.date}`;
 
       if (handledRef.current.has(key)) {
@@ -30,7 +30,7 @@ export function PushNotificationRouter() {
       }
 
       handledRef.current.add(key);
-      Notifications.clearLastNotificationResponse();
+      loadNotifications()?.clearLastNotificationResponse();
 
       const data = parsePushData(response.notification.request.content.data);
 
@@ -55,7 +55,10 @@ export function PushNotificationRouter() {
   );
 
   useEffect(() => {
-    if (Platform.OS === "web") {
+    // Expo Go/web: sem notificacoes do sistema, nada a rotear.
+    const Notifications = loadNotifications();
+
+    if (!Notifications) {
       return;
     }
 

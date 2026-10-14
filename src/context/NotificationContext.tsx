@@ -1,4 +1,3 @@
-import * as Notifications from "expo-notifications";
 import {
   createContext,
   type PropsWithChildren,
@@ -9,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { AppState, Linking, Platform } from "react-native";
+import { AppState, Linking } from "react-native";
 
 import { joinSpeechParts, speak } from "../accessibility/tts";
 import { notificationService } from "../services/notificationService";
@@ -20,6 +19,7 @@ import {
   getPushPermissionStatus,
   isDataOnlyRemotePush,
   isRemotePushSupported,
+  loadNotifications,
   presentForegroundPush,
   type PushPermissionStatus,
   shouldPresentNotification,
@@ -168,7 +168,9 @@ export function NotificationProvider({ children }: PropsWithChildren) {
   // `presentForegroundPush`) que o TalkBack anuncia; quem usa a leitura por voz
   // in-app ouve pelo TTS. O badge atualiza na hora.
   useEffect(() => {
-    if (!isActiveSession || Platform.OS === "web") {
+    const Notifications = isActiveSession ? loadNotifications() : null;
+
+    if (!Notifications) {
       return;
     }
 
@@ -199,7 +201,7 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     const current = await getPushPermissionStatus().catch(() => "undetermined" as const);
 
     if (current === "denied") {
-      const canAskAgain = (await Notifications.getPermissionsAsync().catch(() => null))?.canAskAgain;
+      const canAskAgain = (await loadNotifications()?.getPermissionsAsync().catch(() => null))?.canAskAgain;
 
       if (!canAskAgain) {
         await Linking.openSettings().catch(() => undefined);

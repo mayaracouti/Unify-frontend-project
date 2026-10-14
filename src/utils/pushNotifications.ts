@@ -8,12 +8,17 @@
  *   `expo-notifications` monta a notificacao com o app aberto, em segundo
  *   plano ou fechado, e o toque cai em `addNotificationResponseReceivedListener`.
  * - Push remoto NAO existe no Expo Go desde o SDK 53 nem no web: la tudo aqui
- *   vira no-op e o app segue com as notificacoes in-app (sino).
+ *   vira no-op e o app segue com as notificacoes in-app (sino). Nesses
+ *   ambientes o `expo-notifications` nem e carregado (ver `loadNotifications`).
  * - iOS fica de fora por enquanto: o token nativo do iOS e de APNs, nao FCM
  *   (exigiria conta Apple Developer + chave APNs no Firebase).
  */
 import { isRunningInExpoGo } from "expo";
-import * as Notifications from "expo-notifications";
+import type {
+  Notification,
+  NotificationTrigger,
+  PushNotificationTrigger,
+} from "expo-notifications";
 import { Platform } from "react-native";
 
 import { notificationService } from "../services/notificationService";
@@ -30,9 +35,32 @@ export const DEFAULT_NOTIFICATION_CHANNEL_ID = "default";
 
 export type PushPermissionStatus = "granted" | "denied" | "undetermined" | "unsupported";
 
+type NotificationsModule = typeof import("expo-notifications");
+
+/**
+ * `expo-notifications` sob demanda, e nunca no Expo Go nem no web: so
+ * importar o pacote no Expo Go (SDK 53+) ja registra um listener de token que
+ * dispara um `console.error` ("...removed from Expo Go with the release of
+ * SDK 53") — LogBox vermelha para quem abre o app pelo QR code. `null` = sem
+ * notificacoes do sistema neste ambiente.
+ */
+export function loadNotifications(): NotificationsModule | null {
+  if (Platform.OS === "web" || isRunningInExpoGo()) {
+    return null;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require("expo-notifications") as NotificationsModule;
+}
+
 /** Push remoto so existe em build nativo Android fora do Expo Go. */
 export function isRemotePushSupported(): boolean {
   return Platform.OS === "android" && !isRunningInExpoGo();
+}
+
+/** O modulo, so quando ha push remoto (build nativo Android). */
+function loadRemotePushNotifications(): NotificationsModule | null {
+  return isRemotePushSupported() ? loadNotifications() : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -66,8 +94,8 @@ export function shouldPresentNotification(data: Record<string, unknown> | null |
  * Push do FCM so com `data` (o formato que o backend manda). A copia local
  * criada por `presentForegroundPush` nao conta (gatilho de canal, nao "push").
  */
-export function isDataOnlyRemotePush(notification: Notifications.Notification): boolean {
-  const trigger = notification.request.trigger as Notifications.NotificationTrigger | null;
+export function isDataOnlyRemotePush(notification: Notification): boolean {
+  const trigger = notification.request.trigger as NotificationTrigger | null;
 
   if (Platform.OS !== "android" || !trigger || typeof trigger !== "object" || !("type" in trigger)) {
     return false;
@@ -75,7 +103,7 @@ export function isDataOnlyRemotePush(notification: Notifications.Notification): 
 
   return (
     trigger.type === "push" &&
-    !(trigger as Notifications.PushNotificationTrigger).remoteMessage?.notification
+    !(trigger as PushNotificationTrigger).remoteMessage?.notification
   );
 }
 
@@ -86,8 +114,10 @@ export function isDataOnlyRemotePush(notification: Notifications.Notification): 
  * mesmos dados: o handler abaixo decide o banner e o toque cai no mesmo
  * roteador. Em segundo plano/fechado o proprio expo apresenta.
  */
-export async function presentForegroundPush(notification: Notifications.Notification): Promise<void> {
-  if (!isDataOnlyRemotePush(notification)) {
+export async function presentForegroundPush(notification: Notification): Promise<void> {
+  const Notifications = loadNotifications();
+
+  if (!Notifications || !isDataOnlyRemotePush(notification)) {
     return;
   }
 
@@ -104,7 +134,9 @@ let handlerConfigured = false;
 
 /** Idempotente. Chamado uma vez na raiz (NotificationProvider). */
 export function configureNotificationPresentation() {
-  if (handlerConfigured || Platform.OS === "web") {
+  const Notifications = handlerConfigured ? null : loadNotifications();
+
+  if (!Notifications) {
     return;
   }
 
@@ -132,7 +164,9 @@ export function configureNotificationPresentation() {
  * Android 13+, senao o dialogo do sistema nao aparece.
  */
 export async function ensureAndroidNotificationChannel() {
-  if (Platform.OS !== "android") {
+  const Notifications = Platform.OS === "android" ? loadNotifications() : null;
+
+  if (!Notifications) {
     return;
   }
 
@@ -151,7 +185,9 @@ export async function ensureAndroidNotificationChannel() {
 // ---------------------------------------------------------------------------
 
 export async function getPushPermissionStatus(): Promise<PushPermissionStatus> {
-  if (!isRemotePushSupported()) {
+  const Notifications = loadRemotePushNotifications();
+
+  if (!Notifications) {
     return "unsupported";
   }
 
@@ -167,7 +203,9 @@ export async function getPushPermissionStatus(): Promise<PushPermissionStatus> {
  * `canAskAgain: true`.
  */
 export async function claimAutoPushPermissionPrompt(): Promise<boolean> {
-  if (!isRemotePushSupported()) {
+  const Notifications = loadRemotePushNotifications();
+
+  if (!Notifications) {
     return false;
   }
 
@@ -190,7 +228,9 @@ async function obtainDevicePushToken(options: { askPermission: boolean }): Promi
   // Sem checar `Device.isDevice`: emulador com imagem "Google Play" recebe FCM
   // normalmente. Sem Google Play Services o `getDevicePushTokenAsync` falha e
   // cai no catch abaixo.
-  if (!isRemotePushSupported()) {
+  const Notifications = loadRemotePushNotifications();
+
+  if (!Notifications) {
     return null;
   }
 
@@ -279,7 +319,9 @@ export async function unregisterPushRegistration(): Promise<void> {
 
 /** Token FCM rotacionado pelo Google: reenviar ao backend. */
 export function addPushTokenRotationListener(onToken: (token: string) => void) {
-  if (!isRemotePushSupported()) {
+  const Notifications = loadRemotePushNotifications();
+
+  if (!Notifications) {
     return { remove: () => undefined };
   }
 

@@ -184,7 +184,8 @@ o bundle iOS são `br.com.app.unify`.
 
 - **Expo Go continua funcionando** para o dia a dia, com o sino e a lista
   in-app. Push remoto **não existe no Expo Go** (removido no SDK 53): lá o
-  registro do token é ignorado em silêncio.
+  registro do token é ignorado em silêncio e o `expo-notifications` nem é
+  carregado (importar o pacote no Expo Go já gera um erro vermelho no LogBox).
 - **Para testar push** é preciso um build nativo de debug:
   1. Firebase Console → ⚙ Configurações do projeto → Geral → app Android
      `br.com.app.unify` → baixar `google-services.json` e salvar na raiz deste

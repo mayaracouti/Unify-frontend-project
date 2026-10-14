@@ -1,3 +1,4 @@
+import { isRunningInExpoGo } from "expo";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
@@ -12,6 +13,7 @@ import {
 import {
   claimAutoPushPermissionPrompt,
   isDataOnlyRemotePush,
+  loadNotifications,
   presentForegroundPush,
   setActiveConversationId,
   shouldPresentNotification,
@@ -192,5 +194,28 @@ describe("push com o app aberto", () => {
     await presentForegroundPush(localCopy);
     await presentForegroundPush(withNotification);
     expect(Notifications.scheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe("Expo Go", () => {
+  const originalPlatformOS = Platform.OS;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    Object.defineProperty(Platform, "OS", { configurable: true, value: "android" });
+    (isRunningInExpoGo as jest.Mock).mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    (isRunningInExpoGo as jest.Mock).mockReturnValue(false);
+    Object.defineProperty(Platform, "OS", { configurable: true, value: originalPlatformOS });
+  });
+
+  it("não carrega o expo-notifications (o import sozinho já gera erro no Expo Go)", async () => {
+    expect(loadNotifications()).toBeNull();
+    await expect(claimAutoPushPermissionPrompt()).resolves.toBe(false);
+    await expect(syncPushRegistration("u1", { askPermission: true })).resolves.toBe(false);
+    expect(Notifications.getPermissionsAsync).not.toHaveBeenCalled();
+    expect(notificationService.registerPushToken).not.toHaveBeenCalled();
   });
 });
