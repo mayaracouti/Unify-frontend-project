@@ -294,6 +294,47 @@ function buildAndroidLocalEnv(baseEnv) {
   });
 }
 
+/**
+ * Windows + pasta funda: o build C++ so passa com um CMake mais novo (ninja
+ * 1.12) apontado por `cmake.dir` em `android/local.properties` (ver README).
+ * O reanimated/worklets escolhem a versao pela variavel CMAKE_VERSION e, sem
+ * ela, voltam ao 3.22.1 do SDK ("build.ninja still dirty after 100 tries").
+ * Devolve a versao desse `cmake.dir` para alinhar a variavel; `null` quando
+ * nao ha `cmake.dir` (maquinas sem o ajuste seguem o padrao do Gradle).
+ */
+function resolveLocalCmakeVersion() {
+  const localPropertiesPath = path.join(PROJECT_ROOT, "android", "local.properties");
+
+  if (!fs.existsSync(localPropertiesPath)) {
+    return null;
+  }
+
+  const cmakeDirMatch = fs
+    .readFileSync(localPropertiesPath, "utf8")
+    .match(/^[ \t]*cmake\.dir[ \t]*[=:][ \t]*(.+?)[ \t]*$/m);
+
+  if (!cmakeDirMatch) {
+    return null;
+  }
+
+  // local.properties segue o formato Java: `C\:\\sdk` = `C:\sdk`.
+  const cmakeDir = cmakeDirMatch[1].replace(/\\(.)/g, "$1");
+  const sourcePropertiesPath = path.join(cmakeDir, "source.properties");
+
+  if (fs.existsSync(sourcePropertiesPath)) {
+    const revisionMatch = fs
+      .readFileSync(sourcePropertiesPath, "utf8")
+      .match(/^[ \t]*Pkg\.Revision[ \t]*=[ \t]*(\d+\.\d+\.\d+)/m);
+
+    if (revisionMatch) {
+      return revisionMatch[1];
+    }
+  }
+
+  const folderVersionMatch = path.basename(cmakeDir).match(/^\d+\.\d+\.\d+$/);
+  return folderVersionMatch ? folderVersionMatch[0] : null;
+}
+
 function buildExpoArgs(forwardedExpoArgs, androidLocal) {
   if (forwardedExpoArgs.length > 0) {
     return forwardedExpoArgs;
@@ -470,6 +511,14 @@ async function main() {
     launchEnv = buildAndroidLocalEnv(launchEnv);
   }
 
+  const localCmakeVersion = getEnvValueCaseInsensitive(launchEnv, "CMAKE_VERSION")
+    ? null
+    : resolveLocalCmakeVersion();
+
+  if (localCmakeVersion) {
+    launchEnv = normalizeWindowsEnv(launchEnv, { CMAKE_VERSION: localCmakeVersion });
+  }
+
   let effectiveApiBaseUrl = profileEnv.EXPO_PUBLIC_API_BASE_URL;
 
   if (androidLocal) {
@@ -503,6 +552,12 @@ async function main() {
     effectiveApiBaseUrl,
     metroPort
   );
+
+  if (localCmakeVersion) {
+    console.log(
+      `[start-expo-profile] cmake version: ${localCmakeVersion} (cmake.dir in android/local.properties)`
+    );
+  }
 
   if (checkOnly) {
     return;

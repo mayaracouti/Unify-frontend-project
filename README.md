@@ -205,7 +205,10 @@ o bundle iOS são `br.com.app.unify`.
   instale "CMake 3.31.6" no SDK Manager do Android Studio (SDK Tools → Show
   Package Details), adicione `cmake.dir=C:/Users/<você>/AppData/Local/Android/Sdk/cmake/3.31.6`
   em `android/local.properties` e rode o build com `CMAKE_VERSION=3.31.6`
-  (reanimated/worklets fixam a versão por essa variável).
+  (reanimated/worklets fixam a versão por essa variável). O
+  `scripts/start-expo-profile.js` já define essa variável a partir do
+  `cmake.dir` quando ela não está no terminal (`node scripts/start-expo-profile.js dev -- run:android --device`).
+  Se um build anterior rodou sem ela, apague `node_modules/*/android/.cxx`.
 - **Rede da prefeitura bloqueia o push no aparelho.** O Google Play não
   alcança `android.clients.google.com` (token) nem `mtalk.google.com`
   (entrega, portas 5228-5230/443): o token falha com `SERVICE_NOT_AVAILABLE`.
