@@ -6,7 +6,7 @@ import { announceForAccessibility } from "../../../utils/accessibilityAnnounceme
 import { formatApiErrorMessage } from "../../../utils/auth";
 import { splitPostSpeech } from "../../../utils/personalPostContent";
 
-export function ImageDescriptionAudio({ analyzeImage }: { analyzeImage: () => Promise<string> }) {
+export function ImageDescriptionAudio({ analyzeImage, description: savedDescription }: { analyzeImage?: () => Promise<string>; description?: string | null }) {
   const { speakSequence, stop } = useTTS();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,11 +22,16 @@ export function ImageDescriptionAudio({ analyzeImage }: { analyzeImage: () => Pr
     setLoading(true);
     setError(null);
     try {
-      const result = description ?? (await analyzeImage()).trim();
+      const result = savedDescription?.trim() || description || (await analyzeImage?.())?.trim();
       if (request !== generation.current) return;
-      if (!result) throw new Error("A análise não retornou uma descrição. Tente novamente.");
+      if (!result) {
+        const message = "Descrição solicitada. O processamento ocorre em segundo plano. Consulte a publicação novamente mais tarde.";
+        setError(message);
+        announceForAccessibility(message);
+        return;
+      }
       setDescription(result);
-      const text = `Descrição gerada por inteligência artificial: ${result}`;
+      const text = `Descrição da imagem: ${result}`;
       speakSequence(splitPostSpeech(text), { force: true });
       announceForAccessibility(text);
     } catch (cause) {
@@ -45,16 +50,16 @@ export function ImageDescriptionAudio({ analyzeImage }: { analyzeImage: () => Pr
 
   return (
     <View className="mt-2">
-      <Text className="text-[14px] text-[#CAC3D8]">A IA analisa a imagem para descrevê-la em áudio.</Text>
-      <Pressable accessibilityRole="button" accessibilityLabel="Ouvir descrição da imagem"
-        accessibilityHint="Analisa o conteúdo visual com inteligência artificial e lê o resultado em voz alta."
+      <Text className="text-[14px] text-[#CAC3D8]">A descrição é lida pela voz do dispositivo.</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel={savedDescription || description ? "Ouvir descrição da imagem" : "Solicitar descrição da imagem"}
+        accessibilityHint="Solicita a descrição ausente ou lê a descrição disponível com a voz do dispositivo."
         accessibilityState={{ disabled: loading, busy: loading }} disabled={loading}
         className="min-h-[44px] flex-row items-center gap-2 py-2" onPress={readImage}>
         {loading ? <ActivityIndicator color="#EAEA00" /> : <Ionicons name="volume-high-outline" size={22} color="#EAEA00" importantForAccessibility="no" />}
-        <Text className="flex-1 font-bold text-[#EAEA00]">{loading ? "Analisando imagem…" : "Ouvir descrição da imagem"}</Text>
+        <Text className="flex-1 font-bold text-[#EAEA00]">{loading ? "Solicitando…" : savedDescription || description ? "Ouvir descrição da imagem" : "Solicitar descrição da imagem"}</Text>
       </Pressable>
       {error ? <Text accessibilityRole="alert" className="text-[14px] text-[#CAC3D8]">{error}</Text> : null}
-      {description ? <Text className="text-[14px] leading-6 text-[#CAC3D8]">Descrição gerada por IA: {description}</Text> : null}
+      {description && !savedDescription ? <Text className="text-[14px] leading-6 text-[#CAC3D8]">Descrição da imagem: {description}</Text> : null}
       <Pressable accessibilityRole="button" accessibilityLabel="Parar áudio da descrição"
         accessibilityHint="Interrompe a leitura e cancela a reprodução de uma análise pendente"
         className="min-h-[44px] justify-center py-2" onPress={() => {

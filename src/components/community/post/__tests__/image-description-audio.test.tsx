@@ -1,7 +1,9 @@
+import { customApiCall } from "../../../../api/customApi";
 import { PostImage } from "../post-image";
 import { useTTS } from "../../../../accessibility/tts";
 import { announceForAccessibility } from "../../../../utils/accessibilityAnnouncements";
 
+jest.mock("../../../../api/customApi", () => ({ customApiCall: { get: jest.fn(), post: jest.fn() } }));
 jest.mock("../../../../accessibility/tts", () => ({ useTTS: jest.fn() }));
 jest.mock("../../../../utils/accessibilityAnnouncements", () => ({ announceForAccessibility: jest.fn() }));
 jest.mock("../../../profile/authenticated-remote-image", () => ({ AuthenticatedRemoteImage: "RemoteImage" }));
@@ -12,14 +14,14 @@ const speakSequence = jest.fn();
 const stop = jest.fn();
 type Renderer = { root: { findAllByProps: (props: object) => { props: { onPress: () => Promise<void> | void } }[] }; unmount: () => void; update: (node: React.ReactNode) => void };
 let renderer: Renderer;
-const button = (label = "Ouvir descrição da imagem") => renderer.root.findAllByProps({ accessibilityLabel: label })[0];
+const button = (label = "Solicitar descrição da imagem") => renderer.root.findAllByProps({ accessibilityLabel: label })[0];
 beforeEach(() => {
   jest.clearAllMocks();
   (useTTS as jest.Mock).mockReturnValue({ enabled: false, speakSequence, stop });
 });
 afterEach(async () => { if (renderer) await act(async () => renderer.unmount()); });
 async function mount(analyzeImage?: () => Promise<string>, authToken = "token") {
-  await act(async () => { renderer = create(<PostImage uri="https://api/image" description="Legenda escrita pelo autor"
+  await act(async () => { renderer = create(<PostImage uri="https://api/image"
     authorName="Ana" authToken={authToken} analyzeImage={analyzeImage} />); });
 }
 
@@ -30,8 +32,8 @@ it("analyzes the actual image and speaks the generated description, never the au
   await act(async () => { await button().props.onPress(); });
   expect(analyze).toHaveBeenCalledTimes(1);
   expect(speakSequence).toHaveBeenCalledWith(expect.any(Array), { force: true });
-  expect(speakSequence.mock.calls[0][0].join(" ")).toBe(`Descrição gerada por inteligência artificial: ${generated}`);
-  await act(async () => { await button().props.onPress(); });
+  expect(speakSequence.mock.calls[0][0].join(" ")).toBe(`Descrição da imagem: ${generated}`);
+  await act(async () => { await button("Ouvir descrição da imagem").props.onPress(); });
   expect(analyze).toHaveBeenCalledTimes(1);
   await act(async () => { button("Parar áudio da descrição").props.onPress(); });
   expect(stop).toHaveBeenCalledTimes(1);
@@ -73,4 +75,32 @@ it("discards pending audio when the session changes", async () => {
 it("does not add IA controls to other image previews without an analyzer", async () => {
   await mount();
   expect(renderer.root.findAllByProps({ accessibilityLabel: "Ouvir descrição da imagem" })).toHaveLength(0);
+});
+
+
+it("reads a saved description without requesting AI", async () => {
+  const analyze = jest.fn();
+  await act(async () => { renderer = create(<PostImage uri="https://api/users/posts/p/media" description="Uma árvore"
+    authorName="Ana" authToken="token" analyzeImage={analyze} />); });
+  await act(async () => { await button("Ouvir descrição da imagem").props.onPress(); });
+  expect(analyze).not.toHaveBeenCalled();
+  expect(customApiCall.get).not.toHaveBeenCalled();
+  expect(speakSequence).toHaveBeenCalledWith(["Descrição da imagem: Uma árvore"], { force: true });
+});
+
+it("refreshes a stale post without requesting another generation", async () => {
+  (customApiCall.get as jest.Mock).mockResolvedValue({ imageDescription: "Uma bicicleta" });
+  await act(async () => { renderer = create(<PostImage uri="https://api/users/posts/p/media" authorName="Ana" authToken="token" />); });
+  await act(async () => { await button().props.onPress(); });
+  expect(customApiCall.post).not.toHaveBeenCalled();
+  expect(renderer.root.findAllByProps({ accessibilityLabel: "Solicitar descrição da imagem" })).toHaveLength(0);
+});
+
+it("accepts background processing without waiting or speaking empty text", async () => {
+  (customApiCall.get as jest.Mock).mockResolvedValue({ imageDescription: null });
+  (customApiCall.post as jest.Mock).mockResolvedValue({ status: "pending" });
+  await act(async () => { renderer = create(<PostImage uri="https://api/communities/posts/p/media" authorName="Ana" authToken="token" />); });
+  await act(async () => { await button().props.onPress(); });
+  expect(customApiCall.post).toHaveBeenCalledWith("/communities/posts/p/image-description", undefined, { requiresAuth: true });
+  expect(speakSequence).not.toHaveBeenCalled();
 });
