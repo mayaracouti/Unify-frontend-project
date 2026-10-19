@@ -35,6 +35,8 @@ export function buildPostCommentsHref(post: UserPostResponse): Href {
       authorName: post.author.name,
       authorUserProfileId: post.author.userProfileId ?? "",
       postBody: post.body,
+      mediaUrl: post.mediaUrl ?? "",
+      imageDescription: post.imageDescription ?? "",
       createdAt: post.createdAt,
     },
   };

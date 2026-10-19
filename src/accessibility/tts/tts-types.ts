@@ -6,6 +6,8 @@
 export type TtsPreference = {
   /** Leitura por voz ligada? Primeiro launch = `true` (acessibilidade por padrao). */
   enabled: boolean;
+  /** Velocidade local da leitura: 0.75, 1 ou 1.25. */
+  rate?: number;
   /** O onboarding de acessibilidade do primeiro launch ja foi concluido? */
   onboardingCompleted: boolean;
 };
@@ -18,8 +20,9 @@ export type TtsState = TtsPreference & {
 
 export type TtsSpeakOptions = {
   /**
-   * Fala mesmo com a preferencia desligada. Usado apenas para confirmar ao
-   * usuario que ele acabou de desligar/ligar o proprio recurso.
+   * Fala mesmo com a preferência de leitura automática desligada. Usado em
+   * confirmações da preferência e em controles que pedem reprodução de áudio
+   * explicitamente. Continua respeitando a prioridade do leitor de tela nativo.
    */
   force?: boolean;
   /**

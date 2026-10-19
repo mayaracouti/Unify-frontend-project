@@ -1,7 +1,21 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
-
+import { useEffect, useRef, type RefObject } from "react";
 import { useGlobalAccessibilityState } from "../../accessibility/global-text-adjustments";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { AccessibilityInfo, findNodeHandle, Platform, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+
+function focusNode(node: View | Text | null) {
+  if (!node) return;
+  try {
+    if (Platform.OS === "web") {
+      (node as unknown as HTMLElement).focus?.();
+    } else {
+      const handle = findNodeHandle(node);
+      if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  } catch {
+    // O alvo pode ter sido desmontado depois de uma ação do menu.
+  }
+}
 
 export type ActionSheetOption = {
   key: string;
@@ -30,6 +44,7 @@ export function ActionSheet({
   options,
   title,
   visible,
+  returnFocusRef,
 }: {
   cancelLabel?: string;
   message?: string;
@@ -37,15 +52,36 @@ export function ActionSheet({
   options: ActionSheetOption[];
   title: string;
   visible: boolean;
+  returnFocusRef?: RefObject<View | null>;
 }) {
   // Com fonte grande, muitas opcoes nao cabem: a lista rola e "Cancelar" fica fixo.
   const { height: windowHeight } = useWindowDimensions();
-  // `reduceMotion`: a folha aparece/some sem o fade.
-  const { reduceMotion } = useGlobalAccessibilityState();
+  const { highContrast, reduceMotion } = useGlobalAccessibilityState();
+  const titleRef = useRef<Text | null>(null);
+  const wasVisible = useRef(false);
+  const webPreviousFocus = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (visible) {
+      wasVisible.current = true;
+      if (Platform.OS === "web" && typeof document !== "undefined") {
+        webPreviousFocus.current = document.activeElement as HTMLElement | null;
+      }
+      return;
+    }
+    if (!wasVisible.current) return;
+    wasVisible.current = false;
+    const timer = setTimeout(() => {
+      if (returnFocusRef?.current) focusNode(returnFocusRef.current);
+      else webPreviousFocus.current?.focus?.();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [visible, returnFocusRef]);
 
   return (
     <Modal
       animationType={reduceMotion ? "none" : "fade"}
+      onShow={() => focusNode(titleRef.current)}
       onRequestClose={onClose}
       statusBarTranslucent
       transparent
@@ -64,11 +100,13 @@ export function ActionSheet({
 
         <View
           accessibilityViewIsModal
-          className="rounded-t-[28px] border-t border-[#353534] bg-[#17181C] px-4 pb-8 pt-4"
+          className={`rounded-t-[28px] border-t px-4 pb-8 pt-4 ${highContrast ? "border-hc-border bg-hc-surface" : "border-[#353534] bg-[#17181C]"}`}
         >
           <Text
+            ref={titleRef}
+            accessible
             accessibilityRole="header"
-            className="mb-1 px-2 text-[18px] font-black text-white"
+            className={`mb-1 px-2 text-[18px] font-black ${highContrast ? "text-hc-text" : "text-white"}`}
           >
             {title}
           </Text>
@@ -90,7 +128,9 @@ export function ActionSheet({
                   option.selected !== undefined ? { selected: option.selected } : undefined
                 }
                 className={`mb-2 min-h-[44px] flex-row items-center gap-3 rounded-[16px] px-4 py-4 ${
-                  option.selected ? "border-2 border-[#EAEA00] bg-[#2A2B1A]" : "bg-[#1D1F24]"
+                  highContrast
+                    ? option.selected ? "border-2 border-hc-accent bg-hc-bg" : "border border-hc-border bg-hc-bg"
+                    : option.selected ? "border-2 border-[#EAEA00] bg-[#2A2B1A]" : "bg-[#1D1F24]"
                 }`}
                 key={option.key}
                 onPress={option.onPress}

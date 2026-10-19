@@ -67,6 +67,7 @@ export interface CommunityPostResponse {
   publishedAt?: string | null;
   body: string;
   mediaData?: string | null;
+  imageDescription?: string | null;
   /** Preenchido quando o autor alterou o texto depois de publicar. */
   editedAt?: string | null;
   likesCount?: number | null;
@@ -110,6 +111,8 @@ export interface CommunityCommentResponse {
   author: CommunityPostAuthorResponse;
   publishedAt?: string | null;
   body: string;
+  mediaData?: string | null;
+  imageDescription?: string | null;
   commentedByCurrentUser?: boolean | null;
 }
 
@@ -120,7 +123,8 @@ export interface CommunityCreateCommentRequest {
 }
 
 export interface CommunityPostUpdateRequest {
-  body: string;
+  body?: string;
+  imageDescription?: string | null;
 }
 
 export interface CommunityFeedResponse {
@@ -146,3 +150,12 @@ export interface CommunityForYouPostResponse {
 }
 
 export type CommunityForYouFeedResponse = PageResponse<CommunityForYouPostResponse>;
+
+/**
+ * Resposta de `POST .../image-description` (post ou comentário). `SAVED`: a
+ * descrição já existia (do autor ou gerada antes); `AI`: gerada agora e salva.
+ */
+export interface ImageDescriptionResponse {
+  description: string;
+  source: "AI" | "SAVED";
+}

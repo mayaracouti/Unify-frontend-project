@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -25,9 +25,15 @@ import {
 import { showGlobalToast } from "../../src/utils/globalToast";
 import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware";
 
-const IMAGE_MEDIA_TYPES: ImagePicker.MediaType[] = ["images"];
+import { privacyService } from "../../src/services/privacyService";
+import type { UserPrivacySettingsResponse } from "../../src/types/privacy";
+import { personalFeedAudience } from "../../src/utils/privacySummary";
+import { buildPersonalPostBody, PERSONAL_POST_MAX_LENGTH, splitPersonalPostBody } from "../../src/utils/personalPostContent";
+import { PostImage } from "../../src/components/community/post/post-image";
+import { useAuth } from "../../src/context/AuthContext";
 
-const BODY_MAX_LENGTH = 600;
+const IMAGE_MEDIA_TYPES: ImagePicker.MediaType[] = ["images"];
+const BODY_MAX_LENGTH = PERSONAL_POST_MAX_LENGTH;
 
 type ImageSource = "camera" | "library";
 
@@ -77,12 +83,14 @@ function createUserPostFormData(body: string, asset: ImagePicker.ImagePickerAsse
  */
 export default function ProfileNewPostScreen() {
   const router = useRouter();
+  const { session } = useAuth();
   const { speak } = useTTS();
   const { settings } = useAccessibility();
   const highContrast = settings.highContrast;
   const params = useLocalSearchParams<{
     postId?: string | string[];
     body?: string | string[];
+    mediaUrl?: string | string[];
   }>();
 
   // Ao entrar na tela, o leitor de tela do sistema comeca pelo titulo.
@@ -93,19 +101,37 @@ export default function ProfileNewPostScreen() {
     [params.postId]
   );
   const isEditing = editingPostId !== null;
+  const existingMediaUri = isEditing ? feedService.resolveAssetUrl(normalizeRouteParam(params.mediaUrl)) : null;
+  const initialContent = isEditing && existingMediaUri
+    ? splitPersonalPostBody(normalizeRouteParam(params.body))
+    : { body: isEditing ? normalizeRouteParam(params.body) : "", imageDescription: "" };
 
-  const [body, setBody] = useState(() =>
-    isEditing ? normalizeRouteParam(params.body) : ""
-  );
+  const [body, setBody] = useState(initialContent.body);
   const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(
     null
   );
+  const [imageDescription, setImageDescription] = useState(initialContent.imageDescription);
+  const [privacy, setPrivacy] = useState<UserPrivacySettingsResponse | null>(null);
+  const [privacyLoading, setPrivacyLoading] = useState(true);
   const [imageSourceVisible, setImageSourceVisible] = useState(false);
   const [pickingImage, setPickingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    setPrivacy(null);
+    setPrivacyLoading(true);
+    void privacyService.getSettings().then((value) => {
+      if (active) setPrivacy(value);
+    }).catch(() => { /* O resumo informa que a visibilidade não pôde ser consultada. */ })
+      .finally(() => { if (active) setPrivacyLoading(false); });
+    return () => { active = false; };
+  }, []));
+
+  const publishedBody = buildPersonalPostBody(body, imageDescription, Boolean(selectedImage || existingMediaUri));
+  const contentTooLong = publishedBody.length > BODY_MAX_LENGTH;
   const trimmedBody = useMemo(() => body.trim(), [body]);
-  const submitDisabled = trimmedBody.length === 0 || submitting;
+  const submitDisabled = trimmedBody.length === 0 || contentTooLong || submitting;
   const submitLabel = isEditing ? "Salvar" : "Publicar";
 
   const handlePickImage = useCallback(
@@ -150,6 +176,7 @@ export default function ProfileNewPostScreen() {
 
         if (!pickerResult.canceled) {
           setSelectedImage(pickerResult.assets[0] ?? null);
+          setImageDescription("");
         }
       } catch {
         showGlobalToast({
@@ -179,11 +206,15 @@ export default function ProfileNewPostScreen() {
       return;
     }
 
+    if (publishedBody.length > BODY_MAX_LENGTH) {
+      showGlobalToast({ title: "Texto muito longo", variant: "warning", message: "O texto e a descrição da imagem devem somar até 600 caracteres." });
+      return;
+    }
     setSubmitting(true);
 
     try {
       if (editingPostId) {
-        await feedService.updatePost(editingPostId, trimmedBody);
+        await feedService.updatePost(editingPostId, publishedBody);
 
         showGlobalToast({
           title: "Publicação atualizada",
@@ -195,7 +226,7 @@ export default function ProfileNewPostScreen() {
         return;
       }
 
-      const formData = createUserPostFormData(trimmedBody, selectedImage);
+      const formData = createUserPostFormData(publishedBody, selectedImage);
       await feedService.createPost(formData);
 
       showGlobalToast({
@@ -210,7 +241,7 @@ export default function ProfileNewPostScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [editingPostId, router, selectedImage, submitting, trimmedBody]);
+  }, [editingPostId, publishedBody, router, selectedImage, submitting, trimmedBody]);
 
   const pageBackground = highContrast ? "bg-hc-bg" : "bg-[#09090A]";
   const cardBackground = highContrast
@@ -303,6 +334,19 @@ export default function ProfileNewPostScreen() {
             </View>
 
             <View className={`mt-6 rounded-[28px] p-6 ${cardBackground}`}>
+              <Text accessibilityRole="header" className={`text-[20px] font-bold ${titleColor}`}>Quem pode ver</Text>
+              <Text className={`mt-2 leading-6 ${secondaryColor}`}>
+                {privacyLoading ? "Consultando a visibilidade das suas publicações…" : privacy ? personalFeedAudience(privacy) : "Não foi possível confirmar a visibilidade. Consulte suas configurações de privacidade."}
+              </Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Configurar privacidade das publicações"
+                accessibilityHint="Altera a visibilidade de todas as suas publicações pessoais"
+                className="mt-3 min-h-[48px] justify-center" onPress={() => router.push("/profile/privacy")}>
+                <Text className="font-bold text-brand-soft">Configurar privacidade</Text>
+              </Pressable>
+              <Text className={`mt-2 ${secondaryColor}`}>A configuração é geral e também vale para publicações anteriores.</Text>
+            </View>
+
+            <View className={`mt-6 rounded-[28px] p-6 ${cardBackground}`}>
               <Text className={`mb-3 text-[22px] font-bold ${titleColor}`}>Seu texto</Text>
               <TextInput
                 className={`min-h-[180px] rounded-2xl border-2 px-4 py-4 text-[16px] leading-7 ${
@@ -324,11 +368,22 @@ export default function ProfileNewPostScreen() {
               <Text
                 className={`mt-2 text-right text-[12px] font-semibold ${secondaryColor}`}
               >
-                {body.length} / {BODY_MAX_LENGTH}
+                {publishedBody.length} / {BODY_MAX_LENGTH} (texto e descrição)
               </Text>
             </View>
 
-            {/* Edicao e so de texto: a secao de imagem nao aparece. */}
+            {isEditing && existingMediaUri ? (
+              <View className={`mt-6 rounded-[28px] p-6 ${cardBackground}`}>
+                <PostImage uri={existingMediaUri} description={imageDescription} authorName="você" authToken={session?.accessToken ?? null} />
+                <Text className={`mt-3 font-bold ${titleColor}`}>Descrição da imagem (opcional)</Text>
+                <TextInput multiline maxLength={240} value={imageDescription} onChangeText={setImageDescription}
+                  editable={!submitting} accessibilityLabel="Descrição da imagem"
+                  accessibilityHint="Opcional. Até 240 caracteres, dentro do limite total de 600. Salva junto do texto publicado."
+                  placeholder="O que aparece na imagem?" placeholderTextColor="#909099"
+                  className={`mt-3 min-h-[96px] rounded-2xl border border-content-muted p-3 ${titleColor}`} />
+              </View>
+            ) : null}
+            {/* A edição permite alterar a descrição, mantendo a imagem publicada. */}
             {isEditing ? null : (
               <View className={`mt-6 rounded-[28px] p-6 ${cardBackground}`}>
                 <View className="flex-row items-center justify-between">
@@ -396,8 +451,17 @@ export default function ProfileNewPostScreen() {
                       source={{ uri: selectedImage.uri }}
                       className="aspect-video w-full"
                       resizeMode="cover"
-                      accessibilityLabel="Pré-visualização da imagem selecionada"
+                      accessibilityLabel={imageDescription.trim() || "Pré-visualização da imagem selecionada"}
                     />
+                    <View className="px-4 pt-4">
+                      <Text className={`font-bold ${titleColor}`}>Descreva a imagem</Text>
+                      <Text className={`mt-2 leading-6 ${secondaryColor}`}>Conte o que aparece para quem não pode ver. A descrição será incluída no texto publicado e poderá ser lida por voz.</Text>
+                      <TextInput multiline maxLength={240} value={imageDescription} onChangeText={setImageDescription}
+                        accessibilityLabel="Descrição da imagem" accessibilityHint="Opcional. Incluída no texto publicado. Até 240 caracteres, dentro do limite total de 600."
+                        placeholder="Ex.: Duas pessoas conversando em um parque." placeholderTextColor="#909099"
+                        className={`mt-3 min-h-[96px] rounded-2xl border border-content-muted p-3 ${titleColor}`} />
+                      {contentTooLong ? <Text accessibilityRole="alert" className="mt-2 text-content">Reduza o texto ou a descrição: o limite total é de 600 caracteres.</Text> : null}
+                    </View>
                     <View className="flex-row items-center justify-between px-4 py-4">
                       <Text
                         className={`flex-1 text-[13px] font-semibold ${secondaryColor}`}
@@ -409,6 +473,7 @@ export default function ProfileNewPostScreen() {
                         onPress={() => {
                           speak("Remover imagem");
                           setSelectedImage(null);
+                          setImageDescription("");
                         }}
                         accessibilityRole="button"
                         accessibilityLabel="Remover imagem selecionada"

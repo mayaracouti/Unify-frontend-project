@@ -1,3 +1,4 @@
+import { canModerateRole } from "../../community/permissions";
 import { Pressable, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
@@ -5,6 +6,8 @@ import { buildCommunitySpeech, useTTS } from "../../accessibility/tts";
 import { AuthenticatedRemoteImage } from "../profile/authenticated-remote-image";
 import { communityService } from "../../services/communityService";
 import type { CommunityRole, CommunitySummaryResponse } from "../../types/community";
+
+export { canModerateRole } from "../../community/permissions";
 
 export function formatMemberCount(memberCount?: number | null) {
   if (typeof memberCount !== "number") {
@@ -22,10 +25,6 @@ export function formatMemberCount(memberCount?: number | null) {
   }
 
   return `${memberCount.toLocaleString("pt-BR")} membros`;
-}
-
-export function canModerateRole(role?: CommunityRole | null) {
-  return role === "ADMIN" || role === "MODERATOR";
 }
 
 export function traduzirNomeRole(role: CommunityRole | null | undefined) {

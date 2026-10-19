@@ -360,7 +360,7 @@ export default function ConversationScreen() {
 
   async function handleSendText(body: string) {
     if (!resolvedConversationId) {
-      return;
+      return false;
     }
 
     setSending(true);
@@ -369,8 +369,10 @@ export default function ConversationScreen() {
       upsertLocalMessage(message);
       listRef.current?.scrollToOffset({ offset: 0, animated: !getGlobalTextAdjustments().reduceMotion });
       announceForAccessibility(accessibilityAnnouncements.messageSent());
+      return true;
     } catch (nextError) {
       showSendError(nextError, "Tente novamente em instantes.");
+      return false;
     } finally {
       setSending(false);
     }
@@ -378,7 +380,7 @@ export default function ConversationScreen() {
 
   async function handleSendMedia(media: ChatMediaUpload) {
     if (!resolvedConversationId) {
-      return;
+      return false;
     }
 
     setSending(true);
@@ -387,8 +389,10 @@ export default function ConversationScreen() {
       upsertLocalMessage(message);
       listRef.current?.scrollToOffset({ offset: 0, animated: !getGlobalTextAdjustments().reduceMotion });
       announceForAccessibility(media.type === "AUDIO" ? "Áudio enviado." : "Imagem enviada.");
+      return true;
     } catch (nextError) {
       showSendError(nextError, "Verifique o tamanho do arquivo e tente de novo.");
+      return false;
     } finally {
       setSending(false);
     }
@@ -672,12 +676,8 @@ export default function ConversationScreen() {
             <ChatComposer
               editing={editing ? { messageId: editing.id, body: editing.body ?? "" } : null}
               onCancelEdit={() => setEditing(null)}
-              onSendMedia={(media) => {
-                void handleSendMedia(media);
-              }}
-              onSendText={(body) => {
-                void handleSendText(body);
-              }}
+              onSendMedia={handleSendMedia}
+              onSendText={handleSendText}
               onSubmitEdit={(messageId, body) => {
                 void handleSubmitEdit(messageId, body);
               }}

@@ -1,12 +1,13 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { FollowPendingIcon } from "../social/follow-pending-icon";
 import { LinearGradient } from "expo-linear-gradient";
-import { memo, useMemo, useState, type ComponentProps } from "react";
+import { memo, useMemo, useRef, useState, type ComponentProps } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { postSpeechParts, resolvePostImageDescription } from "../../community/post-content";
+import { PostImage } from "../community/post/post-image";
 
 import {
   buildActionSpeech,
-  buildFeedPostSpeech,
   joinSpeechParts,
   useOnDemandSpeech,
   useTTS,
@@ -125,7 +126,12 @@ function FeedListenAction({ authorName, post }: { authorName: string; post: User
       }
       accessibilityState={{ selected: speaking }}
       onPress={() => {
-        toggle(joinSpeechParts([`Publicação de ${authorName}`, post.body]));
+        toggle(
+          joinSpeechParts([
+            `Publicação de ${authorName}`,
+            ...postSpeechParts({ ...post, hasImage: Boolean(post.mediaUrl) }),
+          ])
+        );
       }}
     >
       <Ionicons
@@ -175,7 +181,15 @@ export const FeedPostCard = memo(function FeedPostCard({
   onCancelFollowRequest,
   onJoinCommunity,
 }: FeedPostCardProps) {
-  const { speak } = useTTS();
+  const { enabled: ttsEnabled, speak, speakSequence, stop } = useTTS();
+  const menuButtonRef = useRef<View | null>(null);
+  const accessibleContent = { ...post, hasImage: Boolean(post.mediaUrl) };
+  const imageDescription = resolvePostImageDescription(accessibleContent);
+  const readPost = () => speakSequence([
+    `Publicação de ${authorName}`,
+    ...postSpeechParts(accessibleContent),
+    `${post.likesCount} curtidas e ${post.commentsCount} comentários`,
+  ]);
   const [menuVisible, setMenuVisible] = useState(false);
 
   const formattedDate = useMemo(() => formatRelativePostDate(post.createdAt), [post.createdAt]);
@@ -432,7 +446,7 @@ export const FeedPostCard = memo(function FeedPostCard({
 
         <Pressable
           className="ml-3 flex-1"
-          onPress={() => speak(buildFeedPostSpeech(post))}
+          onPress={readPost}
           accessibilityRole="button"
           accessibilityLabel={`${summaryLabel}: ${post.body.slice(0, 120)}`}
           accessibilityHint="Lê a publicação em voz alta"
@@ -448,6 +462,7 @@ export const FeedPostCard = memo(function FeedPostCard({
 
         {menuOptions.length > 0 ? (
           <Pressable
+            ref={menuButtonRef}
             className="ml-2 h-9 w-9 items-center justify-center rounded-full"
             onPress={() => {
               speak("Mais opções da publicação");
@@ -476,7 +491,7 @@ export const FeedPostCard = memo(function FeedPostCard({
 
       {/* O cabecalho resume; aqui o leitor nativo recebe o texto completo. */}
       <Pressable
-        onPress={() => speak(buildFeedPostSpeech(post))}
+        onPress={readPost}
         accessibilityRole="text"
         accessibilityLabel={post.body}
         accessibilityHint="Com a leitura por voz do app ligada, toque para ouvir"
@@ -486,22 +501,19 @@ export const FeedPostCard = memo(function FeedPostCard({
         </Text>
       </Pressable>
 
-      {mediaUri ? (
-        <View className="mt-3 h-56 w-full overflow-hidden rounded-2xl bg-[#2A2A2A]">
-          <AuthenticatedRemoteImage
-            accessibilityLabel={`Imagem da publicação de ${authorName}`}
-            authToken={authToken}
-            className="h-full w-full"
-            fallback={
-              <View className="flex-1 items-center justify-center bg-[#2A2A2A]">
-                <Ionicons name="image-outline" size={28} color="#948EA1" />
-              </View>
-            }
-            resizeMode="cover"
-            uri={mediaUri}
-          />
-        </View>
+      {ttsEnabled ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Parar leitura desta publicação"
+          accessibilityHint="Interrompe a leitura por voz do aplicativo"
+          className="mt-2 min-h-[44px] justify-center"
+          onPress={stop}
+        >
+          <Text className={`text-[13px] font-semibold ${secondaryColor}`}>Parar leitura</Text>
+        </Pressable>
       ) : null}
+
+      {mediaUri ? <PostImage version={post.editedAt} uri={mediaUri} description={imageDescription} authorName={authorName} authToken={authToken} /> : null}
 
       <View className="mt-4 h-px bg-[#353534]" />
 
@@ -545,6 +557,7 @@ export const FeedPostCard = memo(function FeedPostCard({
       <ActionSheet
         onClose={() => setMenuVisible(false)}
         options={menuOptions}
+        returnFocusRef={menuButtonRef}
         title="Publicação"
         visible={menuVisible}
       />

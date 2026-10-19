@@ -104,6 +104,7 @@ export interface UserPostCommunityResponse {
  * `origin`); `community` só vem preenchida quando `origin === "COMMUNITY"`.
  */
 export interface UserPostResponse {
+  imageDescription?: string | null;
   id: string;
   origin: PostOrigin;
   community: UserPostCommunityResponse | null;

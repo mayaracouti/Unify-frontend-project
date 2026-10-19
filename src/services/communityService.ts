@@ -18,6 +18,7 @@ import type {
   CommunityPostResponse,
   CommunityPostUpdateRequest,
   CommunitySummaryResponse,
+  ImageDescriptionResponse,
 } from "../types/community";
 
 const COMMUNITIES_ENDPOINT = "/communities";
@@ -79,6 +80,14 @@ function appendQueryParams(
 }
 
 export const communityService = {
+  describeCommentImage(postId: string, commentId: string) {
+    return customApiCall.post<ImageDescriptionResponse>(
+      `${COMMUNITY_POSTS_ENDPOINT}/${encodePathSegment(postId)}/comments/${encodePathSegment(commentId)}/image-description`,
+      undefined,
+      { requiresAuth: true, suppressErrorToast: true, timeoutMs: 60000 }
+    );
+  },
+
   listCategories() {
     return customApiCall.get<CommunityCategoryResponse[]>(
       COMMUNITY_CATEGORIES_ENDPOINT,
@@ -255,7 +264,15 @@ export const communityService = {
     );
   },
 
-  /** Só o autor edita, e só o texto. Devolve o post com `editedAt`. */
+  getPost(postId: string) {
+    return customApiCall.get<CommunityPostResponse>(`${COMMUNITY_POSTS_ENDPOINT}/${encodePathSegment(postId)}`, undefined, { requiresAuth: true });
+  },
+
+  updatePostMedia(postId: string, formData: FormData) {
+    return customApiCall.put<CommunityPostResponse, FormData>(`${COMMUNITY_POSTS_ENDPOINT}/${encodePathSegment(postId)}/media`, formData, { requiresAuth: true });
+  },
+
+  /** O autor edita texto/descrição; campos omitidos são preservados. */
   updatePost(postId: string, payload: CommunityPostUpdateRequest) {
     return customApiCall.put<CommunityPostResponse, CommunityPostUpdateRequest>(
       `${COMMUNITY_POSTS_ENDPOINT}/${encodePathSegment(postId)}`,
@@ -309,6 +326,14 @@ export const communityService = {
       `${COMMUNITY_POSTS_ENDPOINT}/${encodePathSegment(postId)}/comments`,
       payload,
       { requiresAuth: true }
+    );
+  },
+
+  createCommentWithImage(postId: string, payload: FormData) {
+    return customApiCall.post<CommunityCommentResponse, FormData>(
+      `${COMMUNITY_POSTS_ENDPOINT}/${encodePathSegment(postId)}/comments`,
+      payload,
+      { requiresAuth: true, timeoutMs: 60000 }
     );
   },
 

@@ -1,5 +1,12 @@
+import { PostContent } from "../../src/components/community/post/post-content";
+import { useCommunityPostReader } from "../../src/hooks/use-community-post-reader";
+import * as ImagePicker from "expo-image-picker";
+import { useCommunityCommentEditor } from "../../src/hooks/use-community-comment-editor";
+import { PostImage } from "../../src/components/community/post/post-image";
+import { ActionSheet } from "../../src/components/ui/action-sheet";
+import { splitPostSpeech } from "../../src/utils/personalPostContent";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -26,7 +33,7 @@ import {
 import { useAuth } from "../../src/context/AuthContext";
 import { useScreenHeadingFocus } from "../../src/hooks/use-screen-heading-focus";
 import { communityService } from "../../src/services/communityService";
-import type { CommunityCommentResponse } from "../../src/types/community";
+import type { CommunityCommentResponse, CommunityPostResponse } from "../../src/types/community";
 import {
   accessibilityAnnouncements,
   announceForAccessibility,
@@ -130,6 +137,7 @@ function CommentAvatar({
 }
 
 function CommentCard({
+  postId,
   authToken,
   canDelete,
   comment,
@@ -137,6 +145,7 @@ function CommentCard({
   onDelete,
   onOpenProfile,
 }: {
+  postId: string;
   authToken: string | null;
   canDelete: boolean;
   comment: CommunityCommentResponse;
@@ -144,9 +153,8 @@ function CommentCard({
   onDelete: () => void;
   onOpenProfile: (userProfileId: string, name?: string | null) => void;
 }) {
-  const { speak } = useTTS();
-  const truncatedBody =
-    comment.body.length > 120 ? `${comment.body.slice(0, 120)}…` : comment.body;
+  const { speakSequence } = useTTS();
+  const commentSpeech = buildCommunityCommentSpeech(comment) ?? "Comentário";
 
   // O avatar e um botao irmao (abre o perfil); a area de texto e a dona da
   // fala do comentario. Sem Pressable aninhado.
@@ -164,10 +172,10 @@ function CommentCard({
         <Pressable
           className="flex-1"
           // Toque no comentario le autor e corpo reais vindos do backend.
-          onPress={() => speak(buildCommunityCommentSpeech(comment))}
+          onPress={() => speakSequence(splitPostSpeech(commentSpeech))}
           accessibilityRole="button"
-          accessibilityLabel={`Comentário de ${comment.author.name}: ${truncatedBody}`}
-          accessibilityHint="Lê o comentário em voz alta"
+          accessibilityLabel={commentSpeech}
+          accessibilityHint="Lê o comentário completo e a descrição da imagem em voz alta"
         >
           <View className="flex-row items-center justify-between gap-3">
             <Text className="flex-1 text-[16px] font-black text-white">
@@ -206,6 +214,8 @@ function CommentCard({
           </Text>
         </Pressable>
       </View>
+      {comment.mediaData ? <PostImage uri={communityService.resolveAssetUrl(comment.mediaData)!}
+        description={comment.imageDescription} authorName={comment.author.name} authToken={authToken} analyzeImage={async () => (await communityService.describeCommentImage(postId, comment.id)).description} /> : null}
     </View>
   );
 }
@@ -243,6 +253,17 @@ export default function CommunityCommentsScreen() {
     [params.authorName]
   );
   const postBody = useMemo(() => normalizeRouteParam(params.postBody), [params.postBody]);
+  const [sourcePost, setSourcePost] = useState<CommunityPostResponse | null>(null);
+  const sourceRequestRef = useRef(0);
+  useEffect(() => {
+    const generation = ++sourceRequestRef.current;
+    setSourcePost(null);
+    if (postId) void communityService.getPost(postId).then((post) => {
+      if (sourceRequestRef.current === generation) setSourcePost(post);
+    }).catch(() => { /* Existing route text remains available; API reports failure. */ });
+    const lifecycle = sourceRequestRef; return () => { lifecycle.current++; };
+  }, [postId]);
+  const sourceReader = useCommunityPostReader(sourcePost ?? { id: postId, author: { name: authorName }, body: postBody });
   const publishedAt = useMemo(
     () => normalizeRouteParam(params.publishedAt).trim(),
     [params.publishedAt]
@@ -257,11 +278,14 @@ export default function CommunityCommentsScreen() {
   );
 
   const [comments, setComments] = useState<CommunityCommentResponse[]>([]);
-  const [draft, setDraft] = useState("");
+  const editor = useCommunityCommentEditor(postId, isMember, authToken);
+  const { body: draft, setBody: setDraft, submitting } = editor;
+  const [imageSourceVisible, setImageSourceVisible] = useState(false);
+  const [pickingImage, setPickingImage] = useState(false);
+  const pickingImageRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [pendingDeleteCommentId, setPendingDeleteCommentId] = useState<string | null>(null);
 
   const loadComments = useCallback(
@@ -320,17 +344,6 @@ export default function CommunityCommentsScreen() {
       return;
     }
 
-    const trimmedDraft = draft.trim();
-
-    if (trimmedDraft.length === 0) {
-      showGlobalToast({
-        title: "Comentário vazio",
-        variant: "warning",
-        message: "Escreva algo antes de enviar.",
-      });
-      return;
-    }
-
     if (!isMember) {
       showGlobalToast({
         title: "Participação necessária",
@@ -340,27 +353,42 @@ export default function CommunityCommentsScreen() {
       return;
     }
 
-    setSubmitting(true);
-
-    try {
-      const createdComment = await communityService.createComment(postId, {
-        body: trimmedDraft,
-      });
-
+    const createdComment = await editor.submit();
+    if (createdComment) {
       setComments((currentComments) => [...currentComments, createdComment]);
-      setDraft("");
       showGlobalToast({
         title: "Comentário publicado",
         variant: "success",
         message: "Seu comentário já apareceu na conversa.",
       });
       announceForAccessibility(accessibilityAnnouncements.commentPublished());
-    } catch {
-      // Global API error toast already explains the failure.
-    } finally {
-      setSubmitting(false);
     }
-  }, [draft, isMember, postId, submitting]);
+  }, [editor, isMember, postId, submitting]);
+
+  async function pickCommentImage(source: "camera" | "library") {
+    setImageSourceVisible(false);
+    if (!isMember || submitting || pickingImageRef.current) return;
+    pickingImageRef.current = true;
+    setPickingImage(true);
+    try {
+      const permission = source === "camera"
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        showGlobalToast({ title: source === "camera" ? "Câmera bloqueada" : "Galeria bloqueada",
+          message: "Autorize o acesso nas configurações do aparelho para anexar imagens.", variant: "warning" });
+        return;
+      }
+      const options: ImagePicker.ImagePickerOptions = { mediaTypes: ["images"], quality: 0.8, allowsEditing: false };
+      const result = source === "camera" ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
+      if (!result.canceled && result.assets[0]) editor.selectImage(result.assets[0]);
+    } catch {
+      showGlobalToast({ title: "Não foi possível selecionar a imagem", message: "Tente novamente.", variant: "error" });
+    } finally {
+      pickingImageRef.current = false;
+      setPickingImage(false);
+    }
+  }
 
   const canDeleteComment = useCallback(
     (comment: CommunityCommentResponse) => {
@@ -487,11 +515,7 @@ export default function CommunityCommentsScreen() {
                 <Pressable
                   className="rounded-[28px] bg-[#111214] p-6"
                   // Toque relê a publicacao original (dados de runtime).
-                  onPress={() =>
-                    speak(
-                      buildActionSpeech(`Publicação de ${authorName}.`, postBody)
-                    )
-                  }
+                  onPress={sourceReader.read}
                   accessibilityRole="button"
                   accessibilityLabel={`Publicação de ${authorName}`}
                   accessibilityHint="Lê a publicação original em voz alta"
@@ -510,12 +534,11 @@ export default function CommunityCommentsScreen() {
                       {publishedAt}
                     </Text>
                   ) : null}
-                  {postBody ? (
-                    <Text className="mt-4 text-[16px] font-semibold leading-7 text-[#E5E2E1]">
-                      {postBody}
-                    </Text>
-                  ) : null}
+
                 </Pressable>
+                <PostContent editedAt={sourcePost?.editedAt} body={sourcePost?.body ?? postBody} imageDescription={sourcePost?.imageDescription}
+                  mediaUri={communityService.resolveAssetUrl(sourcePost?.mediaData)} authorName={sourcePost?.author.name ?? authorName}
+                  authToken={authToken} onRead={sourceReader.read} onStop={sourceReader.stop} />
 
                 {loadError ? (
                   <View className="mt-6 rounded-2xl border border-[#6A4456] bg-[#2A1C24] px-4 py-4">
@@ -531,6 +554,7 @@ export default function CommunityCommentsScreen() {
                     comments.map((comment) => (
                       <CommentCard
                         key={comment.id}
+                        postId={postId}
                         authToken={authToken}
                         canDelete={canDeleteComment(comment)}
                         comment={comment}
@@ -557,26 +581,55 @@ export default function CommunityCommentsScreen() {
               <View className="border-t border-[#2A2A2A] bg-[#111214] px-6 py-5">
                 {isMember ? (
                   <>
-                    <TextInput
-                      className="min-h-[108px] rounded-2xl border border-[#494455] bg-[#1C1B1B] px-4 py-4 text-[15px] leading-6 text-white"
-                      multiline
-                      maxLength={400}
-                      placeholder="Escreva um comentário..."
-                      placeholderTextColor="#948EA1"
-                      textAlignVertical="top"
-                      value={draft}
-                      onChangeText={setDraft}
-                      onFocus={() => speak("Escreva um comentário")}
-                      accessibilityLabel="Escreva um comentário"
-                      accessibilityHint="Obrigatório para publicar"
-                    />
+                    <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled">
+                      <TextInput
+                        className="min-h-[108px] rounded-2xl border border-[#494455] bg-[#1C1B1B] px-4 py-4 text-[15px] leading-6 text-white"
+                        multiline
+                        maxLength={400}
+                        placeholder="Escreva um comentário..."
+                        placeholderTextColor="#948EA1"
+                        textAlignVertical="top"
+                        value={draft}
+                        editable={!submitting}
+                        onChangeText={setDraft}
+                        onFocus={() => speak("Escreva um comentário")}
+                        accessibilityLabel="Escreva um comentário"
+                        accessibilityHint="Escreva um comentário ou anexe uma imagem. Até 400 caracteres."
+                      />
+                      {editor.image ? (
+                        <View>
+                          <PostImage uri={editor.image.uri} description={editor.imageDescription} authorName="você" authToken={null} />
+                          <Text className="mt-3 font-bold text-white">Descrição da imagem (opcional)</Text>
+                          <TextInput multiline maxLength={240} editable={!submitting}
+                            value={editor.imageDescription} onChangeText={editor.setImageDescription}
+                            accessibilityLabel="Descrição da imagem do comentário"
+                            accessibilityHint="Descreva o conteúdo relevante para quem não pode ver. Até 240 caracteres."
+                            placeholder="O que aparece na imagem?" placeholderTextColor="#948EA1"
+                            className="mt-2 min-h-[80px] rounded-xl border border-[#494455] p-3 text-white" />
+                          <Text className="mt-1 text-right text-[#CAC3D8]">{editor.imageDescription.length} / 240</Text>
+                          <Pressable accessibilityRole="button" accessibilityLabel="Remover imagem do comentário"
+                            accessibilityHint="Remove a imagem e sua descrição, mantendo o texto do comentário"
+                            disabled={submitting} accessibilityState={{ disabled: submitting }}
+                            className="min-h-[44px] justify-center" onPress={() => editor.selectImage(null)}>
+                            <Text className="font-bold text-[#FF8A8A]">Remover imagem</Text>
+                          </Pressable>
+                        </View>
+                      ) : null}
+                    </ScrollView>
                     <View className="mt-4 flex-row items-center justify-between">
                       <Text className="text-[12px] font-semibold text-[#948EA1]">
                         {draft.length} / 400
                       </Text>
+                      <Pressable accessibilityRole="button" accessibilityLabel={editor.image ? "Trocar imagem do comentário" : "Adicionar imagem ao comentário"}
+                        accessibilityHint="Escolhe entre câmera e galeria. Permite descrever a imagem antes de enviar."
+                        disabled={submitting || pickingImage} accessibilityState={{ disabled: submitting || pickingImage, busy: pickingImage }}
+                        className="min-h-[44px] min-w-[44px] items-center justify-center"
+                        onPress={() => setImageSourceVisible(true)}>
+                        <Ionicons name="image-outline" size={26} color="#EAEA00" importantForAccessibility="no" />
+                      </Pressable>
                       <Pressable
                         className={`rounded-full px-5 py-3 ${
-                          draft.trim().length > 0 && !submitting
+                          (draft.trim().length > 0 || editor.image) && !submitting && !pickingImage
                             ? "bg-[#EAEA00]"
                             : "bg-[#3B3841]"
                         }`}
@@ -584,12 +637,12 @@ export default function CommunityCommentsScreen() {
                           speak("Enviar comentário");
                           void handleSubmitComment();
                         }}
-                        disabled={draft.trim().length === 0 || submitting}
+                        disabled={(!draft.trim() && !editor.image) || submitting || pickingImage}
                         accessibilityRole="button"
                         accessibilityLabel="Enviar comentário"
                         accessibilityHint="Publica o comentário abaixo da publicação original."
                         accessibilityState={{
-                          disabled: draft.trim().length === 0 || submitting,
+                          disabled: (!draft.trim() && !editor.image) || submitting || pickingImage,
                           busy: submitting,
                         }}
                       >
@@ -618,6 +671,11 @@ export default function CommunityCommentsScreen() {
           )}
         </KeyboardAvoidingContainer>
       </SafeAreaView>
+      <ActionSheet title="Imagem do comentário" visible={imageSourceVisible} onClose={() => setImageSourceVisible(false)}
+        options={[
+          { key: "camera", label: "Tirar foto", hint: "Abre a câmera", icon: "camera-outline", onPress: () => { void pickCommentImage("camera"); } },
+          { key: "library", label: "Escolher da galeria", hint: "Abre as imagens salvas", icon: "images-outline", onPress: () => { void pickCommentImage("library"); } },
+        ]} />
     </View>
   );
 }

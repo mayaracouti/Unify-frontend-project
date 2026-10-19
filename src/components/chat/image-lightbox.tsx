@@ -1,12 +1,14 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Modal, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTTS } from "../../accessibility/tts";
+import { splitPostSpeech } from "../../utils/personalPostContent";
 
 import { useGlobalAccessibilityState } from "../../accessibility/global-text-adjustments";
 import { AuthenticatedRemoteImage } from "../profile/authenticated-remote-image";
 
 /**
- * Imagem do chat em tela cheia. Fecha pelo botao, tocando na imagem ou com o
+ * Imagem do chat em tela cheia. Fecha pelo botao ou com o
  * botao voltar do Android (`onRequestClose`).
  */
 export function ImageLightbox({
@@ -23,11 +25,13 @@ export function ImageLightbox({
 }) {
   // `reduceMotion`: abre/fecha sem o fade.
   const { reduceMotion } = useGlobalAccessibilityState();
+  const { speakSequence, stop } = useTTS();
+  const close = () => { stop(); onClose(); };
 
   return (
     <Modal
       animationType={reduceMotion ? "none" : "fade"}
-      onRequestClose={onClose}
+      onRequestClose={close}
       statusBarTranslucent
       visible={Boolean(uri)}
     >
@@ -36,15 +40,7 @@ export function ImageLightbox({
         importantForAccessibility="yes"
         className="flex-1 bg-black"
       >
-        {/* A imagem nao e touchable: o Pressable pai e o unico alvo de toque aqui. */}
-        <Pressable
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel="Fechar imagem"
-          accessibilityHint="Fecha a visualização em tela cheia"
-          className="flex-1"
-          onPress={onClose}
-        >
+        <View className="flex-1">
           {uri ? (
             <AuthenticatedRemoteImage
               accessibilityLabel={accessibilityLabel}
@@ -62,7 +58,15 @@ export function ImageLightbox({
               uri={uri}
             />
           ) : null}
-        </Pressable>
+        </View>
+        <SafeAreaView edges={["bottom"]} className="bg-black px-4 pb-3">
+          <Text className="text-[14px] text-white">{accessibilityLabel}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Ler descrição da imagem"
+            accessibilityHint="Lê em voz alta o conteúdo informado junto da imagem"
+            className="min-h-[44px] justify-center" onPress={() => speakSequence(splitPostSpeech(accessibilityLabel))}>
+            <Text className="font-bold text-[#EAEA00]">Ler descrição</Text>
+          </Pressable>
+        </SafeAreaView>
 
         <SafeAreaView
           className="absolute left-0 right-0 top-0 flex-row justify-end px-4 pt-2"
@@ -76,7 +80,7 @@ export function ImageLightbox({
             accessibilityHint="Volta para a conversa"
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             className="h-11 w-11 items-center justify-center rounded-full bg-black/60"
-            onPress={onClose}
+            onPress={close}
           >
             <Ionicons name="close" size={26} color="#FFFFFF" importantForAccessibility="no" />
           </Pressable>

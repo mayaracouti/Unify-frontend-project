@@ -69,7 +69,7 @@ export default function ProfilePostsScreen() {
   /** 404: bloqueio em qualquer direcao (ou perfil inexistente). */
   const [unavailable, setUnavailable] = useState(false);
 
-  const { deletingPostId, dialogs, handlers, likeBusyPostId } = usePostListActions(setPosts);
+  const { deletingPostId, dialogs, handlers, likeBusyPostIds } = usePostListActions(setPosts);
 
   const loadPosts = useCallback(
     async (reset: boolean) => {
@@ -261,7 +261,7 @@ export default function ProfilePostsScreen() {
             deleting={deletingPostId === item.id}
             highContrast={highContrast}
             isOwnPost={isOwnProfile}
-            likeBusy={likeBusyPostId === item.id}
+            likeBusy={likeBusyPostIds.has(item.id)}
             post={item}
             {...handlers}
           />
