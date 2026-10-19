@@ -25,6 +25,7 @@ import { getAuthSnapshot, subscribeToAuthStorage } from "../../src/storage/token
 import type { UserProfileResponse } from "../../src/types/profile";
 import { announceForAccessibility } from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
+import { KeyboardAvoidingContainer } from "../../src/components/ui/keyboard-aware";
 
 const DISCOVERY_ACCENT = "#7C4DFF";
 
@@ -435,7 +436,7 @@ function LocationModal({
       visible={visible}
       onRequestClose={onClose}
     >
-      <View
+      <KeyboardAvoidingContainer
         accessibilityViewIsModal
         importantForAccessibility="yes"
         className="flex-1 justify-end bg-black/70 px-5 pb-6"
@@ -486,7 +487,7 @@ function LocationModal({
             <Text className="text-[16px] font-black text-white">Salvar local</Text>
           </Pressable>
         </View>
-      </View>
+      </KeyboardAvoidingContainer>
     </Modal>
   );
 }

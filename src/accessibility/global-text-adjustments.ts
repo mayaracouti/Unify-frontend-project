@@ -477,6 +477,22 @@ function patchReactNativeExport(
     options
   );
 
+  // Preserva os estaticos do componente original (ex.: `TextInput.State`,
+  // usado para descobrir o input focado), que o wrapper nao teria.
+  for (const key of Object.getOwnPropertyNames(original)) {
+    // `$$typeof`/`render` sao do forwardRef original e nao valem para o wrapper.
+    if (key in adjusted || key === "prototype" || key === "$$typeof" || key === "render") {
+      continue;
+    }
+    try {
+      (adjusted as unknown as Record<string, unknown>)[key] = (
+        original as unknown as Record<string, unknown>
+      )[key];
+    } catch {
+      // Propriedade somente leitura: ignora.
+    }
+  }
+
   try {
     // Registra o componente ajustado como base do interop do NativeWind, para
     // que ele receba a `style` ja resolvida a partir do `className`.

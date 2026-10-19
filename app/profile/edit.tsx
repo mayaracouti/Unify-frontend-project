@@ -4,7 +4,6 @@ import {
   Linking,
   Platform,
   Pressable,
-  ScrollView,
   Text,
   View,
 } from "react-native";
@@ -28,6 +27,7 @@ import {
   requestForegroundLocationPermissionState,
   type AutoLocation,
 } from "../../src/utils/location";
+import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware";
 
 function idsFromOptions(options?: LookupOptionResponse[] | null): number[] {
   return options?.map((option) => option.id) ?? [];
@@ -336,7 +336,7 @@ export default function EditProfile() {
             <ActivityIndicator color="#CDBDFF" />
           </View>
         ) : (
-          <ScrollView
+          <KeyboardAwareScrollView
             className="flex-1"
             contentContainerClassName="mx-auto w-full max-w-[720px] px-6 pb-10 pt-8"
             keyboardShouldPersistTaps="handled"
@@ -540,7 +540,7 @@ export default function EditProfile() {
                 </Text>
               )}
             </Pressable>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         )}
       </SafeAreaView>
     </View>

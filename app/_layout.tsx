@@ -9,6 +9,7 @@ import {
   useGlobalAccessibilityState,
 } from "../src/accessibility/global-text-adjustments";
 import { TtsProvider, useTTS } from "../src/accessibility/tts";
+import { MatchCelebrationWatcher } from "../src/components/matches/match-celebration-watcher";
 import { PushNotificationRouter } from "../src/components/notifications/push-notification-router";
 import { AuthLoadingScreen } from "../src/components/ui/auth-loading-screen";
 import { GlobalToastViewport } from "../src/components/ui/global-toast-viewport";
@@ -185,7 +186,11 @@ function RootNavigator() {
         </Stack.Protected>
       </Stack>
 
-      {/* Toque em push: so com as rotas autenticadas montadas no Stack. */}
+      {/*
+        So com as rotas autenticadas montadas no Stack. O watcher vem antes:
+        o roteador de push usa a consulta que ele registra (toque em NEW_MATCH).
+      */}
+      {hasCompletedOnboarding ? <MatchCelebrationWatcher /> : null}
       {hasCompletedOnboarding ? <PushNotificationRouter /> : null}
     </View>
   );

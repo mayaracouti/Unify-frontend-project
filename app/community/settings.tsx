@@ -4,10 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   Text,
   TextInput,
   View,
@@ -35,6 +33,7 @@ import {
   announceForAccessibility,
 } from "../../src/utils/accessibilityAnnouncements";
 import { showGlobalToast } from "../../src/utils/globalToast";
+import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware";
 
 const IMAGE_MEDIA_TYPES: ImagePicker.MediaType[] = ["images"];
 
@@ -292,10 +291,7 @@ export default function CommunitySettingsScreen() {
   return (
     <View className="flex-1 bg-[#09090A]">
       <SafeAreaView className="flex-1 bg-[#09090A]">
-        <KeyboardAvoidingView
-          className="flex-1"
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
+        <View className="flex-1">
           <View className="h-16 flex-row items-center justify-between border-b border-[#2A2A2A] px-6">
             <View className="flex-row items-center">
               <Pressable
@@ -359,7 +355,7 @@ export default function CommunitySettingsScreen() {
               </View>
             </View>
           ) : (
-            <ScrollView
+            <KeyboardAwareScrollView
               className="flex-1"
               contentContainerClassName="mx-auto w-full max-w-[720px] px-6 pb-16 pt-8"
               keyboardShouldPersistTaps="handled"
@@ -630,9 +626,9 @@ export default function CommunitySettingsScreen() {
                   </Pressable>
                 ) : null}
               </View>
-            </ScrollView>
+            </KeyboardAwareScrollView>
           )}
-        </KeyboardAvoidingView>
+        </View>
       </SafeAreaView>
     </View>
   );

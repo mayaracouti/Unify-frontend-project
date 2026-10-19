@@ -4,8 +4,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -35,6 +33,7 @@ import { formatApiErrorMessage } from "../../src/utils/auth";
 import { showGlobalToast } from "../../src/utils/globalToast";
 import { formatRelativePostDate, getNameInitial } from "../../src/utils/postFormatting";
 import { buildUserProfileHref } from "../../src/utils/userProfileRoute";
+import { KeyboardAvoidingContainer } from "../../src/components/ui/keyboard-aware";
 
 const PAGE_SIZE = 20;
 const COMMENT_MAX_LENGTH = 400;
@@ -291,10 +290,7 @@ export default function PersonalPostCommentsScreen() {
   return (
     <View className="flex-1 bg-[#0B0B0C]">
       <SafeAreaView className="flex-1 bg-[#0B0B0C]">
-        <KeyboardAvoidingView
-          className="flex-1"
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
+        <KeyboardAvoidingContainer className="flex-1">
           <View className="h-16 flex-row items-center justify-between border-b border-[#2A2A2A] px-6">
             <View className="flex-row items-center">
               <Pressable
@@ -561,7 +557,7 @@ export default function PersonalPostCommentsScreen() {
               </View>
             </>
           )}
-        </KeyboardAvoidingView>
+        </KeyboardAvoidingContainer>
       </SafeAreaView>
 
       <ActionSheet

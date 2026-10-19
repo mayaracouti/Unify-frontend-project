@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { authService } from "../../../src/services/authService";
 import { formatApiErrorMessage } from "../../../src/utils/auth";
 import { speak } from "../../../src/accessibility/tts";
+import { KeyboardAwareScrollView } from "../../../src/components/ui/keyboard-aware";
 
 export default function ForgotPassword() {
   const router = useRouter();
@@ -76,111 +77,113 @@ export default function ForgotPassword() {
       <View className="absolute inset-0 bg-black/10" />
 
       <SafeAreaView className="flex-1">
-        <View className="flex-1 px-6 pt-6 mt-10">
-          <Text
-            className="mb-3 text-[34px] font-extrabold leading-[40px] text-white"
-            accessibilityRole="header"
-          >
-            Recuperar senha
-          </Text>
-
-          <Text className="mb-8 text-[15px] font-semibold leading-6 text-white/65">
-            Digite o e-mail cadastrado para receber um link de redefinição.
-          </Text>
-
-          <Text className="mb-2 text-[12px] font-extrabold text-white/80">
-            Endereço de E-mail
-          </Text>
-
-          <TextInput
-            className="mb-5 rounded-md bg-[#F4F4F5] px-4 py-4 text-[15px] text-zinc-900"
-            placeholder="nome@example.com"
-            placeholderTextColor="#6C6F7A"
-            autoCapitalize="none"
-            keyboardType="email-address"
-            value={email}
-            accessibilityLabel="Endereço de e-mail cadastrado"
-            accessibilityHint="Digite o e-mail usado no cadastro para receber o link de redefinição"
-            onFocus={() => speak("Endereço de e-mail cadastrado")}
-            onChangeText={(value) => {
-              setEmail(value);
-
-              if (error) {
-                setError("");
-              }
-
-              if (successMessage) {
-                setSuccessMessage("");
-              }
-            }}
-          />
-
-          {successMessage ? (
-            <View
-              className="mb-4 rounded-md border border-emerald-300/35 bg-emerald-400/10 px-4 py-3"
-              accessibilityLiveRegion="polite"
-            >
-              <Text className="text-center text-[12px] font-semibold text-emerald-100">
-                {successMessage}
-              </Text>
-              <Text className="mt-2 text-center text-[12px] font-medium text-white/80">
-                Abra o e-mail e toque no link para redefinir sua senha no app.
-              </Text>
-            </View>
-          ) : null}
-
-          {error ? (
+        <KeyboardAwareScrollView contentContainerStyle={{ flexGrow: 1 }}>
+          <View className="grow px-6 pt-6 mt-10">
             <Text
-              className="mb-4 text-center text-[12px] font-semibold text-red-300"
-              accessibilityRole="alert"
-              accessibilityLiveRegion="polite"
+              className="mb-3 text-[34px] font-extrabold leading-[40px] text-white"
+              accessibilityRole="header"
             >
-              {error}
+              Recuperar senha
             </Text>
-          ) : null}
 
-          <Pressable
-            className={`items-center justify-center rounded-md py-4 ${
-              loading ? "bg-[#BFC200]" : "bg-[#EFFF00]"
-            }`}
-            disabled={loading}
-            onPress={() => {
-              speak(successMessage ? "Enviar link novamente" : "Enviar link de redefinição");
-              void handleSendResetLink();
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={
-              successMessage
-                ? "Enviar link novamente"
-                : "Enviar link de redefinição"
-            }
-            accessibilityHint="Envia um e-mail com o link para redefinir sua senha"
-            accessibilityState={{ disabled: loading, busy: loading }}
-          >
-            {loading ? (
-              <ActivityIndicator />
-            ) : (
-              <Text className="text-[16px] font-bold text-[#171717]">
-                {successMessage ? "Enviar novamente" : "Enviar link"}
+            <Text className="mb-8 text-[15px] font-semibold leading-6 text-white/65">
+              Digite o e-mail cadastrado para receber um link de redefinição.
+            </Text>
+
+            <Text className="mb-2 text-[12px] font-extrabold text-white/80">
+              Endereço de E-mail
+            </Text>
+
+            <TextInput
+              className="mb-5 rounded-md bg-[#F4F4F5] px-4 py-4 text-[15px] text-zinc-900"
+              placeholder="nome@example.com"
+              placeholderTextColor="#6C6F7A"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              value={email}
+              accessibilityLabel="Endereço de e-mail cadastrado"
+              accessibilityHint="Digite o e-mail usado no cadastro para receber o link de redefinição"
+              onFocus={() => speak("Endereço de e-mail cadastrado")}
+              onChangeText={(value) => {
+                setEmail(value);
+
+                if (error) {
+                  setError("");
+                }
+
+                if (successMessage) {
+                  setSuccessMessage("");
+                }
+              }}
+            />
+
+            {successMessage ? (
+              <View
+                className="mb-4 rounded-md border border-emerald-300/35 bg-emerald-400/10 px-4 py-3"
+                accessibilityLiveRegion="polite"
+              >
+                <Text className="text-center text-[12px] font-semibold text-emerald-100">
+                  {successMessage}
+                </Text>
+                <Text className="mt-2 text-center text-[12px] font-medium text-white/80">
+                  Abra o e-mail e toque no link para redefinir sua senha no app.
+                </Text>
+              </View>
+            ) : null}
+
+            {error ? (
+              <Text
+                className="mb-4 text-center text-[12px] font-semibold text-red-300"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+              >
+                {error}
               </Text>
-            )}
-          </Pressable>
+            ) : null}
 
-          <Pressable
-            className="mt-6 min-h-[44px] items-center justify-center rounded-md border border-white/35 py-3"
-            onPress={() => {
-              speak("Voltar para o login");
-              router.replace("/auth/login");
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Voltar para o login"
-            accessibilityHint="Retorna para a tela de login"
-          >
-            <Text className="text-[14px] font-extrabold text-white">
-              Voltar para o login
-            </Text>
-          </Pressable>
-        </View>
+            <Pressable
+              className={`items-center justify-center rounded-md py-4 ${
+                loading ? "bg-[#BFC200]" : "bg-[#EFFF00]"
+              }`}
+              disabled={loading}
+              onPress={() => {
+                speak(successMessage ? "Enviar link novamente" : "Enviar link de redefinição");
+                void handleSendResetLink();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={
+                successMessage
+                  ? "Enviar link novamente"
+                  : "Enviar link de redefinição"
+              }
+              accessibilityHint="Envia um e-mail com o link para redefinir sua senha"
+              accessibilityState={{ disabled: loading, busy: loading }}
+            >
+              {loading ? (
+                <ActivityIndicator />
+              ) : (
+                <Text className="text-[16px] font-bold text-[#171717]">
+                  {successMessage ? "Enviar novamente" : "Enviar link"}
+                </Text>
+              )}
+            </Pressable>
+
+            <Pressable
+              className="mt-6 min-h-[44px] items-center justify-center rounded-md border border-white/35 py-3"
+              onPress={() => {
+                speak("Voltar para o login");
+                router.replace("/auth/login");
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Voltar para o login"
+              accessibilityHint="Retorna para a tela de login"
+            >
+              <Text className="text-[14px] font-extrabold text-white">
+                Voltar para o login
+              </Text>
+            </Pressable>
+  </View>
+        </KeyboardAwareScrollView>
       </SafeAreaView>
     </LinearGradient>
   );

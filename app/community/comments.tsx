@@ -3,8 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -36,6 +34,7 @@ import {
 import { formatApiErrorMessage } from "../../src/utils/auth";
 import { showGlobalToast } from "../../src/utils/globalToast";
 import { buildUserProfileHref } from "../../src/utils/userProfileRoute";
+import { KeyboardAvoidingContainer } from "../../src/components/ui/keyboard-aware";
 
 function getInitials(name?: string | null) {
   return (name ?? "")
@@ -430,10 +429,7 @@ export default function CommunityCommentsScreen() {
   return (
     <View className="flex-1 bg-[#0B0B0C]">
       <SafeAreaView className="flex-1 bg-[#0B0B0C]">
-        <KeyboardAvoidingView
-          className="flex-1"
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
+        <KeyboardAvoidingContainer className="flex-1">
           <View className="h-16 flex-row items-center justify-between border-b border-[#2A2A2A] px-6">
             <View className="flex-row items-center">
               <Pressable
@@ -620,7 +616,7 @@ export default function CommunityCommentsScreen() {
               </View>
             </>
           )}
-        </KeyboardAvoidingView>
+        </KeyboardAvoidingContainer>
       </SafeAreaView>
     </View>
   );

@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Modal,
   Pressable,
-  ScrollView,
   Text,
   TextInput,
   View,
@@ -20,6 +19,7 @@ import {
 } from "../../utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../utils/auth";
 import { showGlobalToast } from "../../utils/globalToast";
+import { KeyboardAvoidingContainer, KeyboardAwareScrollView } from "../ui/keyboard-aware";
 
 const DESCRIPTION_MAX_LENGTH = 2000;
 
@@ -153,7 +153,7 @@ export function ReportModal({
       visible={visible}
       onRequestClose={onClose}
     >
-      <View
+      <KeyboardAvoidingContainer
         accessibilityViewIsModal
         importantForAccessibility="yes"
         className="flex-1 justify-end bg-black/65 px-6 pb-8"
@@ -192,7 +192,7 @@ export function ReportModal({
             </Pressable>
           </View>
 
-          <ScrollView
+          <KeyboardAwareScrollView
             className="mt-5"
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -331,9 +331,9 @@ export function ReportModal({
             >
               <Text className="text-[15px] font-bold text-white">Cancelar</Text>
             </Pressable>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingContainer>
     </Modal>
   );
 }

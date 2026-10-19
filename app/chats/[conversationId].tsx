@@ -5,8 +5,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   Text,
   View,
@@ -48,6 +46,7 @@ import { followStateFromStats, type FollowState } from "../../src/utils/followRe
 import { showGlobalToast } from "../../src/utils/globalToast";
 import { setActiveConversationId } from "../../src/utils/pushNotifications";
 import { buildUserProfileHref } from "../../src/utils/userProfileRoute";
+import { KeyboardAvoidingContainer } from "../../src/components/ui/keyboard-aware";
 
 type Lightbox = { uri: string; label: string };
 
@@ -597,11 +596,7 @@ export default function ConversationScreen() {
           ) : null}
         </View>
 
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          className="flex-1"
-          keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
-        >
+        <KeyboardAvoidingContainer className="flex-1">
           {loading && messages.length === 0 ? (
             <View
               accessible
@@ -689,7 +684,7 @@ export default function ConversationScreen() {
               sending={sending}
             />
           )}
-        </KeyboardAvoidingView>
+        </KeyboardAvoidingContainer>
       </SafeAreaView>
 
       <ActionSheet

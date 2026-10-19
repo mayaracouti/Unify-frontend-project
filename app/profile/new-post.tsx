@@ -5,10 +5,8 @@ import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   Text,
   TextInput,
   View,
@@ -25,6 +23,7 @@ import {
   announceForAccessibility,
 } from "../../src/utils/accessibilityAnnouncements";
 import { showGlobalToast } from "../../src/utils/globalToast";
+import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware";
 
 const IMAGE_MEDIA_TYPES: ImagePicker.MediaType[] = ["images"];
 
@@ -223,10 +222,7 @@ export default function ProfileNewPostScreen() {
   return (
     <View className={`flex-1 ${pageBackground}`}>
       <SafeAreaView className={`flex-1 ${pageBackground}`}>
-        <KeyboardAvoidingView
-          className="flex-1"
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
+        <View className="flex-1">
           <View
             className={`h-16 flex-row items-center justify-between border-b px-6 ${
               highContrast ? "border-hc-border" : "border-[#2A2A2A]"
@@ -283,7 +279,7 @@ export default function ProfileNewPostScreen() {
             </Pressable>
           </View>
 
-          <ScrollView
+          <KeyboardAwareScrollView
             className="flex-1"
             contentContainerClassName="mx-auto w-full max-w-[720px] px-6 pb-10 pt-8"
             keyboardShouldPersistTaps="handled"
@@ -451,8 +447,8 @@ export default function ProfileNewPostScreen() {
                 )}
               </View>
             )}
-          </ScrollView>
-        </KeyboardAvoidingView>
+          </KeyboardAwareScrollView>
+        </View>
       </SafeAreaView>
 
       <ActionSheet

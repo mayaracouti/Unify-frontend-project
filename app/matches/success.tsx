@@ -12,12 +12,16 @@ import { useAccessibility } from "../../src/context/AccessibilityContext";
 import { useAppShell } from "../../src/context/AppShellContext";
 import { useAuth } from "../../src/context/AuthContext";
 import { chatService } from "../../src/services/chatService";
+import { matchService } from "../../src/services/matchService";
 import {
   accessibilityAnnouncements,
   announceForAccessibility,
 } from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
 import { showGlobalToast } from "../../src/utils/globalToast";
+
+/** "Visto" que falhou (rede) tenta de novo uma vez antes de desistir. */
+const MARK_SEEN_RETRY_DELAY_MS = 3000;
 
 function MatchPhoto({
   accessibilityLabel,
@@ -117,6 +121,22 @@ export default function MatchSuccess() {
       `Deu match! Você e ${matchedName} demonstraram interesse mútuo.`
     );
   }, [matchedName, speak]);
+
+  // A tela foi exibida: este match sai da fila "Deu match" de vez (para quem
+  // curtiu primeiro; quem respondeu o convite o backend ja marcou no POST).
+  useEffect(() => {
+    if (!matchId) {
+      return;
+    }
+
+    // Sem cancelar ao sair da tela: o "visto" vale mesmo que a pessoa feche
+    // a comemoracao antes de a requisicao terminar.
+    void matchService.markMutualMatchSeen(matchId).catch(() => {
+      setTimeout(() => {
+        void matchService.markMutualMatchSeen(matchId).catch(() => undefined);
+      }, MARK_SEEN_RETRY_DELAY_MS);
+    });
+  }, [matchId]);
 
   useEffect(() => {
     // Delay curto: o leitor de tela precisa terminar de anunciar a mudanca de
@@ -276,11 +296,18 @@ export default function MatchSuccess() {
               className="h-[58px] w-full items-center justify-center rounded-[14px] border-[2px] border-[#948EA1] bg-transparent"
               onPress={() => {
                 speak("Continuar navegando");
-                router.replace("/matches");
+                // Volta para onde a pessoa estava: a descoberta (quem
+                // respondeu o convite) ou qualquer tela em que a comemoracao
+                // abriu sozinha (quem curtiu primeiro).
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace("/matches");
+                }
               }}
               accessibilityRole="button"
               accessibilityLabel="Continuar navegando"
-              accessibilityHint="Volta para a descoberta de perfis"
+              accessibilityHint="Fecha a comemoração e volta para a tela anterior"
             >
               <Text className="text-[20px] font-black text-[#E5E2E1]">
                 Continuar Navegando

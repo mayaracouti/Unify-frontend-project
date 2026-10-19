@@ -12,6 +12,7 @@ import { AppState, Linking } from "react-native";
 
 import { joinSpeechParts, speak } from "../accessibility/tts";
 import { notificationService } from "../services/notificationService";
+import { checkPendingMatchCelebrations } from "../utils/matchCelebration";
 import {
   addPushTokenRotationListener,
   claimAutoPushPermissionPrompt,
@@ -183,11 +184,28 @@ export function NotificationProvider({ children }: PropsWithChildren) {
       void refreshUnreadCount();
 
       const content = notification.request.content;
-
-      if (shouldPresentNotification(content.data as Record<string, unknown> | undefined)) {
+      const data = content.data as Record<string, unknown> | undefined;
+      const present = () => {
         speak(joinSpeechParts(["Nova notificação", content.title, content.body]));
         void presentForegroundPush(notification).catch(() => undefined);
+      };
+
+      if (!shouldPresentNotification(data)) {
+        return;
       }
+
+      // Novo match com o app aberto: a tela "Deu match" abre na hora e
+      // substitui o banner. Sem tela (ja vista, erro de rede), vira banner.
+      if (data?.type === "NEW_MATCH") {
+        void checkPendingMatchCelebrations().then((shown) => {
+          if (!shown) {
+            present();
+          }
+        });
+        return;
+      }
+
+      present();
     });
 
     return () => subscription.remove();

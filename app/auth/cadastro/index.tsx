@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Platform,
   Pressable,
-  ScrollView,
   Text,
   View,
 } from "react-native";
@@ -21,6 +20,7 @@ import { useAuth } from "../../../src/context/AuthContext";
 import { formatApiErrorMessage } from "../../../src/utils/auth";
 import { isApiError } from "../../../src/types/auth";
 import { speak } from "../../../src/accessibility/tts";
+import { KeyboardAwareScrollView } from "../../../src/components/ui/keyboard-aware";
 
 const UNDERAGE_SIGNUP_ERROR_CODE = 3008;
 
@@ -245,7 +245,7 @@ export default function Cadastro() {
       <View className="absolute inset-0 bg-black/10" />
 
       <SafeAreaView className="flex-1">
-        <ScrollView
+        <KeyboardAwareScrollView
           className="flex-1"
           contentContainerClassName="px-6 pb-8 pt-7"
           keyboardShouldPersistTaps="handled"
@@ -490,7 +490,7 @@ export default function Cadastro() {
               Voltar para o Login
             </Text>
           </Pressable>
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </SafeAreaView>
     </LinearGradient>
   );

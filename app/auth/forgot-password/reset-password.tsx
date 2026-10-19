@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { authService } from "../../../src/services/authService";
 import { formatApiErrorMessage } from "../../../src/utils/auth";
 import { speak } from "../../../src/accessibility/tts";
+import { KeyboardAwareScrollView } from "../../../src/components/ui/keyboard-aware";
 
 function readTokenParam(tokenParam: string | string[] | undefined): string {
   if (Array.isArray(tokenParam)) {
@@ -105,152 +106,154 @@ export default function ResetPassword() {
       <View className="absolute inset-0 bg-black/10" />
 
       <SafeAreaView className="flex-1">
-        <View className="flex-1 px-6 pt-6 mt-10">
-          <Text
-            className="mb-3 text-[34px] font-extrabold leading-[40px] text-white"
-            accessibilityRole="header"
-          >
-            Nova senha
-          </Text>
-
-          <Text className="mb-8 text-[15px] font-semibold leading-6 text-white/65">
-            {isTokenMissing
-              ? "Esse link não trouxe um token válido. Solicite um novo e-mail de recuperação."
-              : "Defina sua nova senha para concluir a recuperação da conta."}
-          </Text>
-
-          {successMessage ? (
-            <View
-              className="mb-6 rounded-md border border-emerald-300/35 bg-emerald-400/10 px-4 py-4"
-              accessibilityLiveRegion="polite"
-            >
-              <Text className="text-center text-[13px] font-semibold text-emerald-100">
-                {successMessage}
-              </Text>
-            </View>
-          ) : null}
-
-          {error ? (
+        <KeyboardAwareScrollView contentContainerStyle={{ flexGrow: 1 }}>
+          <View className="grow px-6 pt-6 mt-10">
             <Text
-              className="mb-4 text-center text-[12px] font-semibold text-red-300"
-              accessibilityRole="alert"
-              accessibilityLiveRegion="polite"
+              className="mb-3 text-[34px] font-extrabold leading-[40px] text-white"
+              accessibilityRole="header"
             >
-              {error}
+              Nova senha
             </Text>
-          ) : null}
 
-          {!successMessage && !isTokenMissing ? (
-            <>
-              <Text className="mb-2 text-[12px] font-extrabold text-white/80">
-                Nova senha
-              </Text>
+            <Text className="mb-8 text-[15px] font-semibold leading-6 text-white/65">
+              {isTokenMissing
+                ? "Esse link não trouxe um token válido. Solicite um novo e-mail de recuperação."
+                : "Defina sua nova senha para concluir a recuperação da conta."}
+            </Text>
 
-              <TextInput
-                className="mb-5 rounded-md bg-[#F4F4F5] px-4 py-4 text-[15px] text-zinc-900"
-                placeholder="••••••••"
-                placeholderTextColor="#6C6F7A"
-                secureTextEntry
-                value={password}
-                onFocus={() => speak("Nova senha")}
-                accessibilityLabel="Nova senha"
-                accessibilityHint="A senha deve ter pelo menos 8 caracteres"
-                onChangeText={(value) => {
-                  setPassword(value);
-
-                  if (error) {
-                    setError("");
-                  }
-                }}
-              />
-
-              <Text className="mb-2 text-[12px] font-extrabold text-white/80">
-                Confirmar nova senha
-              </Text>
-
-              <TextInput
-                className="mb-5 rounded-md bg-[#F4F4F5] px-4 py-4 text-[15px] text-zinc-900"
-                placeholder="••••••••"
-                placeholderTextColor="#6C6F7A"
-                secureTextEntry
-                value={confirmPassword}
-                onFocus={() => speak("Confirmar nova senha")}
-                accessibilityLabel="Confirmar nova senha"
-                accessibilityHint="Repita exatamente a nova senha digitada acima"
-                onChangeText={(value) => {
-                  setConfirmPassword(value);
-
-                  if (error) {
-                    setError("");
-                  }
-                }}
-              />
-
-              <Pressable
-                className={`items-center justify-center rounded-md py-4 ${
-                  loading ? "bg-[#BFC200]" : "bg-[#EFFF00]"
-                }`}
-                disabled={loading}
-                onPress={() => {
-                  speak("Redefinir senha");
-                  void handleResetPassword();
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Redefinir senha"
-                accessibilityHint="Salva a nova senha e conclui a recuperação da conta"
-                accessibilityState={{ disabled: loading, busy: loading }}
+            {successMessage ? (
+              <View
+                className="mb-6 rounded-md border border-emerald-300/35 bg-emerald-400/10 px-4 py-4"
+                accessibilityLiveRegion="polite"
               >
-                {loading ? (
-                  <ActivityIndicator />
-                ) : (
-                  <Text className="text-[16px] font-bold text-[#171717]">
-                    Redefinir senha
-                  </Text>
-                )}
-              </Pressable>
-            </>
-          ) : null}
+                <Text className="text-center text-[13px] font-semibold text-emerald-100">
+                  {successMessage}
+                </Text>
+              </View>
+            ) : null}
 
-          <Pressable
-            className="mt-6 min-h-[44px] items-center justify-center rounded-md border border-white/35 py-3"
-            onPress={() => {
-              speak(
+            {error ? (
+              <Text
+                className="mb-4 text-center text-[12px] font-semibold text-red-300"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+              >
+                {error}
+              </Text>
+            ) : null}
+
+            {!successMessage && !isTokenMissing ? (
+              <>
+                <Text className="mb-2 text-[12px] font-extrabold text-white/80">
+                  Nova senha
+                </Text>
+
+                <TextInput
+                  className="mb-5 rounded-md bg-[#F4F4F5] px-4 py-4 text-[15px] text-zinc-900"
+                  placeholder="••••••••"
+                  placeholderTextColor="#6C6F7A"
+                  secureTextEntry
+                  value={password}
+                  onFocus={() => speak("Nova senha")}
+                  accessibilityLabel="Nova senha"
+                  accessibilityHint="A senha deve ter pelo menos 8 caracteres"
+                  onChangeText={(value) => {
+                    setPassword(value);
+
+                    if (error) {
+                      setError("");
+                    }
+                  }}
+                />
+
+                <Text className="mb-2 text-[12px] font-extrabold text-white/80">
+                  Confirmar nova senha
+                </Text>
+
+                <TextInput
+                  className="mb-5 rounded-md bg-[#F4F4F5] px-4 py-4 text-[15px] text-zinc-900"
+                  placeholder="••••••••"
+                  placeholderTextColor="#6C6F7A"
+                  secureTextEntry
+                  value={confirmPassword}
+                  onFocus={() => speak("Confirmar nova senha")}
+                  accessibilityLabel="Confirmar nova senha"
+                  accessibilityHint="Repita exatamente a nova senha digitada acima"
+                  onChangeText={(value) => {
+                    setConfirmPassword(value);
+
+                    if (error) {
+                      setError("");
+                    }
+                  }}
+                />
+
+                <Pressable
+                  className={`items-center justify-center rounded-md py-4 ${
+                    loading ? "bg-[#BFC200]" : "bg-[#EFFF00]"
+                  }`}
+                  disabled={loading}
+                  onPress={() => {
+                    speak("Redefinir senha");
+                    void handleResetPassword();
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Redefinir senha"
+                  accessibilityHint="Salva a nova senha e conclui a recuperação da conta"
+                  accessibilityState={{ disabled: loading, busy: loading }}
+                >
+                  {loading ? (
+                    <ActivityIndicator />
+                  ) : (
+                    <Text className="text-[16px] font-bold text-[#171717]">
+                      Redefinir senha
+                    </Text>
+                  )}
+                </Pressable>
+              </>
+            ) : null}
+
+            <Pressable
+              className="mt-6 min-h-[44px] items-center justify-center rounded-md border border-white/35 py-3"
+              onPress={() => {
+                speak(
+                  successMessage || isTokenMissing
+                    ? "Solicitar novo link"
+                    : "Voltar para recuperar senha"
+                );
+                router.replace("/auth/forgot-password");
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={
                 successMessage || isTokenMissing
                   ? "Solicitar novo link"
                   : "Voltar para recuperar senha"
-              );
-              router.replace("/auth/forgot-password");
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={
-              successMessage || isTokenMissing
-                ? "Solicitar novo link"
-                : "Voltar para recuperar senha"
-            }
-            accessibilityHint="Abre a tela de recuperação de senha"
-          >
-            <Text className="text-[14px] font-extrabold text-white">
-              {successMessage || isTokenMissing
-                ? "Solicitar novo link"
-                : "Voltar para recuperar senha"}
-            </Text>
-          </Pressable>
+              }
+              accessibilityHint="Abre a tela de recuperação de senha"
+            >
+              <Text className="text-[14px] font-extrabold text-white">
+                {successMessage || isTokenMissing
+                  ? "Solicitar novo link"
+                  : "Voltar para recuperar senha"}
+              </Text>
+            </Pressable>
 
-          <Pressable
-            className="mt-4 min-h-[44px] items-center justify-center rounded-md border border-white/20 py-3"
-            onPress={() => {
-              speak("Ir para o login");
-              router.replace("/auth/login");
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Ir para o login"
-            accessibilityHint="Abre a tela de login"
-          >
-            <Text className="text-[14px] font-extrabold text-white/90">
-              Ir para o login
-            </Text>
-          </Pressable>
-        </View>
+            <Pressable
+              className="mt-4 min-h-[44px] items-center justify-center rounded-md border border-white/20 py-3"
+              onPress={() => {
+                speak("Ir para o login");
+                router.replace("/auth/login");
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Ir para o login"
+              accessibilityHint="Abre a tela de login"
+            >
+              <Text className="text-[14px] font-extrabold text-white/90">
+                Ir para o login
+              </Text>
+            </Pressable>
+  </View>
+        </KeyboardAwareScrollView>
       </SafeAreaView>
     </LinearGradient>
   );

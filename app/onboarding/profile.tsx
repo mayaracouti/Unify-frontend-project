@@ -4,7 +4,6 @@ import {
   Linking,
   Platform,
   Pressable,
-  ScrollView,
   Text,
   TextInput,
   View,
@@ -24,6 +23,7 @@ import { markOnboardingCompletionForSession } from "../../src/services/onboardin
 import { profileService } from "../../src/services/profileService";
 import type { LookupOptionResponse, ProfileOptionsResponse } from "../../src/types/profile";
 import { formatApiErrorMessage } from "../../src/utils/auth";
+import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware";
 
 function idsFromOptions(options?: LookupOptionResponse[] | null): number[] {
   return options?.map((option) => option.id) ?? [];
@@ -395,7 +395,7 @@ export default function ProfileOnboarding() {
             <ActivityIndicator color="#CDBDFF" />
           </View>
         ) : (
-          <ScrollView
+          <KeyboardAwareScrollView
             className="flex-1"
             contentContainerClassName="mx-auto w-full max-w-[640px] px-6 pb-10 pt-8"
             keyboardShouldPersistTaps="handled"
@@ -586,7 +586,7 @@ export default function ProfileOnboarding() {
                 </Text>
               )}
             </Pressable>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         )}
       </SafeAreaView>
     </View>

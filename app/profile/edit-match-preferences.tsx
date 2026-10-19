@@ -4,7 +4,6 @@ import {
   Linking,
   Platform,
   Pressable,
-  ScrollView,
   Text,
   TextInput,
   View,
@@ -32,6 +31,7 @@ import {
   getForegroundLocationPermissionState,
   requestForegroundLocationPermissionState,
 } from "../../src/utils/location";
+import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware";
 
 function toggleId(currentIds: number[], id: number): number[] {
   return currentIds.includes(id)
@@ -340,7 +340,7 @@ export default function EditMatchPreferences() {
             <ActivityIndicator color="#CDBDFF" />
           </View>
         ) : (
-          <ScrollView
+          <KeyboardAwareScrollView
             className="flex-1"
             contentContainerClassName="mx-auto w-full max-w-[720px] px-6 pb-10 pt-8"
             keyboardShouldPersistTaps="handled"
@@ -613,7 +613,7 @@ export default function EditMatchPreferences() {
                 </Text>
               )}
             </Pressable>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         )}
       </SafeAreaView>
     </View>

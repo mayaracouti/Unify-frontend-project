@@ -16,6 +16,7 @@ import { clearPendingVerificationEmail } from "../../../src/storage/tokenStorage
 import { showGlobalToast } from "../../../src/utils/globalToast";
 import Ionicicons from '@expo/vector-icons/Ionicons';
 import { speak } from "../../../src/accessibility/tts";
+import { KeyboardAwareScrollView } from "../../../src/components/ui/keyboard-aware";
 
 export default function EmailCode() {
   const router = useRouter();
@@ -113,127 +114,129 @@ export default function EmailCode() {
   return (
     <View className="flex-1 bg-[#111214]">
       <SafeAreaView className="flex-1">
-        <View className="flex-1 px-8 pt-8">
-          <Pressable
-            className="mb-14 h-14 w-14 items-center justify-center rounded-full bg-white/8"
-            onPress={() => {
-              speak("Voltar para o login");
-              void goBackLoginScreen();
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Voltar"
-            accessibilityHint="Retorna para a tela de login"
-          >
-            <Ionicicons name="arrow-back-outline" size={24} color="#fff" />
-          </Pressable>
-
-          <Text
-            className="mb-6 text-[48px] font-semibold leading-[58px] text-[#F4F4F5]"
-            accessibilityRole="header"
-          >
-            Insira o código recebido
-          </Text>
-
-          <Text className="mb-10 text-[18px] font-semibold tracking-[1px] text-[#A7AAB2]">
-            {`Enviamos um código de 6 dígitos para ${email}`}
-          </Text>
-
-          <TextInput
-            ref={inputRef}
-            className="mb-5 rounded-md bg-[#F3F3F3] px-4 py-4 text-center text-[22px] font-semibold tracking-[6px] text-zinc-900"
-            keyboardType="default"
-            textContentType="oneTimeCode"
-            maxLength={6}
-            autoFocus
-            placeholder="000000"
-            placeholderTextColor="#6D6D79"
-            value={code}
-            accessibilityLabel="Código de verificação de 6 dígitos"
-            accessibilityHint="Digite o código enviado para seu e-mail"
-            onFocus={() => speak("Código de verificação de 6 dígitos")}
-            onChangeText={(value) => {
-              setCode(normalizeVerificationCode(value));
-
-              if (errorMessage) {
-                setErrorMessage(null);
-              }
-
-              if (infoMessage) {
-                setInfoMessage(null);
-              }
-            }}
-          />
-
-          <Text className="mb-2 text-[18px] leading-7 text-[#A7AAB2]">
-            Digite o código de 6 caracteres enviado para seu email. Enquanto a
-            conta não for confirmada, o app mantém você nesta etapa.
-          </Text>
-
-          {errorMessage ? (
-            <Text
-              className="mb-2 text-[15px] font-semibold text-danger"
-              accessibilityRole="alert"
-              accessibilityLiveRegion="polite"
+        <KeyboardAwareScrollView contentContainerStyle={{ flexGrow: 1 }}>
+          <View className="grow px-8 pt-8">
+            <Pressable
+              className="mb-14 h-14 w-14 items-center justify-center rounded-full bg-white/8"
+              onPress={() => {
+                speak("Voltar para o login");
+                void goBackLoginScreen();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Voltar"
+              accessibilityHint="Retorna para a tela de login"
             >
-              {errorMessage}
-            </Text>
-          ) : null}
+              <Ionicicons name="arrow-back-outline" size={24} color="#fff" />
+            </Pressable>
 
-          {infoMessage ? (
             <Text
-              className="mb-2 text-[15px] font-semibold text-success"
-              accessibilityLiveRegion="polite"
+              className="mb-6 text-[48px] font-semibold leading-[58px] text-[#F4F4F5]"
+              accessibilityRole="header"
             >
-              {infoMessage}
+              Insira o código recebido
             </Text>
-          ) : null}
 
-          <Pressable
-            className="mb-10 self-start"
-            // ~24dp visuais + hitSlop = area de toque de 44dp sem mexer no layout.
-            hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
-            onPress={() => {
-              speak("Reenviar código");
-              void handleResendCode();
-            }}
-            disabled={isResending}
-            accessibilityRole="button"
-            accessibilityLabel="Reenviar código"
-            accessibilityHint="Envia um novo código de verificação para o seu e-mail"
-            accessibilityState={{ disabled: isResending, busy: isResending }}
-          >
-            <Text className="text-[18px] font-bold text-[#2F90D8]">
-              {isResending ? "Reenviando..." : "Reenviar código"}
+            <Text className="mb-10 text-[18px] font-semibold tracking-[1px] text-[#A7AAB2]">
+              {`Enviamos um código de 6 dígitos para ${email}`}
             </Text>
-          </Pressable>
 
-          <Pressable
-            className={`items-center justify-center rounded-full py-5 ${
-              isComplete && !loading ? "bg-white" : "bg-[#3B3D45]"
-            }`}
-            disabled={!isComplete || loading}
-            onPress={() => {
-              speak("Confirmar código");
-              void handleVerifyEmail();
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Confirmar código"
-            accessibilityHint="Valida o código digitado e conclui a verificação do e-mail"
-            accessibilityState={{ disabled: !isComplete || loading, busy: loading }}
-          >
-            {loading ? (
-              <ActivityIndicator />
-            ) : (
+            <TextInput
+              ref={inputRef}
+              className="mb-5 rounded-md bg-[#F3F3F3] px-4 py-4 text-center text-[22px] font-semibold tracking-[6px] text-zinc-900"
+              keyboardType="default"
+              textContentType="oneTimeCode"
+              maxLength={6}
+              autoFocus
+              placeholder="000000"
+              placeholderTextColor="#6D6D79"
+              value={code}
+              accessibilityLabel="Código de verificação de 6 dígitos"
+              accessibilityHint="Digite o código enviado para seu e-mail"
+              onFocus={() => speak("Código de verificação de 6 dígitos")}
+              onChangeText={(value) => {
+                setCode(normalizeVerificationCode(value));
+
+                if (errorMessage) {
+                  setErrorMessage(null);
+                }
+
+                if (infoMessage) {
+                  setInfoMessage(null);
+                }
+              }}
+            />
+
+            <Text className="mb-2 text-[18px] leading-7 text-[#A7AAB2]">
+              Digite o código de 6 caracteres enviado para seu email. Enquanto a
+              conta não for confirmada, o app mantém você nesta etapa.
+            </Text>
+
+            {errorMessage ? (
               <Text
-                className={`text-[22px] font-bold ${
-                  isComplete ? "text-[#18191B]" : "text-[#737782]"
-                }`}
+                className="mb-2 text-[15px] font-semibold text-danger"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
               >
-                Seguinte
+                {errorMessage}
               </Text>
-            )}
-          </Pressable>
-        </View>
+            ) : null}
+
+            {infoMessage ? (
+              <Text
+                className="mb-2 text-[15px] font-semibold text-success"
+                accessibilityLiveRegion="polite"
+              >
+                {infoMessage}
+              </Text>
+            ) : null}
+
+            <Pressable
+              className="mb-10 self-start"
+              // ~24dp visuais + hitSlop = area de toque de 44dp sem mexer no layout.
+              hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+              onPress={() => {
+                speak("Reenviar código");
+                void handleResendCode();
+              }}
+              disabled={isResending}
+              accessibilityRole="button"
+              accessibilityLabel="Reenviar código"
+              accessibilityHint="Envia um novo código de verificação para o seu e-mail"
+              accessibilityState={{ disabled: isResending, busy: isResending }}
+            >
+              <Text className="text-[18px] font-bold text-[#2F90D8]">
+                {isResending ? "Reenviando..." : "Reenviar código"}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              className={`items-center justify-center rounded-full py-5 ${
+                isComplete && !loading ? "bg-white" : "bg-[#3B3D45]"
+              }`}
+              disabled={!isComplete || loading}
+              onPress={() => {
+                speak("Confirmar código");
+                void handleVerifyEmail();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Confirmar código"
+              accessibilityHint="Valida o código digitado e conclui a verificação do e-mail"
+              accessibilityState={{ disabled: !isComplete || loading, busy: loading }}
+            >
+              {loading ? (
+                <ActivityIndicator />
+              ) : (
+                <Text
+                  className={`text-[22px] font-bold ${
+                    isComplete ? "text-[#18191B]" : "text-[#737782]"
+                  }`}
+                >
+                  Seguinte
+                </Text>
+              )}
+            </Pressable>
+  </View>
+        </KeyboardAwareScrollView>
       </SafeAreaView>
     </View>
   );

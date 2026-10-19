@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 
 import { useNotifications } from "../../context/NotificationContext";
 import { notificationService } from "../../services/notificationService";
+import { checkPendingMatchCelebrations } from "../../utils/matchCelebration";
 import { openNotificationTarget, parsePushData } from "../../utils/notificationNavigation";
 import { loadNotifications } from "../../utils/pushNotifications";
 
@@ -41,6 +42,13 @@ export function PushNotificationRouter() {
       if (data.notificationId) {
         // Tocar e "ler": o aviso sai do sino mesmo que o destino nao exista mais.
         await notificationService.markAsRead(data.notificationId).catch(() => undefined);
+      }
+
+      // Match ainda nao comemorado: a tela "Deu match" no lugar da lista de
+      // conexoes (o "Continuar navegando" dela volta para onde a pessoa estava).
+      if (data.type === "NEW_MATCH" && (await checkPendingMatchCelebrations())) {
+        void refreshUnreadCount();
+        return;
       }
 
       const result = await openNotificationTarget(router, data);
