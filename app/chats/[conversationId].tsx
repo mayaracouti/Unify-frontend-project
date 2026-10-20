@@ -23,11 +23,20 @@ import {
 import { getGlobalTextAdjustments } from "../../src/accessibility/global-text-adjustments";
 import { ChatComposer } from "../../src/components/chat/chat-composer";
 import { ImageLightbox } from "../../src/components/chat/image-lightbox";
-import { MessageBubble, type MessageAction } from "../../src/components/chat/message-bubble";
+import {
+  buildMessageAccessibilityLabel,
+  MessageBubble,
+  type MessageAction,
+} from "../../src/components/chat/message-bubble";
+import {
+  type BubbleAnchor,
+  MessageContextMenu,
+  type MessageContextMenuOption,
+} from "../../src/components/chat/message-context-menu";
 import { BlockUserSheet, type BlockUserTarget } from "../../src/components/privacy/block-user-sheet";
 import { AuthenticatedRemoteImage } from "../../src/components/profile/authenticated-remote-image";
 import { useProfileFollowToggle } from "../../src/components/social/use-profile-follow-toggle";
-import { ActionSheet, type ActionSheetOption } from "../../src/components/ui/action-sheet";
+import { ActionSheet } from "../../src/components/ui/action-sheet";
 import { useAppShell } from "../../src/context/AppShellContext";
 import { useAuth } from "../../src/context/AuthContext";
 import { useNotifications } from "../../src/context/NotificationContext";
@@ -36,12 +45,17 @@ import { useScreenHeadingFocus } from "../../src/hooks/use-screen-heading-focus"
 import { chatService } from "../../src/services/chatService";
 import { followService } from "../../src/services/followService";
 import { isApiError } from "../../src/types/auth";
-import type { ChatMediaUpload, ChatMessageResponse } from "../../src/types/chat";
+import type {
+  ChatMediaUpload,
+  ChatMessageReplyResponse,
+  ChatMessageResponse,
+} from "../../src/types/chat";
 import {
   accessibilityAnnouncements,
   announceForAccessibility,
 } from "../../src/utils/accessibilityAnnouncements";
 import { formatApiErrorMessage } from "../../src/utils/auth";
+import { buildReplyQuote } from "../../src/utils/chatReply";
 import { followStateFromStats, type FollowState } from "../../src/utils/followRelation";
 import { showGlobalToast } from "../../src/utils/globalToast";
 import { setActiveConversationId } from "../../src/utils/pushNotifications";
@@ -49,6 +63,12 @@ import { buildUserProfileHref } from "../../src/utils/userProfileRoute";
 import { KeyboardAvoidingContainer } from "../../src/components/ui/keyboard-aware";
 
 type Lightbox = { uri: string; label: string };
+
+/** Mensagem com o menu de contexto aberto e o retangulo do balao (ancora do menu). */
+type MenuTarget = { message: ChatMessageResponse; anchor: BubbleAnchor };
+
+/** Tempo do destaque na mensagem original ao tocar numa citacao. */
+const JUMP_HIGHLIGHT_MS = 1600;
 
 /** Quem esta do outro lado: vem por params da lista ou, em deep link, da API. */
 type Partner = {
@@ -220,8 +240,13 @@ export default function ConversationScreen() {
   }, [otherName, partnerProfileId, router]);
 
   const [sending, setSending] = useState(false);
-  /** Mensagem minha com o menu de acoes (toque longo) aberto. */
-  const [actionTarget, setActionTarget] = useState<ChatMessageResponse | null>(null);
+  /** Mensagem com o menu de contexto (toque longo) aberto. */
+  const [menuTarget, setMenuTarget] = useState<MenuTarget | null>(null);
+  /** Mensagem sendo respondida (citacao que vai junto do proximo envio). */
+  const [replyingTo, setReplyingTo] = useState<ChatMessageReplyResponse | null>(null);
+  /** Original destacada depois de tocar numa citacao. */
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Mensagem aguardando confirmacao de exclusao. */
   const [deleteTarget, setDeleteTarget] = useState<ChatMessageResponse | null>(null);
   /** Mensagem em edicao no compositor. */
@@ -340,6 +365,35 @@ export default function ConversationScreen() {
     }
   }, [editing, messages]);
 
+  // A mensagem sendo respondida foi apagada (pelo outro, no polling): o
+  // backend recusaria a resposta, entao a citacao sai antes do envio.
+  useEffect(() => {
+    if (!replyingTo) {
+      return;
+    }
+    const current = messages.find((message) => message.id === replyingTo.id);
+    if (current?.deletedAt) {
+      setReplyingTo(null);
+      announceForAccessibility("A mensagem que você estava respondendo foi apagada.");
+    }
+  }, [messages, replyingTo]);
+
+  // Espelho para callbacks estaveis (o balao e memo): ler a lista sem
+  // recriar o handler a cada rodada do polling.
+  const messagesRef = useRef(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(
+    () => () => {
+      if (highlightTimerRef.current) {
+        clearTimeout(highlightTimerRef.current);
+      }
+    },
+    []
+  );
+
   function showSendError(nextError: unknown, fallback: string) {
     if (isApiError(nextError) && nextError.status === 409) {
       // Bloqueio: o toast global ja mostra a mensagem do backend; aqui o
@@ -365,8 +419,13 @@ export default function ConversationScreen() {
 
     setSending(true);
     try {
-      const message = await chatService.sendTextMessage(resolvedConversationId, body);
+      const message = await chatService.sendTextMessage(
+        resolvedConversationId,
+        body,
+        replyingTo?.id
+      );
       upsertLocalMessage(message);
+      setReplyingTo(null);
       listRef.current?.scrollToOffset({ offset: 0, animated: !getGlobalTextAdjustments().reduceMotion });
       announceForAccessibility(accessibilityAnnouncements.messageSent());
       return true;
@@ -385,8 +444,12 @@ export default function ConversationScreen() {
 
     setSending(true);
     try {
-      const message = await chatService.sendMediaMessage(resolvedConversationId, media);
+      const message = await chatService.sendMediaMessage(
+        resolvedConversationId,
+        replyingTo ? { ...media, replyToMessageId: replyingTo.id } : media
+      );
       upsertLocalMessage(message);
+      setReplyingTo(null);
       listRef.current?.scrollToOffset({ offset: 0, animated: !getGlobalTextAdjustments().reduceMotion });
       announceForAccessibility(media.type === "AUDIO" ? "Áudio enviado." : "Imagem enviada.");
       return true;
@@ -444,45 +507,127 @@ export default function ConversationScreen() {
     }
   }
 
-  function handleMessageAction(message: ChatMessageResponse, action: MessageAction) {
-    if (action === "menu") {
-      setActionTarget(message);
-      return;
-    }
-    if (action === "edit") {
-      setEditing(message);
-      return;
-    }
-    setDeleteTarget(message);
-  }
+  const startReply = useCallback(
+    (message: ChatMessageResponse) => {
+      const quote = buildReplyQuote(message);
+      setEditing(null);
+      setReplyingTo(quote);
+      speak(quote.fromMe ? "Respondendo à sua mensagem" : `Respondendo a ${otherName}`);
+    },
+    [otherName]
+  );
 
-  const actionOptions: ActionSheetOption[] = actionTarget
+  /** Tocar numa citacao: rola ate a original e a destaca por um instante. */
+  const jumpToMessage = useCallback(
+    (messageId: string) => {
+      const list = messagesRef.current;
+      const index = list.findIndex((message) => message.id === messageId);
+
+      if (index < 0) {
+        showGlobalToast({
+          title: "Mensagem mais antiga",
+          message: "Role a conversa para cima para carregar a mensagem original.",
+          variant: "info",
+        });
+        return;
+      }
+
+      listRef.current?.scrollToIndex({
+        index,
+        viewPosition: 0.5,
+        animated: !getGlobalTextAdjustments().reduceMotion,
+      });
+
+      if (highlightTimerRef.current) {
+        clearTimeout(highlightTimerRef.current);
+      }
+      setHighlightedId(messageId);
+      highlightTimerRef.current = setTimeout(() => setHighlightedId(null), JUMP_HIGHLIGHT_MS);
+
+      announceForAccessibility(
+        `Mensagem original. ${buildMessageAccessibilityLabel(list[index], otherName)}`
+      );
+    },
+    [otherName]
+  );
+
+  const handleMessageAction = useCallback(
+    (message: ChatMessageResponse, action: MessageAction, anchor?: BubbleAnchor) => {
+      switch (action) {
+        case "menu":
+          if (anchor) {
+            setMenuTarget({ message, anchor });
+          }
+          return;
+        case "reply":
+          startReply(message);
+          return;
+        case "jump-to-reply":
+          if (message.replyTo) {
+            jumpToMessage(message.replyTo.id);
+          }
+          return;
+        case "edit":
+          setReplyingTo(null);
+          setEditing(message);
+          return;
+        case "delete":
+          setDeleteTarget(message);
+          return;
+      }
+    },
+    [jumpToMessage, startReply]
+  );
+
+  const openImage = useCallback((uri: string, label: string) => setLightbox({ uri, label }), []);
+
+  const menuMessage = menuTarget?.message ?? null;
+  const menuOptions: MessageContextMenuOption[] = menuMessage
     ? [
-        ...(actionTarget.type === "TEXT"
+        ...(!sendBlocked
           ? [
               {
-                key: "edit",
-                label: "Editar mensagem",
-                hint: "Carrega o texto no campo de mensagem para alterar",
-                icon: "pencil-outline" as const,
+                key: "reply",
+                label: "Responder",
+                hint: "Cita esta mensagem na sua próxima mensagem",
+                icon: "arrow-undo-outline" as const,
                 onPress: () => {
-                  setActionTarget(null);
-                  setEditing(actionTarget);
+                  setMenuTarget(null);
+                  startReply(menuMessage);
                 },
               },
             ]
           : []),
-        {
-          key: "delete",
-          label: "Apagar mensagem",
-          hint: "Pede confirmação antes de apagar",
-          icon: "trash-outline" as const,
-          destructive: true,
-          onPress: () => {
-            setActionTarget(null);
-            setDeleteTarget(actionTarget);
-          },
-        },
+        ...(menuMessage.fromMe && menuMessage.type === "TEXT"
+          ? [
+              {
+                key: "edit",
+                label: "Editar",
+                hint: "Carrega o texto no campo de mensagem para alterar",
+                icon: "pencil-outline" as const,
+                onPress: () => {
+                  setMenuTarget(null);
+                  setReplyingTo(null);
+                  setEditing(menuMessage);
+                },
+              },
+            ]
+          : []),
+        ...(menuMessage.fromMe
+          ? [
+              {
+                key: "delete",
+                label: "Apagar",
+                hint: "Pede confirmação antes de apagar",
+                icon: "trash-outline" as const,
+                destructive: true,
+                onPress: () => {
+                  setMenuTarget(null);
+                  setDeleteTarget(menuMessage);
+                },
+              },
+            ]
+          : []),
       ]
     : [];
 
@@ -616,6 +761,7 @@ export default function ConversationScreen() {
               accessibilityLabel={`Mensagens da conversa com ${otherName}`}
               contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}
               data={messages}
+              extraData={`${highlightedId ?? ""}|${sendBlocked}`}
               // `inverted`: a mensagem mais recente fica embaixo, e o auto-scroll
               // vira scrollToOffset(0) — mais estavel que scrollToEnd.
               inverted
@@ -645,14 +791,29 @@ export default function ConversationScreen() {
                 }
               }}
               onEndReachedThreshold={0.4}
+              // Citacao para mensagem fora da janela renderizada: rola pela
+              // altura media ate ela existir e tenta de novo.
+              onScrollToIndexFailed={({ index, averageItemLength }) => {
+                listRef.current?.scrollToOffset({
+                  offset: averageItemLength * index,
+                  animated: false,
+                });
+                setTimeout(() => {
+                  if (index < messagesRef.current.length) {
+                    listRef.current?.scrollToIndex({ index, viewPosition: 0.5, animated: false });
+                  }
+                }, 120);
+              }}
               ref={listRef}
               renderItem={({ item }) => (
                 <MessageBubble
                   authToken={authToken}
+                  highlighted={item.id === highlightedId}
                   message={item}
-                  onMessageAction={item.fromMe ? handleMessageAction : undefined}
-                  onOpenImage={(uri, label) => setLightbox({ uri, label })}
+                  onMessageAction={handleMessageAction}
+                  onOpenImage={openImage}
                   otherName={otherName}
+                  replyEnabled={!sendBlocked}
                 />
               )}
               showsVerticalScrollIndicator={false}
@@ -676,22 +837,29 @@ export default function ConversationScreen() {
             <ChatComposer
               editing={editing ? { messageId: editing.id, body: editing.body ?? "" } : null}
               onCancelEdit={() => setEditing(null)}
+              onCancelReply={() => {
+                speak("Resposta cancelada");
+                setReplyingTo(null);
+              }}
               onSendMedia={handleSendMedia}
               onSendText={handleSendText}
               onSubmitEdit={(messageId, body) => {
                 void handleSubmitEdit(messageId, body);
               }}
+              otherName={otherName}
+              replyingTo={replyingTo}
               sending={sending}
             />
           )}
         </KeyboardAvoidingContainer>
       </SafeAreaView>
 
-      <ActionSheet
-        onClose={() => setActionTarget(null)}
-        options={actionOptions}
-        title="Mensagem"
-        visible={Boolean(actionTarget)}
+      <MessageContextMenu
+        align={menuMessage?.fromMe ? "end" : "start"}
+        anchor={menuTarget?.anchor ?? null}
+        onClose={() => setMenuTarget(null)}
+        options={menuOptions}
+        title={menuMessage?.fromMe ? "Opções da sua mensagem" : `Opções da mensagem de ${otherName}`}
       />
 
       <ActionSheet

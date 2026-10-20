@@ -21,3 +21,30 @@ it("uses the web picker file instead of a React Native file descriptor", () => {
   expect(append).toHaveBeenCalledWith("file", file, "photo.png");
   expect(append.mock.calls.some(([key]) => key === "caption")).toBe(false);
 });
+
+it("sends the replied message id with text and media replies", () => {
+  chatService.sendTextMessage("conversation", "bora!", "original");
+  expect(customApiCall.post).toHaveBeenCalledWith(
+    "/chats/conversation/messages",
+    { body: "bora!", replyToMessageId: "original" },
+    { requiresAuth: true }
+  );
+
+  chatService.sendTextMessage("conversation", "solta");
+  expect(customApiCall.post).toHaveBeenLastCalledWith(
+    "/chats/conversation/messages",
+    { body: "solta" },
+    { requiresAuth: true }
+  );
+
+  const append = jest.spyOn(FormData.prototype, "append");
+  chatService.sendMediaMessage("conversation", {
+    type: "AUDIO",
+    uri: "file:/voz.m4a",
+    name: "voz.m4a",
+    mimeType: "audio/mp4",
+    durationSeconds: 4,
+    replyToMessageId: "original",
+  });
+  expect(append).toHaveBeenCalledWith("replyToMessageId", "original");
+});

@@ -8,8 +8,9 @@ import { KeyboardAwareScrollView } from "../ui/keyboard-aware";
 
 import { useTTS } from "../../accessibility/tts";
 import { MAX_AUDIO_DURATION_SECONDS, useAudioRecorder } from "../../hooks/useAudioRecorder";
-import type { ChatMediaUpload } from "../../types/chat";
+import type { ChatMediaUpload, ChatMessageReplyResponse } from "../../types/chat";
 import { formatAudioClock, formatAudioDuration } from "../../utils/chatFormatting";
+import { describeReplyForSpeech, describeReplyQuote } from "../../utils/chatReply";
 import { showGlobalToast } from "../../utils/globalToast";
 import { buildChatImageCaption, CHAT_IMAGE_DESCRIPTION_MAX_LENGTH } from "../../utils/chatImageDescription";
 import { PostImage } from "../community/post/post-image";
@@ -22,23 +23,87 @@ export type ChatComposerEditTarget = {
 
 type ImageSource = "camera" | "library";
 
+/**
+ * Faixa "Respondendo a" acima do campo: mostra a mensagem citada (mesmo
+ * visual da citacao no balao) e permite desistir da resposta.
+ */
+function ReplyingBar({
+  onCancel,
+  otherName,
+  quote,
+}: {
+  onCancel: () => void;
+  otherName: string;
+  quote: ChatMessageReplyResponse;
+}) {
+  const { icon, text } = describeReplyQuote(quote);
+  const accent = quote.fromMe ? "#EAEA00" : "#CDBDFF";
+
+  return (
+    <View className="flex-row items-center gap-3 border-b border-[#353534] px-4 py-2">
+      <View
+        accessible
+        accessibilityRole="text"
+        accessibilityLabel={`Respondendo. ${describeReplyForSpeech(quote, otherName)}.`}
+        accessibilityLiveRegion="polite"
+        className="flex-1 flex-row overflow-hidden rounded-[12px] bg-[#1D1F24]"
+      >
+        <View style={{ width: 4, backgroundColor: accent }} />
+        <View className="shrink px-3 py-2">
+          <Text className="text-[13px] font-bold" numberOfLines={1} style={{ color: accent }}>
+            {quote.fromMe ? "Respondendo a você" : `Respondendo a ${otherName}`}
+          </Text>
+          <View className="mt-0.5 flex-row items-center gap-1">
+            {icon ? <Ionicons name={icon} size={14} color="#9F96B8" /> : null}
+            <Text className="shrink text-[13px] text-[#CAC3D8]" numberOfLines={1}>
+              {text}
+            </Text>
+          </View>
+        </View>
+      </View>
+      <Pressable
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel="Cancelar resposta"
+        accessibilityHint="A próxima mensagem sai sem citar esta"
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        className="h-9 w-9 items-center justify-center rounded-full bg-[#1D1F24]"
+        onPress={onCancel}
+      >
+        <Ionicons name="close" size={18} color="#CAC3D8" importantForAccessibility="no" />
+      </Pressable>
+    </View>
+  );
+}
+
 export function ChatComposer({
   editing,
   onCancelEdit,
+  onCancelReply,
   onSendMedia,
   onSendText,
   onSubmitEdit,
+  otherName = "essa pessoa",
+  replyingTo = null,
   sending,
 }: {
   /** Mensagem em edicao: o compositor vira "Editando" e o envio confirma a edicao. */
   editing: ChatComposerEditTarget | null;
   onCancelEdit: () => void;
+  onCancelReply?: () => void;
   onSendMedia: (media: ChatMediaUpload) => Promise<boolean>;
   onSendText: (body: string) => Promise<boolean>;
   onSubmitEdit: (messageId: string, body: string) => void;
+  otherName?: string;
+  /**
+   * Mensagem sendo respondida: aparece a faixa "Respondendo a" e o campo
+   * ganha foco. Quem envia (a tela) anexa a citacao ao texto, imagem ou audio.
+   */
+  replyingTo?: ChatMessageReplyResponse | null;
   sending: boolean;
 }) {
   const [draft, setDraft] = useState("");
+  const inputRef = useRef<TextInput | null>(null);
   const textSendInFlight = useRef(false);
   const imageSendInFlight = useRef(false);
   const pickingImage = useRef(false);
@@ -55,6 +120,14 @@ export function ChatComposer({
   useEffect(() => {
     setDraft(editing ? editing.body : "");
   }, [editing]);
+
+  // Escolheu responder (puxao ou menu): o teclado ja abre no campo, como no WhatsApp.
+  const replyingToId = replyingTo?.id ?? null;
+  useEffect(() => {
+    if (replyingToId) {
+      inputRef.current?.focus();
+    }
+  }, [replyingToId]);
 
   const trimmed = draft.trim();
   const canSend =
@@ -285,6 +358,13 @@ export function ChatComposer({
           </Pressable>
         </View>
       ) : null}
+      {replyingTo && !editing ? (
+        <ReplyingBar
+          onCancel={() => onCancelReply?.()}
+          otherName={otherName}
+          quote={replyingTo}
+        />
+      ) : null}
 
       <View
         accessibilityRole="toolbar"
@@ -330,9 +410,16 @@ export function ChatComposer({
         ) : null}
 
         <TextInput
-          accessibilityLabel={editing ? "Novo texto da mensagem" : "Mensagem"}
+          ref={inputRef}
+          accessibilityLabel={
+            editing ? "Novo texto da mensagem" : replyingTo ? "Resposta" : "Mensagem"
+          }
           accessibilityHint={
-            editing ? "Altere o texto e toque em confirmar" : "Digite o texto e toque em enviar"
+            editing
+              ? "Altere o texto e toque em confirmar"
+              : replyingTo
+                ? "Digite a resposta e toque em enviar"
+                : "Digite o texto e toque em enviar"
           }
           className="max-h-28 flex-1 rounded-[20px] bg-[#1D1F24] px-4 py-3 text-[16px] text-white"
           cursorColor="#7C4DFF"
@@ -340,7 +427,13 @@ export function ChatComposer({
           multiline
           onChangeText={setDraft}
           onFocus={() => speak(editing ? "Editar mensagem" : "Escrever mensagem")}
-          placeholder={editing ? "Edite a mensagem..." : "Escreva uma mensagem..."}
+          placeholder={
+            editing
+              ? "Edite a mensagem..."
+              : replyingTo
+                ? "Escreva sua resposta..."
+                : "Escreva uma mensagem..."
+          }
           placeholderTextColor="#8B8C98"
           value={draft}
         />

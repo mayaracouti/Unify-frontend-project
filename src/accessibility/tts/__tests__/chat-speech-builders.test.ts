@@ -146,6 +146,26 @@ describe("buildChatMessageSpeech", () => {
     expect(speech).not.toContain("Legenda:");
   });
 
+  it("resposta: cita a mensagem respondida antes do conteudo", () => {
+    expect(
+      buildChatMessageSpeech(
+        message({
+          body: "Bora!",
+          replyTo: {
+            id: "orig",
+            senderUserProfileId: "p1",
+            senderName: "Bruno",
+            fromMe: false,
+            type: "TEXT",
+            preview: "cinema sábado?",
+            mediaDurationSeconds: null,
+            deleted: false,
+          },
+        })
+      )
+    ).toBe("hoje às 14:29. Em resposta à mensagem de Bruno: cinema sábado?. Bora!");
+  });
+
   it("apagada: so aviso e horario", () => {
     expect(buildChatMessageSpeech(message({ deletedAt: TODAY_14_30, body: null }))).toBe(
       "Mensagem apagada, hoje às 14:29"

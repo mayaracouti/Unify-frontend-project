@@ -80,10 +80,11 @@ export const chatService = {
     );
   },
 
-  sendTextMessage(conversationId: string, body: string) {
+  /** `replyToMessageId`: mensagem da mesma conversa que esta responde (citacao). */
+  sendTextMessage(conversationId: string, body: string, replyToMessageId?: string | null) {
     return customApiCall.post<ChatMessageResponse, ChatMessageCreateRequest>(
       `${CHATS_ENDPOINT}/${encodePathSegment(conversationId)}/messages`,
-      { body },
+      replyToMessageId ? { body, replyToMessageId } : { body },
       { requiresAuth: true }
     );
   },
@@ -112,6 +113,10 @@ export const chatService = {
 
     if (typeof media.durationSeconds === "number") {
       formData.append("durationSeconds", String(Math.round(media.durationSeconds)));
+    }
+
+    if (media.replyToMessageId) {
+      formData.append("replyToMessageId", media.replyToMessageId);
     }
 
     return customApiCall.post<ChatMessageResponse, FormData>(

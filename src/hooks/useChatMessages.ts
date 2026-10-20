@@ -3,6 +3,7 @@ import { AppState, type AppStateStatus } from "react-native";
 
 import { chatService } from "../services/chatService";
 import type { ChatMessageResponse } from "../types/chat";
+import { syncReplyQuotes } from "../utils/chatReply";
 
 const POLL_INTERVAL_MS = 4500;
 const MAX_BACKOFF_MS = 30000;
@@ -102,10 +103,14 @@ export function useChatMessages({
         }
 
         // Sempre da mais recente para a mais antiga (a FlatList e `inverted`).
-        return Array.from(byId.values()).sort(
+        const merged = Array.from(byId.values()).sort(
           (first, second) =>
             new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()
         );
+
+        // Original editada/apagada: as respostas que a citam nao voltam no
+        // polling, entao a citacao delas e atualizada aqui.
+        return mode === "prepend" ? syncReplyQuotes(merged, incoming) : merged;
       });
     },
     []

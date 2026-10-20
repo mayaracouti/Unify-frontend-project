@@ -22,7 +22,7 @@ const { act, create } = require("react-test-renderer");
 
 type Renderer = {
   root: {
-    findByType: (type: unknown) => { props: { value: string; onChangeText: (text: string) => void; options: { key: string; onPress: () => void }[] } };
+    findByType: (type: unknown) => { props: { value: string; placeholder?: string; onChangeText: (text: string) => void; options: { key: string; onPress: () => void }[] } };
     findAll: (predicate: (node: { props: Record<string, unknown> }) => boolean) => { props: { onPress: () => void } }[];
     findAllByProps: (props: object) => { props: { value: string; onChangeText: (text: string) => void; onPress: () => void } }[];
   };
@@ -110,5 +110,28 @@ it("does not discard new text when an earlier submission completes", async () =>
   await act(async () => { input().props.onChangeText("Outra mensagem"); });
   await act(async () => { finish(true); });
   expect(input().props.value).toBe("Outra mensagem");
+  await act(async () => { renderer.unmount(); });
+});
+
+it("shows who is being answered and lets the user cancel the reply", async () => {
+  const onCancelReply = jest.fn();
+  let renderer!: Renderer;
+  await act(async () => {
+    renderer = create(
+      <ChatComposer editing={null} onCancelEdit={jest.fn()} onCancelReply={onCancelReply}
+        onSendMedia={jest.fn()} onSendText={jest.fn()} onSubmitEdit={jest.fn()} otherName="Bruno"
+        replyingTo={{ id: "orig", senderUserProfileId: "p1", senderName: "Bruno Lima", fromMe: false,
+          type: "TEXT", preview: "cinema sábado?", mediaDurationSeconds: null, deleted: false }}
+        sending={false} />
+    );
+  });
+  expect(renderer.root.findAllByProps({
+    accessibilityLabel: "Respondendo. Em resposta à mensagem de Bruno: cinema sábado?.",
+  }).length).toBeGreaterThan(0);
+  expect(renderer.root.findByType(TextInput).props.placeholder).toBe("Escreva sua resposta...");
+  await act(async () => {
+    renderer.root.findAllByProps({ accessibilityLabel: "Cancelar resposta" })[0].props.onPress();
+  });
+  expect(onCancelReply).toHaveBeenCalledTimes(1);
   await act(async () => { renderer.unmount(); });
 });

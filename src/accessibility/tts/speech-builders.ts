@@ -32,6 +32,7 @@ import {
 } from "../../utils/accessibilityAnnouncements";
 import { describeAudioMessage, formatTimeForSpeech } from "../../utils/chatFormatting";
 import { chatImageCaptionLabel } from "../../utils/chatImageDescription";
+import { describeReplyForSpeech } from "../../utils/chatReply";
 import { describeFeedSuggestion } from "../../utils/feedSource";
 import { formatDistanceSpeech } from "../../utils/distanceFormatting";
 import { getHiddenFields, profileFieldLabel } from "../../utils/profileFieldVisibility";
@@ -510,7 +511,8 @@ export function buildConversationListEntrySpeech(
 
 /**
  * Uma mensagem do chat lida em voz alta: tipo (omitido quando e texto),
- * horario e conteudo. Ex.: "hoje às 14:29. Oi, tudo bem?" ou
+ * horario, citacao (quando e resposta) e conteudo. Ex.: "hoje às 14:29. Oi, tudo bem?",
+ * "hoje às 14:31. Em resposta à sua mensagem: bora? Bora!" ou
  * "Imagem, hoje às 14:30. Legenda: olha isso".
  */
 export function buildChatMessageSpeech(
@@ -529,18 +531,25 @@ export function buildChatMessageSpeech(
   const caption = message.body
     ? `Legenda: ${toConcise(message.body, CHAT_MESSAGE_SPEECH_MAX_LENGTH)}`
     : null;
+  const reply = message.replyTo
+    ? toConcise(describeReplyForSpeech(message.replyTo), CHAT_MESSAGE_SPEECH_MAX_LENGTH)
+    : null;
 
   switch (message.type) {
     case "TEXT":
-      return joinSpeechParts([when, toConcise(message.body, CHAT_MESSAGE_SPEECH_MAX_LENGTH)]);
+      return joinSpeechParts([when, reply, toConcise(message.body, CHAT_MESSAGE_SPEECH_MAX_LENGTH)]);
     case "IMAGE":
-      return joinSpeechParts([`Imagem, ${when}`, chatImageCaptionLabel(message.body)]);
+      return joinSpeechParts([`Imagem, ${when}`, reply, chatImageCaptionLabel(message.body)]);
     case "AUDIO":
-      return joinSpeechParts([`${describeAudioMessage(message.mediaDurationSeconds)}, ${when}`, caption]);
+      return joinSpeechParts([
+        `${describeAudioMessage(message.mediaDurationSeconds)}, ${when}`,
+        reply,
+        caption,
+      ]);
     case "VIDEO":
-      return joinSpeechParts([`Vídeo, ${when}`, caption]);
+      return joinSpeechParts([`Vídeo, ${when}`, reply, caption]);
     default:
-      return joinSpeechParts([when, toConcise(message.body, CHAT_MESSAGE_SPEECH_MAX_LENGTH)]);
+      return joinSpeechParts([when, reply, toConcise(message.body, CHAT_MESSAGE_SPEECH_MAX_LENGTH)]);
   }
 }
 
