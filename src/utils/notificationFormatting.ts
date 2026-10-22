@@ -16,6 +16,7 @@ export const NOTIFICATION_ICONS: Record<NotificationType, IconName> = {
   POST_COMMENTED: "chatbubble",
   COMMUNITY_POST: "people",
   REPORT_UPDATE: "shield-checkmark",
+  POST_REMOVED: "shield-outline",
 };
 
 /** Dica de acessibilidade: o que acontece ao tocar (resultado da acao). */
@@ -29,6 +30,7 @@ export const NOTIFICATION_ACTION_HINTS: Record<NotificationType, string> = {
   POST_COMMENTED: "Abre a publicação e os comentários",
   COMMUNITY_POST: "Abre a comunidade",
   REPORT_UPDATE: "Marca esta notificação como lida",
+  POST_REMOVED: "Marca esta notificação como lida",
 };
 
 export function notificationIcon(type: NotificationType): IconName {

@@ -14,7 +14,8 @@ export type NotificationType =
   | "POST_LIKED"
   | "POST_COMMENTED"
   | "COMMUNITY_POST"
-  | "REPORT_UPDATE";
+  | "REPORT_UPDATE"
+  | "POST_REMOVED";
 
 export interface NotificationActor {
   userId: string;

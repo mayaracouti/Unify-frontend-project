@@ -74,6 +74,10 @@ describe("resolveNotificationTarget", () => {
 
   it("denúncia, tipo desconhecido ou referência ausente não navegam", () => {
     expect(resolveNotificationTarget({ type: "REPORT_UPDATE", referenceId: "r1" })).toEqual({ kind: "none" });
+    // Post removido pela moderação (semana 07) não abre: buscar daria "indisponível".
+    expect(resolveNotificationTarget({ type: "POST_REMOVED", referenceId: "p1", contextId: "c1" })).toEqual({
+      kind: "none",
+    });
     expect(resolveNotificationTarget({ type: "XYZ", referenceId: "r1" })).toEqual({ kind: "none" });
     expect(resolveNotificationTarget({ type: "NEW_FOLLOWER", referenceId: "  " })).toEqual({ kind: "none" });
   });

@@ -21,6 +21,7 @@ import { buildUserProfileHref } from "./userProfileRoute";
  * | POST_LIKED/COMMENTED    | post                     | comunidade (ou nulo) | comentarios do post (busca o post) |
  * | COMMUNITY_POST          | post                     | comunidade           | /community/[communityId]        |
  * | REPORT_UPDATE           | denuncia                 | —                    | (sem tela propria)              |
+ * | POST_REMOVED            | post removido            | comunidade (ou nulo) | (post nao abre mais)            |
  */
 export type NotificationTarget =
   | { kind: "route"; href: Href }
@@ -38,6 +39,7 @@ const NOTIFICATION_TYPES: readonly NotificationType[] = [
   "POST_COMMENTED",
   "COMMUNITY_POST",
   "REPORT_UPDATE",
+  "POST_REMOVED",
 ];
 
 export function isNotificationType(value: unknown): value is NotificationType {

@@ -34,5 +34,6 @@ describe("notificationFormatting", () => {
   it("toda notificação tem dica dizendo o resultado do toque", () => {
     expect(notificationActionHint("NEW_MESSAGE")).toBe("Abre a conversa");
     expect(notificationActionHint("REPORT_UPDATE")).toBe("Marca esta notificação como lida");
+    expect(notificationActionHint("POST_REMOVED")).toBe("Marca esta notificação como lida");
   });
 });
